@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 菜单栏标签视图
 struct MenuBarLabelView: View {
-    let appState: AppState
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         if !appState.isAPIKeyConfigured {

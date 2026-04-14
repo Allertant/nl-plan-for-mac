@@ -35,13 +35,9 @@ struct NLPlanApp: App {
                 .modelContainer(container)
                 .environment(appState)
         } label: {
-            MenuBarLabelView(appState: appState)
+            MenuBarLabelView()
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environment(appState)
-        }
+        .environment(appState)
     }
 }

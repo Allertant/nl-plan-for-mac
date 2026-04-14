@@ -35,9 +35,6 @@ final class AppState {
     /// 当前显示的页面
     var currentPage: Page = .main
 
-    /// 是否显示设置页
-    var showSettings: Bool = false
-
     /// 是否显示总结页
     var showSummary: Bool = false
 
@@ -52,6 +49,7 @@ final class AppState {
         case main
         case summary
         case history
+        case settings
     }
 
     // MARK: - Init

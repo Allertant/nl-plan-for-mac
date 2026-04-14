@@ -65,7 +65,7 @@ struct PopoverView: View {
                 .foregroundStyle(Color.accentColor)
 
                 Button {
-                    appState.showSettings = true
+                    appState.currentPage = .settings
                 } label: {
                     Label("设置", systemImage: "gear")
                         .font(.system(size: 11))
