@@ -4,6 +4,8 @@ import SwiftData
 @main
 struct NLPlanApp: App {
 
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @State private var appState: AppState
 
     let container: ModelContainer
