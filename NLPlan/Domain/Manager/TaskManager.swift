@@ -1,0 +1,178 @@
+import Foundation
+import SwiftData
+
+/// 任务生命周期管理
+actor TaskManager {
+
+    private let taskRepo: TaskRepository
+    private let thoughtRepo: ThoughtRepository
+    private let sessionLogRepo: SessionLogRepository
+    private let aiService: AIServiceProtocol
+    private let timerEngine: TimerEngine
+
+    init(
+        taskRepo: TaskRepository,
+        thoughtRepo: ThoughtRepository,
+        sessionLogRepo: SessionLogRepository,
+        aiService: AIServiceProtocol,
+        timerEngine: TimerEngine
+    ) {
+        self.taskRepo = taskRepo
+        self.thoughtRepo = thoughtRepo
+        self.sessionLogRepo = sessionLogRepo
+        self.aiService = aiService
+        self.timerEngine = timerEngine
+    }
+
+    // MARK: - 想法池操作
+
+    /// 提交自然语言 → AI 解析 → 进入想法池
+    func submitThought(rawText: String) async throws -> [TaskEntity] {
+        // 1. 保存原始想法
+        let thought = try thoughtRepo.create(rawText: rawText)
+
+        // 2. 获取想法池中已有任务（用于去重）
+        let existingTasks = try taskRepo.fetchAllIdeaPoolTasks()
+        let existingTitles = existingTasks.map { $0.title }
+
+        // 3. 调用 AI 解析
+        let parsedTasks = try await aiService.parseThoughts(
+            input: rawText,
+            existingTaskTitles: existingTitles
+        )
+
+        // 4. 转为 TaskEntity 并保存
+        var createdTasks: [TaskEntity] = []
+        for (index, parsed) in parsedTasks.enumerated() {
+            let task = try taskRepo.create(
+                title: parsed.title,
+                category: parsed.category,
+                estimatedMinutes: parsed.estimatedMinutes,
+                priority: parsed.priority,
+                aiRecommended: parsed.recommended,
+                recommendationReason: parsed.reason,
+                pool: .ideaPool,
+                date: .now
+            )
+            // 设置排序权重
+            var mutableTask = task
+            mutableTask.sortOrder = index
+            try taskRepo.update(mutableTask)
+            createdTasks.append(task)
+        }
+
+        // 5. 标记想法已处理
+        try thoughtRepo.markProcessed(thought)
+
+        return createdTasks
+    }
+
+    /// 从想法池中挑选任务加入必做项
+    func promoteToMustDo(taskId: UUID) async throws {
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+        guard task.pool == TaskPool.ideaPool.rawValue else {
+            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
+        }
+        try taskRepo.moveToMustDo(task)
+    }
+
+    /// 将必做项移回想法池
+    func demoteToIdeaPool(taskId: UUID, markAttempted: Bool = false) async throws {
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+        guard task.pool == TaskPool.mustDo.rawValue else {
+            throw NLPlanError.taskNotInExpectedPool(expected: .mustDo, actual: task.taskPool)
+        }
+
+        // 停止计时（如果正在运行）
+        if task.status == TaskStatus.running.rawValue {
+            _ = await timerEngine.stopTask(taskId)
+            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
+                try sessionLogRepo.endSession(openLog)
+            }
+        }
+
+        try taskRepo.moveToIdeaPool(task, markAttempted: markAttempted)
+    }
+
+    /// 删除想法池中的任务
+    func deleteFromIdeaPool(taskId: UUID) async throws {
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+        guard task.pool == TaskPool.ideaPool.rawValue else {
+            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
+        }
+        try taskRepo.delete(task)
+    }
+
+    // MARK: - 必做项操作
+
+    /// 开始执行任务
+    func startTask(taskId: UUID) async throws {
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+        guard task.pool == TaskPool.mustDo.rawValue else {
+            throw NLPlanError.taskNotInExpectedPool(expected: .mustDo, actual: task.taskPool)
+        }
+        guard task.status != TaskStatus.done.rawValue else { return }
+
+        // 1. TimerEngine 处理切换逻辑
+        let stoppedTasks = await timerEngine.startTask(taskId)
+
+        // 2. 持久化被停止任务的 session（查找并结束已有的 open session）
+        for stopInfo in stoppedTasks {
+            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
+                try sessionLogRepo.endSession(openLog)
+            }
+            if let stoppedTask = try taskRepo.fetchById(stopInfo.taskId) {
+                try taskRepo.updateStatus(stoppedTask, status: .pending)
+            }
+        }
+
+        // 3. 为新任务创建 open session
+        _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
+
+        // 4. 更新任务状态
+        try taskRepo.updateStatus(task, status: .running)
+    }
+
+    /// 标记任务完成
+    func markComplete(taskId: UUID) async throws {
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+
+        // 停止计时
+        if task.status == TaskStatus.running.rawValue {
+            _ = await timerEngine.stopTask(taskId)
+            // 结束已有的 open session
+            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
+                try sessionLogRepo.endSession(openLog)
+            }
+        }
+
+        try taskRepo.markComplete(task)
+    }
+
+    // MARK: - 查询
+
+    /// 获取所有想法池任务
+    func fetchIdeaPool() async throws -> [TaskEntity] {
+        try taskRepo.fetchAllIdeaPoolTasks()
+    }
+
+    /// 获取指定日期的必做项
+    func fetchMustDo(date: Date = .now) async throws -> [TaskEntity] {
+        try taskRepo.fetchTasks(date: date, pool: .mustDo)
+    }
+
+    /// 获取活跃的正在运行的任务
+    func fetchRunningTasks() async throws -> [TaskEntity] {
+        try taskRepo.fetchActiveRunningTasks()
+    }
+}

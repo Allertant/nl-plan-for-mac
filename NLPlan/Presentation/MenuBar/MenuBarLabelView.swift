@@ -1,0 +1,28 @@
+import SwiftUI
+
+/// 菜单栏标签视图
+struct MenuBarLabelView: View {
+    let appState: AppState
+
+    var body: some View {
+        if !appState.isAPIKeyConfigured {
+            Text("请配置 API")
+                .font(.system(size: 12, weight: .medium))
+        } else if appState.isTimerRunning {
+            HStack(spacing: 4) {
+                Image(systemName: "timer")
+                Text("\(appState.timerDisplayText) \(truncateTitle(appState.currentTaskTitle))")
+            }
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
+        } else {
+            Image(systemName: "timer")
+        }
+    }
+
+    private func truncateTitle(_ title: String) -> String {
+        if title.count > 10 {
+            return String(title.prefix(10)) + "…"
+        }
+        return title
+    }
+}
