@@ -114,10 +114,10 @@ final class AppState {
         mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
 
         // 连接回调：提交成功后刷新想法池并展开
-        inputViewModel?.onSubmitSuccess = { [weak self] in
+        inputViewModel?.onSubmitSuccess = { [weak self] taskIds in
             guard let ideaPoolVM = self?.ideaPoolViewModel else { return }
             ideaPoolVM.isExpanded = true
-            await ideaPoolVM.refresh()
+            await ideaPoolVM.refresh(newTaskIds: Set(taskIds))
         }
     }
 }

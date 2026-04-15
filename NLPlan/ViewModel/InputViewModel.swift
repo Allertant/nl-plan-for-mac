@@ -13,8 +13,8 @@ final class InputViewModel {
 
     private let taskManager: TaskManager
 
-    /// 提交成功后的回调（用于通知想法池刷新）
-    var onSubmitSuccess: (() async -> Void)?
+    /// 提交成功后的回调，传入新增任务 ID（用于通知想法池刷新并高亮）
+    var onSubmitSuccess: (([UUID]) async -> Void)?
 
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
@@ -40,9 +40,10 @@ final class InputViewModel {
 
         // 3. 调用 Domain
         do {
-            _ = try await taskManager.submitThought(rawText: trimmed)
+            let createdTasks = try await taskManager.submitThought(rawText: trimmed)
             successMessage = "✅ 解析成功"
-            await onSubmitSuccess?()
+            let taskIds = createdTasks.map { $0.id }
+            await onSubmitSuccess?(taskIds)
         } catch {
             errorMessage = error.localizedDescription
         }

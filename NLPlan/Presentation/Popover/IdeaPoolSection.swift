@@ -48,7 +48,7 @@ struct IdeaPoolSection: View {
                 } else {
                     LazyVStack(spacing: 4) {
                         ForEach(viewModel.tasks, id: \.id) { task in
-                            IdeaPoolTaskRow(task: task) {
+                            IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) {
                                 Task { await viewModel.promoteToMustDo(taskId: task.id) }
                             } onDelete: {
                                 Task { await viewModel.deleteTask(taskId: task.id) }
@@ -68,8 +68,11 @@ struct IdeaPoolSection: View {
 /// 想法池任务卡片
 struct IdeaPoolTaskRow: View {
     let task: TaskEntity
+    var isNew: Bool = false
     let onPromote: () -> Void
     let onDelete: () -> Void
+
+    @State private var flashCount = 0
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -143,7 +146,30 @@ struct IdeaPoolTaskRow: View {
             }
         }
         .padding(8)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor))
         .cornerRadius(6)
+        .onAppear {
+            if isNew {
+                // 闪烁两次
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    flashCount = 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        flashCount = 0
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        flashCount = 1
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        flashCount = 0
+                    }
+                }
+            }
+        }
     }
 }
