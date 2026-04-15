@@ -52,6 +52,7 @@ final class AppState {
         case main
         case summary
         case history
+        case settings
     }
 
     // MARK: - Init

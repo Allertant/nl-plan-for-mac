@@ -38,10 +38,5 @@ struct NLPlanApp: App {
             MenuBarLabelView(appState: appState)
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environment(appState)
-        }
     }
 }
