@@ -34,16 +34,6 @@ struct PopoverView: View {
 
             // 底部操作栏
             HStack(spacing: 16) {
-                Button {
-                    // 聚焦输入框（通过清空 error 来触发）
-                    ideaPoolViewModel.isExpanded = true
-                } label: {
-                    Label("添加想法", systemImage: "plus")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
-
                 Spacer()
 
                 Button {
