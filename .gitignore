@@ -1,3 +1,18 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode / macOS
+.DS_Store
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/
+
+# Environment / secrets
+.env
+
+# Logs
+*.log
 # Xcode
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
@@ -28,6 +43,9 @@ Package.resolved
 
 # VS Code
 .vscode/
+
+# 环境变量（包含真实 API Key，不可提交）
+.env
 
 # Claude / AI
 .claude/

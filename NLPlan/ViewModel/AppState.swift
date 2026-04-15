@@ -69,7 +69,7 @@ final class AppState {
     func makeAIService() -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
-        return ZhipuAIService(apiKey: apiKey, model: model)
+        return DeepSeekAIService(apiKey: apiKey, model: model)
     }
 
     // MARK: - Private

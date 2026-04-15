@@ -2,13 +2,13 @@ import Foundation
 
 // MARK: - API Request
 
-struct ZhipuAPIRequest: Encodable {
+struct DeepSeekAPIRequest: Encodable {
     let model: String
-    let messages: [ZhipuMessage]
+    let messages: [DeepSeekMessage]
     let temperature: Double
     let responseFormat: ResponseFormat?
 
-    struct ZhipuMessage: Encodable {
+    struct DeepSeekMessage: Encodable {
         let role: String
         let content: String
     }
@@ -20,7 +20,7 @@ struct ZhipuAPIRequest: Encodable {
 
 // MARK: - API Response
 
-struct ZhipuAPIResponse: Decodable {
+struct DeepSeekAPIResponse: Decodable {
     let choices: [Choice]
     let usage: Usage?
 

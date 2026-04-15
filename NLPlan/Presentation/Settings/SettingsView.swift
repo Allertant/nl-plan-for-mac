@@ -37,7 +37,7 @@ struct SettingsView: View {
             Form {
                 // API Key
                 Section {
-                    SecureField("智谱 AI API Key", text: $apiKey)
+                    SecureField("DeepSeek API Key", text: $apiKey)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
 

@@ -1,7 +1,12 @@
 import Foundation
 
-/// 智谱 GLM AI 服务实现
-final class ZhipuAIService: AIServiceProtocol {
+/// DeepSeek AI 服务实现
+///
+/// DeepSeek API 兼容 OpenAI 格式：
+/// - 端点：https://api.deepseek.com/chat/completions
+/// - 认证：Bearer Token
+/// - 两种模式：deepseek-chat（普通对话）、deepseek-reasoner（深度推理）
+final class DeepSeekAIService: AIServiceProtocol {
 
     private let apiKey: String
     private let endpoint: URL
@@ -10,16 +15,17 @@ final class ZhipuAIService: AIServiceProtocol {
 
     init(
         apiKey: String,
-        endpoint: URL = URL(string: "https://open.bigmodel.cn/api/paas/v4/chat/completions")!,
-        model: String = "glm-5.1"
+        endpoint: URL = URL(string: "https://api.deepseek.com/chat/completions")!,
+        model: String = "deepseek-chat"
     ) {
         self.apiKey = apiKey
         self.endpoint = endpoint
         self.model = model
 
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 30
+        let timeoutInterval = Self.timeoutInterval(for: model)
+        config.timeoutIntervalForRequest = timeoutInterval
+        config.timeoutIntervalForResource = timeoutInterval + 30
         self.urlSession = URLSession(configuration: config)
     }
 
@@ -101,7 +107,8 @@ final class ZhipuAIService: AIServiceProtocol {
     // MARK: - Private
 
     private func sendRequest(systemPrompt: String, userPrompt: String) async throws -> String {
-        let request = ZhipuAPIRequest(
+        let timeoutInterval = Self.timeoutInterval(for: model)
+        let request = DeepSeekAPIRequest(
             model: model,
             messages: [
                 .init(role: "system", content: systemPrompt),
@@ -129,7 +136,7 @@ final class ZhipuAIService: AIServiceProtocol {
 
                 switch httpResponse.statusCode {
                 case 200..<300:
-                    let apiResponse = try JSONDecoder().decode(ZhipuAPIResponse.self, from: data)
+                    let apiResponse = try JSONDecoder().decode(DeepSeekAPIResponse.self, from: data)
                     guard let content = apiResponse.choices.first?.message.content else {
                         throw NLPlanError.aiResponseParseError
                     }
@@ -142,16 +149,27 @@ final class ZhipuAIService: AIServiceProtocol {
                     let message = String(data: data, encoding: .utf8) ?? "未知错误"
                     throw NLPlanError.aiAPIError(statusCode: httpResponse.statusCode, message: message)
                 }
+            } catch let urlError as URLError where urlError.code == .timedOut {
+                print("⏳ DeepSeek \(model) 第 \(attempt + 1) 次请求超时（\(Int(timeoutInterval))s）")
+                throw NLPlanError.aiRequestTimeout
             } catch let error as NLPlanError {
                 throw error
             } catch {
                 lastError = error
+                print("⚠️ DeepSeek \(model) 第 \(attempt + 1) 次请求失败：\(error.localizedDescription)")
                 if attempt < 2 {
                     try await Task.sleep(for: .seconds(3))
                 }
             }
         }
         throw lastError ?? NLPlanError.aiRequestTimeout
+    }
+
+    private static func timeoutInterval(for model: String) -> TimeInterval {
+        if model == "deepseek-reasoner" {
+            return AppConstants.reasonerTimeoutInterval
+        }
+        return AppConstants.aiTimeoutInterval
     }
 
     private func parseJSON<T: Decodable>(_ jsonString: String, as type: T.Type) throws -> T {
