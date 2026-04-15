@@ -3,6 +3,13 @@ import SwiftUI
 /// 想法池区域
 struct IdeaPoolSection: View {
     @Bindable var viewModel: IdeaPoolViewModel
+    @State private var searchText: String = ""
+
+    private var filteredTasks: [TaskEntity] {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return viewModel.tasks }
+        return viewModel.tasks.filter { $0.title.localizedCaseInsensitiveContains(keyword) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,17 +54,44 @@ struct IdeaPoolSection: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 16)
                 } else {
-                    LazyVStack(spacing: 4) {
-                        ForEach(viewModel.tasks, id: \.id) { task in
-                            IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) {
-                                Task { await viewModel.promoteToMustDo(taskId: task.id) }
-                            } onDelete: {
-                                Task { await viewModel.deleteTask(taskId: task.id) }
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+
+                        TextField("搜索计划名称", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12))
+
+                        Text("\(filteredTasks.count)条")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .cornerRadius(6)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+
+                    if filteredTasks.isEmpty {
+                        Text("未找到匹配的计划")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 16)
+                    } else {
+                        LazyVStack(spacing: 4) {
+                            ForEach(filteredTasks, id: \.id) { task in
+                                IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) {
+                                    Task { await viewModel.promoteToMustDo(taskId: task.id) }
+                                } onDelete: {
+                                    Task { await viewModel.deleteTask(taskId: task.id) }
+                                }
                             }
                         }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
                 }
             }
         }
