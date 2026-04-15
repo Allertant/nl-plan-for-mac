@@ -1,10 +1,35 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import AppKit
 
 /// 全局应用状态
 @Observable
 final class AppState {
+
+    enum AppearanceMode: String, CaseIterable, Identifiable {
+        case system
+        case light
+        case dark
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .system: return "跟随系统"
+            case .light: return "浅色"
+            case .dark: return "深色"
+            }
+        }
+
+        var colorScheme: ColorScheme? {
+            switch self {
+            case .system: return nil
+            case .light: return .light
+            case .dark: return .dark
+            }
+        }
+    }
 
     // MARK: - Dependencies
 
@@ -34,6 +59,9 @@ final class AppState {
 
     /// 当前显示的页面
     var currentPage: Page = .main
+
+    /// 应用外观模式
+    var appearanceMode: AppearanceMode = .system
 
     /// 是否显示设置页
     var showSettings: Bool = false
@@ -66,6 +94,7 @@ final class AppState {
     init(modelContainer: ModelContainer, timerEngine: TimerEngine) {
         self.modelContainer = modelContainer
         self.timerEngine = timerEngine
+        loadAppearanceMode()
         checkAPIKey()
     }
 
@@ -86,6 +115,31 @@ final class AppState {
 
     func refreshAPIKeyStatus() {
         checkAPIKey()
+    }
+
+    func updateAppearanceMode(_ mode: AppearanceMode) {
+        appearanceMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: AppConstants.appearanceModeKey)
+        applyAppearanceMode(mode)
+    }
+
+    private func loadAppearanceMode() {
+        let raw = UserDefaults.standard.string(forKey: AppConstants.appearanceModeKey) ?? AppearanceMode.system.rawValue
+        appearanceMode = AppearanceMode(rawValue: raw) ?? .system
+        applyAppearanceMode(appearanceMode)
+    }
+
+    private func applyAppearanceMode(_ mode: AppearanceMode) {
+        DispatchQueue.main.async {
+            switch mode {
+            case .system:
+                NSApp.appearance = nil
+            case .light:
+                NSApp.appearance = NSAppearance(named: .aqua)
+            case .dark:
+                NSApp.appearance = NSAppearance(named: .darkAqua)
+            }
+        }
     }
 
     // MARK: - ViewModel Initialization

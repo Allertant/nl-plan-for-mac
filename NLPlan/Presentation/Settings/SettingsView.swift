@@ -97,6 +97,27 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .semibold))
                 }
 
+                // 外观模式
+                Section {
+                    Picker(
+                        "外观模式",
+                        selection: Binding(
+                            get: { appState.appearanceMode },
+                            set: { appState.updateAppearanceMode($0) }
+                        )
+                    ) {
+                        ForEach(AppState.AppearanceMode.allCases) { mode in
+                            Text(mode.displayName)
+                                .font(.system(size: 12))
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("外观")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
                 // AI 模型选择
                 Section {
                     Picker("选择模型", selection: $selectedModel) {

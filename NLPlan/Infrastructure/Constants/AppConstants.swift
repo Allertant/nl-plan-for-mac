@@ -26,6 +26,9 @@ enum AppConstants {
     /// 模型选择持久化 key
     static let selectedModelKey = "nlplan_selected_model"
 
+    /// 外观模式持久化 key
+    static let appearanceModeKey = "nlplan_appearance_mode"
+
     /// 默认模型
     static let defaultModel = "deepseek-chat"
 

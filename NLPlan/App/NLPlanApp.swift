@@ -34,6 +34,7 @@ struct NLPlanApp: App {
             MainContentView()
                 .modelContainer(container)
                 .environment(appState)
+                .preferredColorScheme(appState.appearanceMode.colorScheme)
         } label: {
             MenuBarLabelView(appState: appState)
         }
