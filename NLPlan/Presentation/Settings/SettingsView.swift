@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var apiKey: String = ""
+    @State private var savedAPIKey: String = ""
     @State private var allowParallel: Bool = false
     @State private var launchAtLogin: Bool = false
     @State private var isUpdatingLaunchAtLogin: Bool = false
@@ -51,6 +52,7 @@ struct SettingsView: View {
                         }
                         .font(.system(size: 12))
                         .buttonStyle(.borderedProminent)
+                        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || apiKey == savedAPIKey)
 
                         Button(isValidatingAPIKey ? "验证中..." : "验证") {
                             validateAPIKey()
@@ -69,16 +71,6 @@ struct SettingsView: View {
                             Text(validationMessage)
                                 .font(.system(size: 11))
                                 .foregroundStyle(validationMessage.hasPrefix("✅") ? .green : .secondary)
-                        }
-
-                        Spacer()
-
-                        if !apiKey.isEmpty {
-                            Button("清除") {
-                                clearAPIKey()
-                            }
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
                         }
                     }
                 } header: {
@@ -141,18 +133,17 @@ struct SettingsView: View {
     private func loadAPIKey() {
         if let key = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) {
             apiKey = key
+            savedAPIKey = key
         }
     }
 
     private func saveAPIKey() {
         do {
-            if apiKey.isEmpty {
-                try KeychainStore.shared.delete(key: AppConstants.apiKeyKeychainKey)
-            } else {
-                try KeychainStore.shared.save(key: AppConstants.apiKeyKeychainKey, value: apiKey)
-            }
+            try KeychainStore.shared.save(key: AppConstants.apiKeyKeychainKey, value: apiKey)
+            savedAPIKey = apiKey
             appState.refreshAPIKeyStatus()
             showSaveSuccess = true
+            validationMessage = ""
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 showSaveSuccess = false
             }
@@ -192,17 +183,6 @@ struct SettingsView: View {
                     launchAtLogin.toggle()
                 }
             }
-        }
-    }
-
-    private func clearAPIKey() {
-        apiKey = ""
-        validationMessage = ""
-        do {
-            try KeychainStore.shared.delete(key: AppConstants.apiKeyKeychainKey)
-            appState.refreshAPIKeyStatus()
-        } catch {
-            // 静默失败
         }
     }
 
