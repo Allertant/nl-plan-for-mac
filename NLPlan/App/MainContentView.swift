@@ -18,10 +18,11 @@ struct MainContentView: View {
 
             case .history:
                 HistoryContainerView()
-
-            case .settings:
-                SettingsContainerView()
             }
+        }
+        .sheet(isPresented: Bindable(appState).showSettings) {
+            SettingsView()
+                .environment(appState)
         }
         .task {
             guard !didInitialize else { return }
@@ -171,19 +172,5 @@ struct HistoryContainerView: View {
             )
             self.historyVM = HistoryViewModel(dayManager: dayMgr)
         }
-    }
-}
-
-// MARK: - Settings Container
-
-/// Settings 容器视图
-struct SettingsContainerView: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        SettingsView(onClose: {
-            appState.currentPage = .main
-        })
-        .environment(appState)
     }
 }
