@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool = false
     @State private var syncToNotes: Bool = true
     @State private var showSaveSuccess: Bool = false
+    @State private var selectedModel: String = AppConstants.defaultModel
 
     /// 关闭回调
     var onClose: (() -> Void)? = nil
@@ -84,15 +85,18 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .semibold))
                 }
 
-                // AI 服务扩展（预留）
+                // AI 模型选择
                 Section {
-                    HStack {
-                        Text("智谱 GLM-5.1")
-                            .font(.system(size: 12))
-                        Spacer()
-                        Text("当前默认")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                    Picker("选择模型", selection: $selectedModel) {
+                        ForEach(AppConstants.availableModels, id: \.id) { model in
+                            Text("\(model.name) – \(model.description)")
+                                .font(.system(size: 12))
+                                .tag(model.id)
+                        }
+                    }
+                    .font(.system(size: 12))
+                    .onChange(of: selectedModel) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: AppConstants.selectedModelKey)
                     }
                 } header: {
                     Text("AI 模型")
@@ -104,6 +108,7 @@ struct SettingsView: View {
         .frame(width: 360, height: 420)
         .onAppear {
             loadAPIKey()
+            loadSelectedModel()
         }
     }
 
@@ -128,6 +133,10 @@ struct SettingsView: View {
         } catch {
             // 静默失败
         }
+    }
+
+    private func loadSelectedModel() {
+        selectedModel = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
     }
 
     private func clearAPIKey() {

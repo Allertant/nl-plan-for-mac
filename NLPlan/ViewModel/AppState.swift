@@ -68,7 +68,8 @@ final class AppState {
     /// 创建当前配置的 AI Service 实例
     func makeAIService() -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
-        return ZhipuAIService(apiKey: apiKey)
+        let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
+        return ZhipuAIService(apiKey: apiKey, model: model)
     }
 
     // MARK: - Private
