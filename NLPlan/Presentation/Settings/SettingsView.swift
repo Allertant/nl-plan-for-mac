@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 /// 设置页
@@ -6,6 +7,7 @@ struct SettingsView: View {
     @State private var apiKey: String = ""
     @State private var allowParallel: Bool = false
     @State private var launchAtLogin: Bool = false
+    @State private var isUpdatingLaunchAtLogin: Bool = false
     @State private var syncToNotes: Bool = true
     @State private var showSaveSuccess: Bool = false
     @State private var validationMessage: String = ""
@@ -91,7 +93,10 @@ struct SettingsView: View {
 
                     Toggle("开机自启", isOn: $launchAtLogin)
                         .font(.system(size: 12))
-                        .disabled(true) // V1 暂不实现
+                        .disabled(isUpdatingLaunchAtLogin)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            updateLaunchAtLogin(enabled: newValue)
+                        }
 
                     Toggle("同步到备忘录", isOn: $syncToNotes)
                         .font(.system(size: 12))
@@ -125,6 +130,7 @@ struct SettingsView: View {
         .onAppear {
             loadAPIKey()
             loadSelectedModel()
+            loadLaunchAtLoginState()
         }
         .onChange(of: apiKey) { _, _ in
             validationMessage = ""
@@ -157,6 +163,36 @@ struct SettingsView: View {
 
     private func loadSelectedModel() {
         selectedModel = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
+    }
+
+    private func loadLaunchAtLoginState() {
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    private func updateLaunchAtLogin(enabled: Bool) {
+        guard !isUpdatingLaunchAtLogin else { return }
+
+        isUpdatingLaunchAtLogin = true
+
+        Task {
+            do {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try await SMAppService.mainApp.unregister()
+                }
+
+                await MainActor.run {
+                    isUpdatingLaunchAtLogin = false
+                    launchAtLogin = enabled
+                }
+            } catch {
+                await MainActor.run {
+                    isUpdatingLaunchAtLogin = false
+                    launchAtLogin.toggle()
+                }
+            }
+        }
     }
 
     private func clearAPIKey() {
