@@ -111,7 +111,7 @@ actor DayManager {
         let yesterdayStart = Calendar.current.startOfDay(for: yesterday)
 
         // 检查昨天是否已有评分
-        if let existing = try summaryRepo.fetch(date: yesterdayStart) {
+        if try summaryRepo.fetch(date: yesterdayStart) != nil {
             return nil // 已评分
         }
 

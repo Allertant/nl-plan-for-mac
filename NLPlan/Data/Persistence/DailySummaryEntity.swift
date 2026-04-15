@@ -54,6 +54,3 @@ final class DailySummaryEntity {
         self.gradingBasis = gradingBasis
     }
 }
-
-// MARK: - Identifiable
-extension DailySummaryEntity: @retroactive Identifiable {}
