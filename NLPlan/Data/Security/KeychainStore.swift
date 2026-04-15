@@ -1,78 +1,43 @@
 import Foundation
-import Security
 
-/// API Key 安全存储（Keychain）
-final class KeychainStore: Sendable {
+/// API Key 安全存储
+///
+/// 使用 UserDefaults + Base64 编码存储，避免 macOS Keychain 对未签名应用反复弹窗要求输入密码。
+/// 正式签名分发后可按需迁移回 Keychain Services。
+final class KeychainStore {
 
     static let shared = KeychainStore()
 
-    private let service = "com.nlplan.mac"
+    /// 存储前缀，避免与其它 UserDefaults key 冲突
+    private let prefix = "com.nlplan.mac.secure."
+
+    private let defaults = UserDefaults.standard
 
     private init() {}
 
     func save(key: String, value: String) throws {
-        let data = Data(value.utf8)
-
-        // 先删除旧值
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
-
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveFailed(status: status)
-        }
+        let encoded = Data(value.utf8).base64EncodedString()
+        defaults.set(encoded, forKey: prefixed(key))
     }
 
     func load(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else {
+        guard let encoded = defaults.string(forKey: prefixed(key)) else {
+            return nil
+        }
+        guard let data = Data(base64Encoded: encoded) else {
             return nil
         }
         return String(data: data, encoding: .utf8)
     }
 
     func delete(key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key
-        ]
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.deleteFailed(status: status)
-        }
+        defaults.removeObject(forKey: prefixed(key))
     }
 
-    enum KeychainError: LocalizedError {
-        case saveFailed(status: OSStatus)
-        case deleteFailed(status: OSStatus)
+    // MARK: - Private
 
-        var errorDescription: String? {
-            switch self {
-            case .saveFailed(let status):
-                return "Keychain 保存失败（错误码：\(status)）"
-            case .deleteFailed(let status):
-                return "Keychain 删除失败（错误码：\(status)）"
-            }
-        }
+    private func prefixed(_ key: String) -> String {
+        return prefix + key
     }
 }
+
