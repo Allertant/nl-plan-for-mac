@@ -6,8 +6,10 @@ import SwiftData
 final class InputViewModel {
 
     var inputText: String = ""
+    var submittedText: String = ""
     var isProcessing: Bool = false
     var errorMessage: String?
+    var successMessage: String?
 
     private let taskManager: TaskManager
 
@@ -27,19 +29,23 @@ final class InputViewModel {
             return
         }
 
-        // 2. 状态更新
+        // 2. 锁定提交文本
+        submittedText = trimmed
         isProcessing = true
         errorMessage = nil
+        successMessage = nil
 
         // 3. 调用 Domain
         do {
             _ = try await taskManager.submitThought(rawText: trimmed)
-            inputText = ""
+            successMessage = "✅ 解析成功"
         } catch {
             errorMessage = error.localizedDescription
         }
 
         // 4. 恢复状态
+        submittedText = ""
+        inputText = ""
         isProcessing = false
     }
 }
