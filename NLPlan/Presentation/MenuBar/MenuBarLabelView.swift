@@ -6,16 +6,19 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         if !appState.isAPIKeyConfigured {
-            Text("请配置 API")
-                .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 4) {
+                Image(systemName: "sparkle")
+                Text("请配置 API")
+            }
+            .font(.system(size: 12, weight: .medium))
         } else if appState.isTimerRunning {
             HStack(spacing: 4) {
-                Image(systemName: "timer")
+                Image(systemName: "sparkle")
                 Text("\(appState.timerDisplayText) \(truncateTitle(appState.currentTaskTitle))")
             }
             .font(.system(size: 12, weight: .medium, design: .monospaced))
         } else {
-            Image(systemName: "timer")
+            Image(systemName: "sparkle")
         }
     }
 
