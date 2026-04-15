@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool = false
     @State private var syncToNotes: Bool = true
     @State private var showSaveSuccess: Bool = false
+    @State private var validationMessage: String = ""
+    @State private var isValidatingAPIKey: Bool = false
     @State private var selectedModel: String = AppConstants.defaultModel
 
     /// 关闭回调
@@ -48,10 +50,23 @@ struct SettingsView: View {
                         .font(.system(size: 12))
                         .buttonStyle(.borderedProminent)
 
+                        Button(isValidatingAPIKey ? "验证中..." : "验证") {
+                            validateAPIKey()
+                        }
+                        .font(.system(size: 12))
+                        .buttonStyle(.bordered)
+                        .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isValidatingAPIKey)
+
                         if showSaveSuccess {
                             Text("已保存 ✓")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.green)
+                        }
+
+                        if !validationMessage.isEmpty {
+                            Text(validationMessage)
+                                .font(.system(size: 11))
+                                .foregroundStyle(validationMessage.hasPrefix("✅") ? .green : .secondary)
                         }
 
                         Spacer()
@@ -97,6 +112,7 @@ struct SettingsView: View {
                     .font(.system(size: 12))
                     .onChange(of: selectedModel) { _, newValue in
                         UserDefaults.standard.set(newValue, forKey: AppConstants.selectedModelKey)
+                        validationMessage = ""
                     }
                 } header: {
                     Text("AI 模型")
@@ -109,6 +125,10 @@ struct SettingsView: View {
         .onAppear {
             loadAPIKey()
             loadSelectedModel()
+        }
+        .onChange(of: apiKey) { _, _ in
+            validationMessage = ""
+            showSaveSuccess = false
         }
     }
 
@@ -141,11 +161,62 @@ struct SettingsView: View {
 
     private func clearAPIKey() {
         apiKey = ""
+        validationMessage = ""
         do {
             try KeychainStore.shared.delete(key: AppConstants.apiKeyKeychainKey)
             appState.refreshAPIKeyStatus()
         } catch {
             // 静默失败
+        }
+    }
+
+    private func validateAPIKey() {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedKey.isEmpty else {
+            validationMessage = "请输入 API Key"
+            return
+        }
+
+        isValidatingAPIKey = true
+        validationMessage = ""
+
+        Task {
+            let service = DeepSeekAIService(apiKey: trimmedKey, model: selectedModel)
+
+            do {
+                _ = try await service.parseThoughts(
+                    input: "请返回一个简单任务",
+                    existingTaskTitles: []
+                )
+
+                await MainActor.run {
+                    isValidatingAPIKey = false
+                    validationMessage = "✅ API Key 有效"
+                }
+            } catch let error as NLPlanError {
+                await MainActor.run {
+                    isValidatingAPIKey = false
+                    switch error {
+                    case .aiAPIError(let statusCode, _):
+                        if statusCode == 401 {
+                            validationMessage = "❌ API Key 无效"
+                        } else if statusCode == 429 {
+                            validationMessage = "⚠️ 请求频率超限，请稍后再试"
+                        } else {
+                            validationMessage = "❌ 验证失败：HTTP \(statusCode)"
+                        }
+                    case .aiRequestTimeout:
+                        validationMessage = "⚠️ 验证超时，请稍后重试"
+                    default:
+                        validationMessage = "❌ 验证失败"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isValidatingAPIKey = false
+                    validationMessage = "❌ 验证失败"
+                }
+            }
         }
     }
 }
