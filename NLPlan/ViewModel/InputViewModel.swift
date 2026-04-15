@@ -13,6 +13,9 @@ final class InputViewModel {
 
     private let taskManager: TaskManager
 
+    /// 提交成功后的回调（用于通知想法池刷新）
+    var onSubmitSuccess: (() async -> Void)?
+
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
     }
@@ -39,6 +42,7 @@ final class InputViewModel {
         do {
             _ = try await taskManager.submitThought(rawText: trimmed)
             successMessage = "✅ 解析成功"
+            await onSubmitSuccess?()
         } catch {
             errorMessage = error.localizedDescription
         }
