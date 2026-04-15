@@ -15,7 +15,7 @@ final class SessionLogEntity {
     /// 计算当前仍在进行中的 session 的实时已用秒数
     @Transient
     var liveElapsedSeconds: Int {
-        if let endedAt {
+        if endedAt != nil {
             return durationSeconds
         } else {
             return durationSeconds + Int(Date.now.timeIntervalSince(startedAt))

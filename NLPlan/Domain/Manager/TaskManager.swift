@@ -55,9 +55,8 @@ actor TaskManager {
                 date: .now
             )
             // 设置排序权重
-            var mutableTask = task
-            mutableTask.sortOrder = index
-            try taskRepo.update(mutableTask)
+            task.sortOrder = index
+            try taskRepo.update(task)
             createdTasks.append(task)
         }
 
