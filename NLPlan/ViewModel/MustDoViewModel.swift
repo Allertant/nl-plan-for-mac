@@ -8,6 +8,9 @@ final class MustDoViewModel {
     var tasks: [TaskEntity] = []
     var errorMessage: String?
 
+    /// 移回想法池后的回调（用于通知想法池刷新）
+    var onDemotedToIdeaPool: (() async -> Void)?
+
     private let taskManager: TaskManager
 
     init(taskManager: TaskManager) {
@@ -48,6 +51,7 @@ final class MustDoViewModel {
         do {
             try await taskManager.demoteToIdeaPool(taskId: taskId)
             await refresh()
+            await onDemotedToIdeaPool?()
         } catch {
             errorMessage = error.localizedDescription
         }

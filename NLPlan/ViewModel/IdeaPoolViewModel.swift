@@ -10,6 +10,9 @@ final class IdeaPoolViewModel {
     var errorMessage: String?
     var newlyAddedTaskIds: Set<UUID> = []
 
+    /// 提升到必做项后的回调（用于通知必做项刷新）
+    var onPromotedToMustDo: (() async -> Void)?
+
     private let taskManager: TaskManager
 
     init(taskManager: TaskManager) {
@@ -38,6 +41,7 @@ final class IdeaPoolViewModel {
         do {
             try await taskManager.promoteToMustDo(taskId: taskId)
             await refresh()
+            await onPromotedToMustDo?()
         } catch {
             errorMessage = error.localizedDescription
         }

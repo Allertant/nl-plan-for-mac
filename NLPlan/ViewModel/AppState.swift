@@ -119,5 +119,15 @@ final class AppState {
             ideaPoolVM.isExpanded = true
             await ideaPoolVM.refresh(newTaskIds: Set(taskIds))
         }
+
+        // 连接回调：想法池提升到必做项后刷新必做项
+        ideaPoolViewModel?.onPromotedToMustDo = { [weak self] in
+            await self?.mustDoViewModel?.refresh()
+        }
+
+        // 连接回调：必做项移回想法池后刷新想法池
+        mustDoViewModel?.onDemotedToIdeaPool = { [weak self] in
+            await self?.ideaPoolViewModel?.refresh()
+        }
     }
 }
