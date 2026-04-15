@@ -41,6 +41,12 @@ final class AppState {
     /// 是否显示总结页
     var showSummary: Bool = false
 
+    // MARK: - ViewModels (全局持有，避免面板关闭后重建丢失状态)
+
+    var inputViewModel: InputViewModel?
+    var ideaPoolViewModel: IdeaPoolViewModel?
+    var mustDoViewModel: MustDoViewModel?
+
     // MARK: - API Key
 
     /// API Key 是否已配置
@@ -80,5 +86,31 @@ final class AppState {
 
     func refreshAPIKeyStatus() {
         checkAPIKey()
+    }
+
+    // MARK: - ViewModel Initialization
+
+    /// 确保 ViewModel 已初始化（幂等）
+    @MainActor
+    func ensureViewModelsInitialized() {
+        guard inputViewModel == nil else { return }
+
+        let context = modelContainer.mainContext
+        let taskRepo = TaskRepository(modelContext: context)
+        let thoughtRepo = ThoughtRepository(modelContext: context)
+        let sessionLogRepo = SessionLogRepository(modelContext: context)
+        let aiService = makeAIService()
+
+        let taskMgr = TaskManager(
+            taskRepo: taskRepo,
+            thoughtRepo: thoughtRepo,
+            sessionLogRepo: sessionLogRepo,
+            aiService: aiService,
+            timerEngine: timerEngine
+        )
+
+        inputViewModel = InputViewModel(taskManager: taskMgr)
+        ideaPoolViewModel = IdeaPoolViewModel(taskManager: taskMgr)
+        mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
     }
 }

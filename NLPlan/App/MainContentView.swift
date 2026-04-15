@@ -56,17 +56,15 @@ struct MainContentView: View {
 
 // MARK: - Popover Container
 
-/// Popover 容器视图，持有 ViewModel 实例
+/// Popover 容器视图，从 AppState 获取 ViewModel 实例
 struct PopoverContainerView: View {
     @Environment(AppState.self) private var appState
 
-    @State private var inputVM: InputViewModel?
-    @State private var ideaPoolVM: IdeaPoolViewModel?
-    @State private var mustDoVM: MustDoViewModel?
-
     var body: some View {
         Group {
-            if let inputVM, let ideaPoolVM, let mustDoVM {
+            if let inputVM = appState.inputViewModel,
+               let ideaPoolVM = appState.ideaPoolViewModel,
+               let mustDoVM = appState.mustDoViewModel {
                 PopoverView(
                     inputViewModel: inputVM,
                     ideaPoolViewModel: ideaPoolVM,
@@ -79,23 +77,7 @@ struct PopoverContainerView: View {
             }
         }
         .task {
-            let context = appState.modelContainer.mainContext
-            let taskRepo = TaskRepository(modelContext: context)
-            let thoughtRepo = ThoughtRepository(modelContext: context)
-            let sessionLogRepo = SessionLogRepository(modelContext: context)
-            let aiService = appState.makeAIService()
-
-            let taskMgr = TaskManager(
-                taskRepo: taskRepo,
-                thoughtRepo: thoughtRepo,
-                sessionLogRepo: sessionLogRepo,
-                aiService: aiService,
-                timerEngine: appState.timerEngine
-            )
-
-            self.inputVM = InputViewModel(taskManager: taskMgr)
-            self.ideaPoolVM = IdeaPoolViewModel(taskManager: taskMgr)
-            self.mustDoVM = MustDoViewModel(taskManager: taskMgr)
+            appState.ensureViewModelsInitialized()
         }
     }
 }
