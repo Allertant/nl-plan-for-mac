@@ -39,9 +39,11 @@ struct SettingsView: View {
 
             Divider()
 
-            Form {
-                // API Key
-                Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AI 服务配置")
+                    .font(.system(size: 12, weight: .semibold))
+
+                VStack(alignment: .leading, spacing: 8) {
                     SecureField("DeepSeek API Key", text: $apiKey)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
@@ -73,13 +75,15 @@ struct SettingsView: View {
                                 .foregroundStyle(validationMessage.hasPrefix("✅") ? .green : .secondary)
                         }
                     }
-                } header: {
-                    Text("AI 服务配置")
-                        .font(.system(size: 12, weight: .semibold))
                 }
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                .cornerRadius(8)
 
-                // 功能开关
-                Section {
+                Text("功能设置")
+                    .font(.system(size: 12, weight: .semibold))
+
+                VStack(alignment: .leading, spacing: 8) {
                     Toggle("允许并行计时", isOn: $allowParallel)
                         .font(.system(size: 12))
 
@@ -92,54 +96,50 @@ struct SettingsView: View {
 
                     Toggle("同步到备忘录", isOn: $syncToNotes)
                         .font(.system(size: 12))
-                } header: {
-                    Text("功能设置")
-                        .font(.system(size: 12, weight: .semibold))
+                }
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                .cornerRadius(8)
+
+                Text("外观")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Picker(
+                    "外观模式",
+                    selection: Binding(
+                        get: { appState.appearanceMode },
+                        set: { appState.updateAppearanceMode($0) }
+                    )
+                ) {
+                    ForEach(AppState.AppearanceMode.allCases) { mode in
+                        Text(mode.displayName)
+                            .font(.system(size: 12))
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text("AI 模型")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Picker("选择模型", selection: $selectedModel) {
+                    ForEach(AppConstants.availableModels, id: \.id) { model in
+                        Text("\(model.name) – \(model.description)")
+                            .font(.system(size: 12))
+                            .tag(model.id)
+                    }
+                }
+                .font(.system(size: 12))
+                .onChange(of: selectedModel) { _, newValue in
+                    UserDefaults.standard.set(newValue, forKey: AppConstants.selectedModelKey)
+                    validationMessage = ""
                 }
 
-                // 外观模式
-                Section {
-                    Picker(
-                        "外观模式",
-                        selection: Binding(
-                            get: { appState.appearanceMode },
-                            set: { appState.updateAppearanceMode($0) }
-                        )
-                    ) {
-                        ForEach(AppState.AppearanceMode.allCases) { mode in
-                            Text(mode.displayName)
-                                .font(.system(size: 12))
-                                .tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("外观")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-
-                // AI 模型选择
-                Section {
-                    Picker("选择模型", selection: $selectedModel) {
-                        ForEach(AppConstants.availableModels, id: \.id) { model in
-                            Text("\(model.name) – \(model.description)")
-                                .font(.system(size: 12))
-                                .tag(model.id)
-                        }
-                    }
-                    .font(.system(size: 12))
-                    .onChange(of: selectedModel) { _, newValue in
-                        UserDefaults.standard.set(newValue, forKey: AppConstants.selectedModelKey)
-                        validationMessage = ""
-                    }
-                } header: {
-                    Text("AI 模型")
-                        .font(.system(size: 12, weight: .semibold))
-                }
+                Spacer(minLength: 0)
             }
-            .formStyle(.grouped)
+            .padding(12)
         }
-        .frame(width: 360, height: 420)
+        .frame(width: 360, height: 520)
         .onAppear {
             loadAPIKey()
             loadSelectedModel()
