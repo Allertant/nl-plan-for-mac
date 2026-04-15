@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 主面板容器
 struct PopoverView: View {
@@ -28,7 +29,9 @@ struct PopoverView: View {
                     MustDoSection(viewModel: mustDoViewModel, timerEngine: timerEngine)
                 }
                 .padding(12)
+                .background(ScrollViewScrollerHider())
             }
+            .scrollIndicators(.hidden)
 
             Divider()
 
@@ -72,6 +75,22 @@ struct PopoverView: View {
                 await ideaPoolViewModel.refresh()
                 await mustDoViewModel.refresh()
             }
+        }
+    }
+}
+
+/// 强制隐藏外层面板滚动条，避免滚动条显隐导致布局抖动
+private struct ScrollViewScrollerHider: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let scrollView = nsView.enclosingScrollView else { return }
+            scrollView.hasVerticalScroller = false
+            scrollView.autohidesScrollers = true
+            scrollView.scrollerStyle = .overlay
         }
     }
 }

@@ -31,6 +31,7 @@ struct IdeaPoolSection: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -60,6 +61,7 @@ struct IdeaPoolSection: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
         .cornerRadius(8)
     }
@@ -143,6 +145,7 @@ struct IdeaPoolTaskRow: View {
             }
         }
         .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor))
         .cornerRadius(6)
         .onAppear {
