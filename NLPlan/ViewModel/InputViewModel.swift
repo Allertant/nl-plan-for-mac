@@ -92,4 +92,24 @@ final class InputViewModel {
         submittedText = ""
         inputText = ""
     }
+
+    /// 编辑解析结果中的某个任务
+    func updateParsedTask(at index: Int, title: String, category: String, estimatedMinutes: Int) {
+        guard var tasks = pendingParsedTasks, index >= 0, index < tasks.count else { return }
+        tasks[index].title = title
+        tasks[index].category = category
+        tasks[index].estimatedMinutes = estimatedMinutes
+        pendingParsedTasks = tasks
+    }
+
+    /// 删除解析结果中的某个任务
+    func removeParsedTask(at index: Int) {
+        guard var tasks = pendingParsedTasks, index >= 0, index < tasks.count else { return }
+        tasks.remove(at: index)
+        if tasks.isEmpty {
+            cancelConfirmation()
+        } else {
+            pendingParsedTasks = tasks
+        }
+    }
 }

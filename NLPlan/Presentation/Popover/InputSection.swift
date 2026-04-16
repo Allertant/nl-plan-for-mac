@@ -61,6 +61,12 @@ struct InputSection: View {
                     },
                     onCancel: {
                         viewModel.cancelConfirmation()
+                    },
+                    onEdit: { index, title, category, minutes in
+                        viewModel.updateParsedTask(at: index, title: title, category: category, estimatedMinutes: minutes)
+                    },
+                    onDelete: { index in
+                        viewModel.removeParsedTask(at: index)
                     }
                 )
             }
@@ -90,15 +96,19 @@ struct InputSection: View {
     }
 }
 
+// MARK: - 确认卡片
+
 /// AI 解析结果确认卡片
 private struct ParsedTaskConfirmation: View {
     let originalInput: String
     let parsedTasks: [ParsedTask]
     let onConfirm: () -> Void
     let onCancel: () -> Void
+    let onEdit: (_ index: Int, _ title: String, _ category: String, _ minutes: Int) -> Void
+    let onDelete: (_ index: Int) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             // 用户原始输入
             VStack(alignment: .leading, spacing: 4) {
                 Label("你的输入", systemImage: "text.bubble")
@@ -114,17 +124,23 @@ private struct ParsedTaskConfirmation: View {
             .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
             .cornerRadius(6)
 
-            Divider().padding(.horizontal, -2)
+            Divider()
 
             // 解析结果列表
-            VStack(alignment: .leading, spacing: 4) {
-                Text("AI 解析结果（\(parsedTasks.count) 个任务）")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+            Text("AI 解析结果（\(parsedTasks.count) 个任务）")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
 
-                ForEach(parsedTasks) { task in
-                    ParsedTaskRow(task: task)
-                }
+            ForEach(Array(parsedTasks.enumerated()), id: \.element.id) { index, task in
+                ParsedTaskRow(
+                    task: task,
+                    onEdit: { title, category, minutes in
+                        onEdit(index, title, category, minutes)
+                    },
+                    onDelete: {
+                        onDelete(index)
+                    }
+                )
             }
 
             // 操作按钮
@@ -161,28 +177,80 @@ private struct ParsedTaskConfirmation: View {
     }
 }
 
-/// 单个解析任务行
+// MARK: - 单个任务行
+
+/// 单个解析任务行（含编辑/删除）
 private struct ParsedTaskRow: View {
     let task: ParsedTask
+    let onEdit: (_ title: String, _ category: String, _ minutes: Int) -> Void
+    let onDelete: () -> Void
+
+    @State private var isEditing = false
+    @State private var editTitle: String = ""
+    @State private var editCategory: String = ""
+    @State private var editMinutes: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            // 第一行：标题 + 预估时间
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 4) {
+            if isEditing {
+                editBody
+            } else {
+                viewBody
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .textBackgroundColor))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 查看态
+
+    private var viewBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // 第一行：标题 + 操作按钮
+            HStack(alignment: .top) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                 Spacer()
-                Text("\(task.estimatedMinutes)分钟")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+
+                // 编辑/删除按钮
+                HStack(spacing: 4) {
+                    Button {
+                        editTitle = task.title
+                        editCategory = task.category
+                        editMinutes = String(task.estimatedMinutes)
+                        isEditing = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("编辑")
+
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red.opacity(0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .help("删除")
+                }
             }
 
-            // 第二行：分类 + 优先级
+            // 第二行：分类 + 预估时长 + 推荐
             HStack(spacing: 8) {
                 Label(task.category, systemImage: "folder")
-                Label(task.priority.displayName + "优先级", systemImage: task.priority.iconName)
-                    .foregroundStyle(priorityColor(task.priority))
+                Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
                 if task.recommended {
                     Label("AI 推荐", systemImage: "star.fill")
                         .foregroundStyle(.yellow)
@@ -191,7 +259,7 @@ private struct ParsedTaskRow: View {
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
 
-            // 第三行：AI 推荐理由
+            // 第三行：推荐理由
             if !task.reason.isEmpty {
                 Text(task.reason)
                     .font(.system(size: 10))
@@ -200,17 +268,46 @@ private struct ParsedTaskRow: View {
                     .padding(.leading, 2)
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.4))
-        .cornerRadius(4)
     }
 
-    private func priorityColor(_ priority: TaskPriority) -> Color {
-        switch priority {
-        case .high: return .red
-        case .medium: return .orange
-        case .low: return .blue
+    // MARK: - 编辑态
+
+    private var editBody: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("任务名称", text: $editTitle)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+
+            HStack(spacing: 8) {
+                TextField("分类", text: $editCategory)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .frame(width: 80)
+
+                TextField("时长(分钟)", text: $editMinutes)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .frame(width: 70)
+            }
+
+            HStack {
+                Button("取消") {
+                    isEditing = false
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 10))
+
+                Spacer()
+
+                Button("保存") {
+                    let minutes = Int(editMinutes) ?? task.estimatedMinutes
+                    onEdit(editTitle, editCategory, minutes)
+                    isEditing = false
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 10, weight: .medium))
+                .disabled(editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
         }
     }
 }

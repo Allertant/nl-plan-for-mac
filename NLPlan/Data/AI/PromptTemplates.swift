@@ -8,15 +8,15 @@ enum PromptTemplates {
     static func parseThought(input: String, existingTaskTitles: [String]) -> String {
         var prompt = """
         你是一个任务管理助手。用户会用自然语言描述今天的想法和计划。
-        请将用户的输入拆解为结构化的任务列表。
+        请将用户的输入整理为结构化的任务列表。
 
         要求：
         1. 每个任务必须是可执行、可完成的具体行动
-        2. 任务粒度控制在 15-90 分钟
+        2. 将内容相近的细碎事项合并为一个任务，保持每个任务有足够的体量（30-120 分钟）
         3. 为每个任务预估合理时长（分钟）
-        4. 判断优先级（high/medium/low）并说明理由
-        5. 推荐其中最应该今天完成的任务（recommended = true）
-        6. 为每个任务分类（工作/生活/学习/健康/其他）
+        4. 推荐其中最应该今天完成的任务（recommended = true）
+        5. 为每个任务分类（工作/生活/学习/健康/其他）
+        6. 生成 1-3 个任务即可，不要过度拆分
 
         输出严格的 JSON 格式：
         {
@@ -25,7 +25,6 @@ enum PromptTemplates {
               "title": "任务名称",
               "category": "分类",
               "estimated_minutes": 60,
-              "priority": "high",
               "recommended": true,
               "reason": "推荐理由"
             }

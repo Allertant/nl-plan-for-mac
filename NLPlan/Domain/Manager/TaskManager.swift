@@ -46,7 +46,6 @@ actor TaskManager {
                 title: parsed.title,
                 category: parsed.category,
                 estimatedMinutes: parsed.estimatedMinutes,
-                priority: parsed.priority,
                 aiRecommended: parsed.recommended,
                 recommendationReason: parsed.reason,
                 pool: .ideaPool,

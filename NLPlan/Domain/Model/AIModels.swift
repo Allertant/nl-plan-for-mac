@@ -3,10 +3,9 @@ import Foundation
 /// AI 解析后的任务模型（DTO，非持久化）
 struct ParsedTask: Sendable, Identifiable {
     let id = UUID()
-    let title: String
-    let category: String
-    let estimatedMinutes: Int
-    let priority: TaskPriority
+    var title: String
+    var category: String
+    var estimatedMinutes: Int
     let recommended: Bool
     let reason: String
 }

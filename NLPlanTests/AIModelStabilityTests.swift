@@ -171,10 +171,6 @@ struct AIModelStabilityTests {
                 for task in results {
                     #expect(!task.title.isEmpty, "\(modelConfig.name) 返回了空标题的任务")
                     #expect(task.estimatedMinutes > 0, "\(modelConfig.name) 返回了预估时间为0的任务: \(task.title)")
-                    #expect(
-                        TaskPriority(rawValue: task.priority.rawValue) != nil,
-                        "\(modelConfig.name) 返回了无效优先级: \(task.priority.rawValue)"
-                    )
                 }
 
                 print("  ✅ \(modelConfig.name): 返回 \(results.count) 个任务")
@@ -207,10 +203,6 @@ struct AIModelStabilityTests {
             #expect(!task.category.isEmpty, "任务[\(index)] 分类为空: \(task.title)")
             #expect(task.estimatedMinutes > 0, "任务[\(index)] 预估时间 ≤ 0: \(task.title)")
             #expect(!task.reason.isEmpty, "任务[\(index)] 理由为空: \(task.title)")
-            #expect(
-                ["high", "medium", "low"].contains(task.priority.rawValue),
-                "任务[\(index)] 优先级无效: \(task.priority.rawValue)"
-            )
         }
 
         print("✅ parseThoughts 数据结构完整性: \(results.count) 个任务")

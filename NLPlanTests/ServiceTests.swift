@@ -11,8 +11,8 @@ struct MockAIServiceTests {
     func testParseThoughtsSuccess() async throws {
         let mockService = MockAIService(
             mockParsedTasks: [
-                ParsedTask(title: "写文档", category: "工作", estimatedMinutes: 60, priority: .high, recommended: true, reason: "紧急"),
-                ParsedTask(title: "跑步", category: "生活", estimatedMinutes: 30, priority: .medium, recommended: false, reason: "不紧急")
+                ParsedTask(title: "写文档", category: "工作", estimatedMinutes: 60, recommended: true, reason: "紧急"),
+                ParsedTask(title: "跑步", category: "生活", estimatedMinutes: 30, recommended: false, reason: "不紧急")
             ]
         )
 
@@ -168,14 +168,12 @@ struct ParsedTaskTests {
             title: "写文档",
             category: "工作",
             estimatedMinutes: 60,
-            priority: .high,
             recommended: true,
             reason: "紧急"
         )
         #expect(task.title == "写文档")
         #expect(task.category == "工作")
         #expect(task.estimatedMinutes == 60)
-        #expect(task.priority == .high)
         #expect(task.recommended == true)
     }
 }

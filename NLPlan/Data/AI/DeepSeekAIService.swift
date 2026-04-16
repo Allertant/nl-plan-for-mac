@@ -47,7 +47,6 @@ final class DeepSeekAIService: AIServiceProtocol {
                 title: dto.title,
                 category: dto.category,
                 estimatedMinutes: dto.estimatedMinutes,
-                priority: TaskPriority(rawValue: dto.priority) ?? .medium,
                 recommended: dto.recommended,
                 reason: dto.reason
             )
