@@ -33,15 +33,9 @@ swift build
 
 | 权限 | 用途 | 触发时机 |
 |------|------|----------|
-| **钥匙串（Keychain）** | 安全存储 AI API Key | 首次保存或读取 API Key 时 |
+| **UserDefaults + Base64** | 存储 AI API Key | 首次保存或读取 API Key 时 |
 
-应用使用 macOS 钥匙串来安全存储你的 API Key，首次访问时会弹出系统授权弹窗：
-
-> "NL Plan" 想要使用你存储在钥匙串的"com.nlplan.mac"中的机密信息
-
-这是正常的安全机制。点击 **"始终允许"** 后不会再重复弹出。
-
-> **注意**：在开发阶段通过 `swift build` 构建的未签名二进制文件，每次重新编译后可能再次触发此弹窗。正式签名打包后不会出现此问题。
+应用使用 UserDefaults + Base64 编码存储 API Key，避免未签名应用触发 Keychain 反复弹窗。正式签名分发后可按需迁移回 Keychain Services。
 
 ## 配置
 
@@ -54,7 +48,7 @@ swift build
 - **UI**：SwiftUI + MenuBarExtra
 - **数据持久化**：SwiftData
 - **AI 服务**：DeepSeek（通过 AIServiceProtocol 抽象，可扩展）
-- **安全存储**：Keychain Services
+- **安全存储**：UserDefaults + Base64 编码
 
 ## License
 

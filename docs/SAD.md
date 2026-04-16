@@ -51,7 +51,7 @@
 | 可扩展性 | AI 服务层必须可替换，数据层与 UI 解耦 |
 | 离线优先 | 本地计时、本地存储不依赖网络，仅 AI 解析需要联网 |
 | 响应性 | UI 不阻塞，AI 调用异步执行，队列处理不阻塞输入 |
-| 数据安全 | API Key 入 Keychain，数据全部本地持久化 |
+| 数据安全 | API Key 入 UserDefaults + Base64，数据全部本地持久化 |
 
 ### 2.2 架构约束
 
@@ -111,6 +111,8 @@
 │                  (Persistence)                                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐                  │
 │  │ SwiftData    │  │ KeychainStore│  │ AppleNotesSync   │                  │
+│  │ Repository   │  │ (UserDefaults│  │ (AppleScript)    │                  │
+│  │              │  │  + Base64)   │  │                  │                  │
 │  │ Repository   │  │ (API Key)    │  │ (AppleScript)    │                  │
 │  └──────────────┘  └──────────────┘  └──────────────────┘                  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -206,7 +208,7 @@ NLPlan/
 │   ├── Sync/
 │   │   └── AppleNotesService.swift     # 备忘录同步（AppleScript）
 │   └── Security/
-│       └── KeychainStore.swift         # API Key 安全存储
+│       └── KeychainStore.swift         # API Key 存储（UserDefaults + Base64 编码）
 │
 ├── Infrastructure/               # 基础设施
 │   ├── Extensions/
@@ -440,7 +442,7 @@ struct GradeStats: Sendable {
 /// 兼容 OpenAI 格式
 final class DeepSeekAIService: AIServiceProtocol {
 
-    private let apiKey: String         // 从 Keychain 读取
+    private let apiKey: String         // 从 UserDefaults + Base64 读取
     private let endpoint: URL          // https://api.deepseek.com/chat/completions
     private let urlSession: URLSession
     private let model: String          // "deepseek-chat" / "deepseek-reasoner"
@@ -1058,7 +1060,7 @@ View (显示错误提示)
 
 | 项目 | 方案 |
 |------|------|
-| API Key 存储 | `KeychainStore` 封装，使用 macOS Keychain Services |
+| API Key 存储 | `KeychainStore` 封装，使用 UserDefaults + Base64 编码（避免未签名应用 Keychain 弹窗） |
 | 网络传输 | HTTPS (TLS 1.2+)，URLSession 默认行为 |
 | 本地数据 | SwiftData 默认存储在 Application Support，受 macOS 沙盒保护 |
 | 敏感日志 | Release 构建不输出 API Key 和用户输入内容 |
@@ -1154,7 +1156,7 @@ V1 不引入任何第三方依赖。
 | HTTP 请求 | URLSession（系统原生） |
 | JSON 解析 | Foundation Codable |
 | 数据库 | SwiftData（系统原生） |
-| Keychain | Security framework（系统原生） |
+| Keychain | UserDefaults + Base64 编码（当前方案） |
 | 定时器 | Foundation Timer |
 | AppleScript | Process / NSAppleScript |
 
@@ -1180,7 +1182,7 @@ V1 不引入任何第三方依赖。
     │
     └── 运行时：
          ├── 本地：SwiftData 数据库（~/Library/Application Support/NLPlan/）
-         ├── Keychain：API Key
+         ├── UserDefaults + Base64：API Key
          └── 网络：HTTPS → DeepSeek API
 ```
 

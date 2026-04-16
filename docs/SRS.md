@@ -339,7 +339,7 @@ NL Plan 是一款独立的 macOS 桌面应用，以菜单栏工具（Menu Bar Ex
 | 编号 | 需求 | 优先级 |
 |------|------|--------|
 | FR-CONFIG-001 | 设置页提供 API Key 输入框，用于配置 DeepSeek 认证信息 | P0 |
-| FR-CONFIG-002 | API Key 存储于 macOS Keychain | P0 |
+| FR-CONFIG-002 | API Key 存储于 UserDefaults + Base64 编码（避免未签名应用 Keychain 弹窗） | P0 |
 | FR-CONFIG-003 | 未配置 API Key 时，菜单栏显示"请配置 API" | P0 |
 | FR-CONFIG-004 | 设置页支持 AI 模型切换（DeepSeek Chat / DeepSeek Reasoner） | P0 |
 | FR-CONFIG-005 | 设置页支持外观模式切换（跟随系统 / 浅色 / 深色） | P0 |
@@ -412,7 +412,7 @@ NL Plan 是一款独立的 macOS 桌面应用，以菜单栏工具（Menu Bar Ex
 
 #### 4.1.8 设置页
 
-- API Key 输入框（DeepSeek，必填，存储于 Keychain）
+- API Key 输入框（DeepSeek，必填，存储于 UserDefaults + Base64 编码）
 - AI 模型选择（DeepSeek Chat / DeepSeek Reasoner）
 - 外观模式（跟随系统 / 浅色 / 深色）
 - 并行任务开关
@@ -474,7 +474,7 @@ NL Plan 是一款独立的 macOS 桌面应用，以菜单栏工具（Menu Bar Ex
 
 | 编号 | 需求 |
 |------|------|
-| NFR-SEC-001 | AI API Key 存储在 macOS Keychain 中 |
+| NFR-SEC-001 | AI API Key 通过 Base64 编码存储在 UserDefaults 中 |
 | NFR-SEC-002 | 所有 AI 调用使用 HTTPS 加密传输 |
 | NFR-SEC-003 | 用户数据仅存储在本地，不上传至任何第三方服务器（AI API 调用除外） |
 
@@ -505,7 +505,7 @@ NL Plan 是一款独立的 macOS 桌面应用，以菜单栏工具（Menu Bar Ex
 |------|------|
 | 协议 | HTTPS POST |
 | 地址 | https://api.deepseek.com/chat/completions |
-| 认证 | API Key（Bearer Token，存储于 Keychain） |
+| 认证 | API Key（Bearer Token，存储于 UserDefaults + Base64 编码） |
 | 超时 | deepseek-chat 30 秒，deepseek-reasoner 更长 |
 | 重试 | 失败后最多重试 2 次，间隔 3 秒 |
 | 模型 | deepseek-chat / deepseek-reasoner |

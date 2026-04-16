@@ -353,7 +353,7 @@
 
 ### 6.6 设置页
 
-- **API Key 配置**：DeepSeek API Key 输入框（必填，存储于 Keychain）
+- **API Key 配置**：DeepSeek API Key 输入框（必填，存储于 UserDefaults + Base64 编码）
 - **AI 模型选择**：DeepSeek Chat / DeepSeek Reasoner
 - **外观模式**：跟随系统 / 浅色 / 深色
 - 并行任务开关
