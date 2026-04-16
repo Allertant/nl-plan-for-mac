@@ -34,6 +34,19 @@ actor TaskManager {
         )
     }
 
+    /// 根据用户指令修改已解析的任务（供确认流程使用）
+    func refineParsedTasks(
+        originalInput: String,
+        currentTasks: [ParsedTask],
+        userInstruction: String
+    ) async throws -> [ParsedTask] {
+        try await aiService.refineTasks(
+            originalInput: originalInput,
+            currentTasks: currentTasks,
+            userInstruction: userInstruction
+        )
+    }
+
     /// 将已解析的任务保存到想法池（供确认流程使用）
     func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [TaskEntity] {
         // 1. 保存原始想法

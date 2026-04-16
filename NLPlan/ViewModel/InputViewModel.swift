@@ -14,6 +14,11 @@ final class InputViewModel {
     /// AI 解析结果，待用户确认
     var pendingParsedTasks: [ParsedTask]?
 
+    /// 对话输入
+    var chatInput: String = ""
+    /// 是否正在处理对话修改
+    var isChatProcessing: Bool = false
+
     /// 原始输入文本（确认时用于传递）
     private var pendingRawText: String = ""
 
@@ -111,5 +116,27 @@ final class InputViewModel {
         } else {
             pendingParsedTasks = tasks
         }
+    }
+
+    /// 与 AI 对话修改解析结果
+    func sendModification() async {
+        let instruction = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !instruction.isEmpty, let currentTasks = pendingParsedTasks else { return }
+
+        isChatProcessing = true
+        chatInput = ""
+        errorMessage = nil
+
+        do {
+            pendingParsedTasks = try await taskManager.refineParsedTasks(
+                originalInput: pendingRawText,
+                currentTasks: currentTasks,
+                userInstruction: instruction
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isChatProcessing = false
     }
 }

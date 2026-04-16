@@ -56,6 +56,8 @@ struct InputSection: View {
                 ParsedTaskConfirmation(
                     originalInput: viewModel.submittedText,
                     parsedTasks: parsedTasks,
+                    chatInput: $viewModel.chatInput,
+                    isChatProcessing: viewModel.isChatProcessing,
                     onConfirm: {
                         Task { await viewModel.confirm() }
                     },
@@ -67,6 +69,9 @@ struct InputSection: View {
                     },
                     onDelete: { index in
                         viewModel.removeParsedTask(at: index)
+                    },
+                    onSendChat: {
+                        Task { await viewModel.sendModification() }
                     }
                 )
             }
@@ -102,10 +107,13 @@ struct InputSection: View {
 private struct ParsedTaskConfirmation: View {
     let originalInput: String
     let parsedTasks: [ParsedTask]
+    @Binding var chatInput: String
+    let isChatProcessing: Bool
     let onConfirm: () -> Void
     let onCancel: () -> Void
     let onEdit: (_ index: Int, _ title: String, _ category: String, _ minutes: Int) -> Void
     let onDelete: (_ index: Int) -> Void
+    let onSendChat: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -134,6 +142,7 @@ private struct ParsedTaskConfirmation: View {
             ForEach(Array(parsedTasks.enumerated()), id: \.element.id) { index, task in
                 ParsedTaskRow(
                     task: task,
+                    isLocked: isChatProcessing,
                     onEdit: { title, category, minutes in
                         onEdit(index, title, category, minutes)
                     },
@@ -142,6 +151,34 @@ private struct ParsedTaskConfirmation: View {
                     }
                 )
             }
+
+            // AI 对话输入区
+            HStack(alignment: .top) {
+                TextField("告诉 AI 你想怎么调整...", text: $chatInput, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...3)
+                    .font(.system(size: 12))
+                    .onSubmit {
+                        Task { onSendChat() }
+                    }
+
+                Button {
+                    onSendChat()
+                } label: {
+                    if isChatProcessing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(isChatProcessing || chatInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(8)
+            .background(Color(nsColor: .textBackgroundColor))
+            .cornerRadius(6)
 
             // 操作按钮
             HStack {
@@ -182,6 +219,7 @@ private struct ParsedTaskConfirmation: View {
 /// 单个解析任务行（含编辑/删除）
 private struct ParsedTaskRow: View {
     let task: ParsedTask
+    var isLocked: Bool = false
     let onEdit: (_ title: String, _ category: String, _ minutes: Int) -> Void
     let onDelete: () -> Void
 
@@ -235,6 +273,7 @@ private struct ParsedTaskRow: View {
                     }
                     .buttonStyle(.plain)
                     .help("编辑")
+                    .disabled(isLocked)
 
                     if showDeleteConfirm {
                         Button {
@@ -245,6 +284,7 @@ private struct ParsedTaskRow: View {
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
+                        .disabled(isLocked)
 
                         Button {
                             onDelete()
@@ -254,6 +294,7 @@ private struct ParsedTaskRow: View {
                                 .foregroundStyle(.red)
                         }
                         .buttonStyle(.plain)
+                        .disabled(isLocked)
                     } else {
                         Button {
                             showDeleteConfirm = true
@@ -264,6 +305,7 @@ private struct ParsedTaskRow: View {
                         }
                         .buttonStyle(.plain)
                         .help("删除")
+                        .disabled(isLocked)
                     }
                 }
             }

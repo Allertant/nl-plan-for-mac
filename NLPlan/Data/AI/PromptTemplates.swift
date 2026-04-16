@@ -41,6 +41,49 @@ enum PromptTemplates {
         return prompt
     }
 
+    // MARK: - 修改解析结果
+
+    static func refineParsedTasks(
+        originalInput: String,
+        currentTasks: [ParsedTask],
+        userInstruction: String
+    ) -> String {
+        let taskList = currentTasks.enumerated().map { i, t in
+            "\(i + 1). 「\(t.title)」(\(t.category)，\(t.estimatedMinutes)分钟)\(t.recommended ? " [推荐]" : "")\(t.reason.isEmpty ? "" : " —— \(t.reason)")"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个任务管理助手。用户之前输入了一段想法，你将其解析为了任务列表。现在用户希望调整结果。
+
+        用户原始输入：
+        \(originalInput)
+
+        当前任务列表：
+        \(taskList)
+
+        用户的修改要求：
+        \(userInstruction)
+
+        请根据用户的修改要求，调整任务列表（可以增删改），输出严格的 JSON 格式：
+        {
+          "tasks": [
+            {
+              "title": "任务名称",
+              "category": "分类",
+              "estimated_minutes": 60,
+              "recommended": true,
+              "reason": "推荐理由"
+            }
+          ]
+        }
+
+        要求：
+        1. 只输出修改后的完整任务列表
+        2. 生成 1-3 个任务，不要过度拆分
+        3. 每个任务 30-120 分钟
+        """
+    }
+
     // MARK: - 日终评分
 
     static func dailyGrade(input: DailySummaryInput) -> String {

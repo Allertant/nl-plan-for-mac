@@ -16,6 +16,13 @@ struct MockAIService: AIServiceProtocol {
         return mockParsedTasks
     }
 
+    func refineTasks(originalInput: String, currentTasks: [ParsedTask], userInstruction: String) async throws -> [ParsedTask] {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return currentTasks
+    }
+
     func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade {
         if shouldFail {
             throw NLPlanError.aiServiceUnavailable

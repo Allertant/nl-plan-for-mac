@@ -53,6 +53,30 @@ final class DeepSeekAIService: AIServiceProtocol {
         }
     }
 
+    func refineTasks(
+        originalInput: String,
+        currentTasks: [ParsedTask],
+        userInstruction: String
+    ) async throws -> [ParsedTask] {
+        let prompt = PromptTemplates.refineParsedTasks(
+            originalInput: originalInput,
+            currentTasks: currentTasks,
+            userInstruction: userInstruction
+        )
+        let responseContent = try await sendRequest(systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。", userPrompt: prompt)
+        let parsedResponse = try parseJSON(responseContent, as: ParsedTasksResponse.self)
+
+        return parsedResponse.tasks.map { dto in
+            ParsedTask(
+                title: dto.title,
+                category: dto.category,
+                estimatedMinutes: dto.estimatedMinutes,
+                recommended: dto.recommended,
+                reason: dto.reason
+            )
+        }
+    }
+
     func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade {
         let prompt = PromptTemplates.dailyGrade(input: summaryInput)
         let responseContent = try await sendRequest(systemPrompt: "你是一个效率教练，只输出 JSON 格式。", userPrompt: prompt)

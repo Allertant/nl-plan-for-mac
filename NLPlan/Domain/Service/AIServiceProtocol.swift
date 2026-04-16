@@ -12,6 +12,13 @@ protocol AIServiceProtocol: Sendable {
         existingTaskTitles: [String]
     ) async throws -> [ParsedTask]
 
+    /// 根据用户修改指令调整已解析的任务
+    func refineTasks(
+        originalInput: String,
+        currentTasks: [ParsedTask],
+        userInstruction: String
+    ) async throws -> [ParsedTask]
+
     /// 日终评分
     /// - Parameter summaryInput: 当日任务完成数据
     /// - Returns: 评分结果
