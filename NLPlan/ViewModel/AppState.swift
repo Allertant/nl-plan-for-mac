@@ -82,11 +82,28 @@ final class AppState {
 
     // MARK: - Enums
 
-    enum Page {
+    enum Page: Equatable {
         case main
         case summary
         case history
         case settings
+        case queueDetail(UUID)
+
+        static func == (lhs: Page, rhs: Page) -> Bool {
+            switch (lhs, rhs) {
+            case (.main, .main), (.summary, .summary), (.history, .history), (.settings, .settings):
+                return true
+            case (.queueDetail(let a), .queueDetail(let b)):
+                return a == b
+            default:
+                return false
+            }
+        }
+
+        var queueItemID: UUID? {
+            if case .queueDetail(let id) = self { return id }
+            return nil
+        }
     }
 
     // MARK: - Init

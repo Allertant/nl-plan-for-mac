@@ -34,6 +34,11 @@ struct PopoverView: View {
                         // 输入区
                         InputSection(viewModel: inputViewModel)
 
+                        // 解析队列
+                        ParseQueueSection(viewModel: inputViewModel) { queueItemID in
+                            appState.currentPage = .queueDetail(queueItemID)
+                        }
+
                         // 想法池
                         IdeaPoolSection(viewModel: ideaPoolViewModel)
 

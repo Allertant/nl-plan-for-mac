@@ -1,29 +1,22 @@
 import Foundation
 import SwiftData
 
-/// 输入区 ViewModel
+/// 输入区 ViewModel（队列模式）
 @Observable
 final class InputViewModel {
 
     var inputText: String = ""
-    var submittedText: String = ""
-    var isProcessing: Bool = false
     var errorMessage: String?
     var successMessage: String?
 
-    /// AI 解析结果，待用户确认
-    var pendingParsedTasks: [ParsedTask]?
+    /// 解析队列
+    var queueItems: [ParseQueueItem] = []
 
-    /// AI 对话调整成功提示
-    var chatSuccessMessage: String?
+    /// 当前正在查看详情的队列项 ID
+    var activeDetailItemID: UUID?
 
-    /// 对话输入
+    /// 对话输入（详情页用）
     var chatInput: String = ""
-    /// 是否正在处理对话修改
-    var isChatProcessing: Bool = false
-
-    /// 原始输入文本（确认时用于传递）
-    private var pendingRawText: String = ""
 
     private let taskManager: TaskManager
 
@@ -34,9 +27,10 @@ final class InputViewModel {
         self.taskManager = taskManager
     }
 
-    /// 提交输入 → AI 解析 → 等待用户确认
+    // MARK: - 提交
+
+    /// 提交输入 → 入队 → 触发串行处理
     func submit() async {
-        // 1. 验证
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             errorMessage = "请输入内容后再提交"
@@ -47,101 +41,138 @@ final class InputViewModel {
             return
         }
 
-        // 2. 锁定提交文本
-        submittedText = trimmed
-        pendingRawText = trimmed
-        isProcessing = true
+        // 入队并清空输入框
+        let item = ParseQueueItem(rawText: trimmed)
+        queueItems.append(item)
+        inputText = ""
         errorMessage = nil
-        successMessage = nil
-        pendingParsedTasks = nil
 
-        // 3. 仅调用 AI 解析，不保存任务
+        // 触发串行处理
+        await processNextInQueue()
+    }
+
+    // MARK: - 串行处理
+
+    /// 串行处理队列中下一个 waiting 项
+    private func processNextInQueue() async {
+        // 已有正在处理的项则跳过
+        guard !queueItems.contains(where: { $0.status == .processing }) else { return }
+
+        // 取第一个 waiting 项
+        guard let item = queueItems.first(where: { $0.status == .waiting }) else { return }
+
+        item.status = .processing
+
         do {
             let existingTasks = try await taskManager.fetchIdeaPool()
             let existingTitles = existingTasks.map { $0.title }
             let parsedTasks = try await taskManager.parseThoughts(
-                rawText: trimmed,
+                rawText: item.rawText,
                 existingTaskTitles: existingTitles
             )
-            pendingParsedTasks = parsedTasks
+            item.parsedTasks = parsedTasks
+            item.status = .completed
         } catch {
-            errorMessage = error.localizedDescription
+            item.errorMessage = error.localizedDescription
+            item.status = .failed
         }
 
-        isProcessing = false
+        // 递归处理下一个
+        await processNextInQueue()
     }
 
-    /// 用户确认 → 将解析结果保存到想法池
-    func confirm() async {
-        guard let parsedTasks = pendingParsedTasks else { return }
+    // MARK: - 队列操作
+
+    /// 确认队列项 → 保存到想法池 → 移除
+    func confirmQueueItem(id: UUID) async {
+        guard let index = queueItems.firstIndex(where: { $0.id == id }) else { return }
+        let item = queueItems[index]
+        guard let parsedTasks = item.parsedTasks else { return }
 
         do {
             let createdTasks = try await taskManager.saveParsedTasks(
                 parsedTasks: parsedTasks,
-                rawText: pendingRawText
+                rawText: item.rawText
             )
             successMessage = "✅ 已添加到想法池"
             let taskIds = createdTasks.map { $0.id }
             await onSubmitSuccess?(taskIds)
+            queueItems.remove(at: index)
         } catch {
-            errorMessage = error.localizedDescription
-            return
-        }
-
-        // 恢复状态
-        pendingParsedTasks = nil
-        submittedText = ""
-        inputText = ""
-    }
-
-    /// 用户取消 → 放弃解析结果，恢复输入状态
-    func cancelConfirmation() {
-        pendingParsedTasks = nil
-        submittedText = ""
-        inputText = ""
-    }
-
-    /// 编辑解析结果中的某个任务
-    func updateParsedTask(at index: Int, title: String, category: String, estimatedMinutes: Int) {
-        guard var tasks = pendingParsedTasks, index >= 0, index < tasks.count else { return }
-        tasks[index].title = title
-        tasks[index].category = category
-        tasks[index].estimatedMinutes = estimatedMinutes
-        pendingParsedTasks = tasks
-    }
-
-    /// 删除解析结果中的某个任务
-    func removeParsedTask(at index: Int) {
-        guard var tasks = pendingParsedTasks, index >= 0, index < tasks.count else { return }
-        tasks.remove(at: index)
-        if tasks.isEmpty {
-            cancelConfirmation()
-        } else {
-            pendingParsedTasks = tasks
+            item.errorMessage = error.localizedDescription
         }
     }
 
-    /// 与 AI 对话修改解析结果
-    func sendModification() async {
+    /// 取消队列项 → 移除
+    func cancelQueueItem(id: UUID) {
+        guard let index = queueItems.firstIndex(where: { $0.id == id }) else { return }
+        let item = queueItems[index]
+        // 处理中的不能取消，等它完成后再移除
+        guard item.status != .processing else { return }
+        queueItems.remove(at: index)
+    }
+
+    /// 重试失败的队列项
+    func retryQueueItem(id: UUID) async {
+        guard let item = queueItems.first(where: { $0.id == id }) else { return }
+        guard item.status == .failed else { return }
+        item.status = .waiting
+        item.errorMessage = nil
+        await processNextInQueue()
+    }
+
+    // MARK: - 详情页操作
+
+    /// 编辑队列项中的某个任务
+    func updateParsedTask(queueItemID: UUID, taskIndex: Int, title: String, category: String, estimatedMinutes: Int) {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }),
+              var tasks = item.parsedTasks,
+              taskIndex >= 0, taskIndex < tasks.count else { return }
+        tasks[taskIndex].title = title
+        tasks[taskIndex].category = category
+        tasks[taskIndex].estimatedMinutes = estimatedMinutes
+        item.parsedTasks = tasks
+    }
+
+    /// 删除队列项中的某个任务
+    func removeParsedTask(queueItemID: UUID, taskIndex: Int) {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }),
+              var tasks = item.parsedTasks,
+              taskIndex >= 0, taskIndex < tasks.count else { return }
+        tasks.remove(at: taskIndex)
+        item.parsedTasks = tasks
+    }
+
+    /// 与 AI 对话修改队列项的解析结果
+    func sendModification(queueItemID: UUID) async {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }),
+              let currentTasks = item.parsedTasks else { return }
+
         let instruction = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !instruction.isEmpty, let currentTasks = pendingParsedTasks else { return }
+        guard !instruction.isEmpty else { return }
 
-        isChatProcessing = true
+        // 锁定编辑状态
+        activeDetailItemID = item.id
         chatInput = ""
         errorMessage = nil
-        chatSuccessMessage = nil
 
         do {
-            pendingParsedTasks = try await taskManager.refineParsedTasks(
-                originalInput: pendingRawText,
+            let newTasks = try await taskManager.refineParsedTasks(
+                originalInput: item.rawText,
                 currentTasks: currentTasks,
                 userInstruction: instruction
             )
-            chatSuccessMessage = "✅ 已调整"
+            item.parsedTasks = newTasks
+            successMessage = "✅ 已调整"
         } catch {
             errorMessage = error.localizedDescription
         }
 
-        isChatProcessing = false
+        activeDetailItemID = nil
+    }
+
+    /// 判断指定队列项是否正在 AI 调整中
+    func isItemChatProcessing(id: UUID) -> Bool {
+        activeDetailItemID == id
     }
 }
