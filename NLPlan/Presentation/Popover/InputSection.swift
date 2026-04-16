@@ -121,7 +121,7 @@ private struct ParsedTaskConfirmation: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(8)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+            .background(Color(nsColor: .textBackgroundColor))
             .cornerRadius(6)
 
             Divider()
@@ -168,11 +168,11 @@ private struct ParsedTaskConfirmation: View {
             .padding(.top, 2)
         }
         .padding(10)
-        .background(Color.accentColor.opacity(0.06))
+        .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
         )
     }
 }
