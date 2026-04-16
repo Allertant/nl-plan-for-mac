@@ -26,22 +26,20 @@ actor TaskManager {
 
     // MARK: - 想法池操作
 
-    /// 提交自然语言 → AI 解析 → 进入想法池
-    func submitThought(rawText: String) async throws -> [TaskEntity] {
+    /// 仅调用 AI 解析，不保存（供确认流程使用）
+    func parseThoughts(rawText: String, existingTaskTitles: [String]) async throws -> [ParsedTask] {
+        try await aiService.parseThoughts(
+            input: rawText,
+            existingTaskTitles: existingTaskTitles
+        )
+    }
+
+    /// 将已解析的任务保存到想法池（供确认流程使用）
+    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [TaskEntity] {
         // 1. 保存原始想法
         let thought = try thoughtRepo.create(rawText: rawText)
 
-        // 2. 获取想法池中已有任务（用于去重）
-        let existingTasks = try taskRepo.fetchAllIdeaPoolTasks()
-        let existingTitles = existingTasks.map { $0.title }
-
-        // 3. 调用 AI 解析
-        let parsedTasks = try await aiService.parseThoughts(
-            input: rawText,
-            existingTaskTitles: existingTitles
-        )
-
-        // 4. 转为 TaskEntity 并保存
+        // 2. 转为 TaskEntity 并保存
         var createdTasks: [TaskEntity] = []
         for (index, parsed) in parsedTasks.enumerated() {
             let task = try taskRepo.create(
@@ -54,16 +52,23 @@ actor TaskManager {
                 pool: .ideaPool,
                 date: .now
             )
-            // 设置排序权重
             task.sortOrder = index
             try taskRepo.update(task)
             createdTasks.append(task)
         }
 
-        // 5. 标记想法已处理
+        // 3. 标记想法已处理
         try thoughtRepo.markProcessed(thought)
 
         return createdTasks
+    }
+
+    /// 提交自然语言 → AI 解析 → 进入想法池（一步到位）
+    func submitThought(rawText: String) async throws -> [TaskEntity] {
+        let existingTasks = try taskRepo.fetchAllIdeaPoolTasks()
+        let existingTitles = existingTasks.map { $0.title }
+        let parsedTasks = try await parseThoughts(rawText: rawText, existingTaskTitles: existingTitles)
+        return try await saveParsedTasks(parsedTasks: parsedTasks, rawText: rawText)
     }
 
     /// 从想法池中挑选任务加入必做项
