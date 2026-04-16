@@ -2,8 +2,8 @@
 
 > **文档编号**：NLPLAN-SAD-001  
 > **产品名称**：NL Plan（暂定）  
-> **文档版本**：v0.1  
-> **日期**：2026-04-14  
+> **文档版本**：v0.2  
+> **日期**：2026-04-16  
 > **作者**：架构团队  
 > **状态**：草案
 
@@ -14,6 +14,7 @@
 | 版本 | 日期 | 修改人 | 修改内容 |
 |------|------|--------|----------|
 | v0.1 | 2026-04-14 | — | 初稿 |
+| v0.2 | 2026-04-16 | — | 更新 AI 服务为 DeepSeek；更新文件结构；新增解析队列架构；更新数据流；移除 Combine 引用；更新接口签名 |
 
 ---
 
@@ -25,8 +26,8 @@
 
 ### 1.2 参考资料
 
-- [NL Plan PRD v0.1](./PRD.md)
-- [NL Plan SRS v0.1](./SRS.md)
+- [NL Plan PRD v0.2](./PRD.md)
+- [NL Plan SRS v0.2](./SRS.md)
 
 ### 1.3 术语
 
@@ -36,6 +37,7 @@
 | Popover | 点击菜单栏图标弹出的面板 |
 | Session | 一次任务计时的起止记录 |
 | Pool | 任务池（想法池 / 必做项） |
+| Parse Queue | 解析队列，用户输入的串行处理列表 |
 
 ---
 
@@ -48,7 +50,7 @@
 | 简洁性 | 自用工具，避免过度设计，优先可维护性 |
 | 可扩展性 | AI 服务层必须可替换，数据层与 UI 解耦 |
 | 离线优先 | 本地计时、本地存储不依赖网络，仅 AI 解析需要联网 |
-| 响应性 | UI 不阻塞，AI 调用异步执行 |
+| 响应性 | UI 不阻塞，AI 调用异步执行，队列处理不阻塞输入 |
 | 数据安全 | API Key 入 Keychain，数据全部本地持久化 |
 
 ### 2.2 架构约束
@@ -60,6 +62,7 @@
 | UI 框架 | SwiftUI（Menu Bar Extra + Popover） |
 | 数据持久化 | SwiftData（macOS 14+ 原生方案） |
 | 并发模型 | Swift Structured Concurrency (async/await, Actor) |
+| 状态管理 | @Observable（不使用 Combine） |
 | 分发 | Xcode 直接构建，不上架 App Store |
 
 ---
@@ -69,44 +72,48 @@
 ### 3.1 分层架构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Presentation Layer                      │
-│                    (SwiftUI Views)                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │MenuBarView│  │PopoverView│  │SummaryView│  │HistoryView│  │SettingsView│  │
-│  └─────┬────┘  └─────┬────┘  └─────┬────┘  └─────┬────┘  └─────┬────┘   │
-│        └──────────┬──┴──────────┬──┘              │         │
-│                   ▼             ▼                 ▼         │
-│              ┌─────────────────────────────────────────┐    │
-│              │            ViewModel Layer               │    │
-│              │   (ObservableObject / @Observable)       │    │
-│              └────────────────┬────────────────────────┘    │
-└───────────────────────────────┼─────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         Presentation Layer                                 │
+│                       (SwiftUI Views)                                      │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐  │
+│  │MenuBarView│ │PopoverView│ │SummaryView│ │HistoryView│ │SettingsView│  │
+│  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘  │
+│        └──────────┬──┴──────────┬──┘              │              │         │
+│                   ▼             ▼                 ▼              │         │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐ │
+│  │ParseQueueSection│ │ QueueDetailView │ │     MainContentView         │ │
+│  └─────────────────┘ └─────────────────┘ │  (Page 路由容器)             │ │
+│                                           └─────────────────────────────┘ │
+│              ┌─────────────────────────────────────────┐                   │
+│              │            ViewModel Layer               │                   │
+│              │         (@Observable classes)            │                   │
+│              └────────────────┬────────────────────────┘                   │
+└───────────────────────────────┼─────────────────────────────────────────────┘
                                 │
-┌───────────────────────────────┼─────────────────────────────┐
-│                      Domain Layer                            │
-│                   (Business Logic)                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ TaskManager  │  │ TimerEngine  │  │   DayManager    │  │
-│  │  (Actor)     │  │  (Actor)     │  │                  │  │
-│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
-│         │                 │                    │             │
-│         └──────────┬──────┘                    │             │
-│                    ▼                           ▼             │
-│           ┌────────────────────────────────────────┐        │
-│           │           AIServiceProtocol             │        │
-│           │        (AI 服务抽象接口)                  │        │
-│           └────────────────┬───────────────────────┘        │
-└────────────────────────────┼────────────────────────────────┘
+┌───────────────────────────────┼─────────────────────────────────────────────┐
+│                      Domain Layer                                            │
+│                   (Business Logic)                                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐                  │
+│  │ TaskManager  │  │ TimerEngine  │  │   DayManager    │                  │
+│  │  (Actor)     │  │  (Actor)     │  │                  │                  │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘                  │
+│         │                 │                    │                             │
+│         └──────────┬──────┘                    │                             │
+│                    ▼                           ▼                             │
+│           ┌────────────────────────────────────────┐                        │
+│           │           AIServiceProtocol             │                        │
+│           │        (AI 服务抽象接口)                  │                        │
+│           └────────────────┬───────────────────────┘                        │
+└────────────────────────────┼────────────────────────────────────────────────┘
                              │
-┌────────────────────────────┼────────────────────────────────┐
-│                    Data Layer                                 │
-│                  (Persistence)                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ SwiftData    │  │ KeychainStore│  │ AppleNotesSync   │  │
-│  │ Repository   │  │ (API Key)    │  │ (AppleScript)    │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────┼────────────────────────────────────────────────┐
+│                    Data Layer                                                 │
+│                  (Persistence)                                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐                  │
+│  │ SwiftData    │  │ KeychainStore│  │ AppleNotesSync   │                  │
+│  │ Repository   │  │ (API Key)    │  │ (AppleScript)    │                  │
+│  └──────────────┘  └──────────────┘  └──────────────────┘                  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.2 架构风格
@@ -119,7 +126,7 @@
 - **Data Layer**：数据持久化、外部服务调用
 
 **关键原则**：
-1. **单向数据流**：ViewModel → Domain → Data，数据变更通过 Combine/回调通知 UI
+1. **单向数据流**：ViewModel → Domain → Data，数据变更通过回调通知 UI
 2. **依赖倒置**：Domain Layer 通过 Protocol 依赖 Data Layer，不直接依赖具体实现
 3. **Actor 隔离**：计时器和任务管理器用 Actor 封装，避免数据竞争
 
@@ -133,31 +140,35 @@
 NLPlan/
 ├── App/                          # 应用入口
 │   ├── NLPlanApp.swift           # @main 入口，MenuBarExtra 配置
-│   └── AppDelegate.swift         # 生命周期管理
+│   ├── AppDelegate.swift         # 生命周期管理（右键菜单）
+│   └── MainContentView.swift     # 页面路由容器（AppState.Page 驱动）
 │
 ├── Presentation/                 # 表现层 — SwiftUI Views
 │   ├── MenuBar/
-│   │   └── MenuBarView.swift     # 菜单栏常驻视图
+│   │   └── MenuBarLabelView.swift     # 菜单栏常驻视图
 │   ├── Popover/
-│   │   ├── PopoverView.swift     # 主面板容器
-│   │   ├── InputSection.swift    # 输入区
-│   │   ├── IdeaPoolSection.swift # 想法池区域
-│   │   └── MustDoSection.swift   # 必做项列表
+│   │   ├── PopoverView.swift          # 主面板容器
+│   │   ├── InputSection.swift         # 输入区（含 ParsedTaskRow 组件）
+│   │   ├── ParseQueueSection.swift    # 解析队列列表
+│   │   ├── IdeaPoolSection.swift      # 想法池区域
+│   │   └── MustDoSection.swift        # 必做项列表
+│   ├── QueueDetail/
+│   │   └── QueueDetailView.swift      # 队列项详情页（全屏确认）
 │   ├── Summary/
-│   │   └── SummaryView.swift     # 日终总结页
+│   │   └── SummaryView.swift          # 日终总结页
 │   ├── History/
-│   │   └── HistoryView.swift     # 历史日历视图（日历格，每格显示日期+评分）
+│   │   └── HistoryView.swift          # 历史日历视图
 │   └── Settings/
-│       └── SettingsView.swift    # 设置页
+│       └── SettingsView.swift         # 设置页（API Key、模型、外观）
 │
 ├── ViewModel/                    # 视图模型层
-│   ├── AppViewModel.swift        # 全局状态管理
-│   ├── InputViewModel.swift      # 输入区状态
+│   ├── AppState.swift            # 全局状态（Page 路由、ViewModel 工厂）
+│   ├── InputViewModel.swift      # 输入区 + 解析队列管理
 │   ├── IdeaPoolViewModel.swift   # 想法池状态
 │   ├── MustDoViewModel.swift     # 必做项状态
-│   ├── TimerViewModel.swift      # 计时器显示状态
 │   ├── SummaryViewModel.swift    # 总结页状态
-│   └── HistoryViewModel.swift    # 历史日历视图状态
+│   ├── HistoryViewModel.swift    # 历史视图状态
+│   └── TimerViewModel.swift      # 计时器显示状态
 │
 ├── Domain/                       # 领域层 — 核心业务逻辑
 │   ├── Manager/
@@ -165,49 +176,46 @@ NLPlan/
 │   │   ├── TimerEngine.swift     # 计时引擎（Actor）
 │   │   └── DayManager.swift      # 每日管理（评分、日切换）
 │   ├── Model/
-│   │   ├── Thought.swift         # 想法输入实体
-│   │   ├── Task.swift            # 任务实体（含状态机）
-│   │   ├── SessionLog.swift      # 计时记录实体
-│   │   └── DailySummary.swift    # 日终总结实体
+│   │   ├── AIModels.swift        # ParsedTask、DailyGrade 等 DTO
+│   │   ├── ParseQueueItem.swift  # 解析队列项（@Observable）
+│   │   └── DayStats.swift        # 每日统计数据
 │   ├── Enum/
 │   │   ├── TaskPool.swift        # 想法池 / 必做项
 │   │   ├── TaskStatus.swift      # pending/running/paused/done
-│   │   └── Grade.swift           # S/A/B/C/D
+│   │   ├── TaskPriority.swift    # high/medium/low（预留）
+│   │   ├── Grade.swift           # S/A/B/C/D
+│   │   └── NLPlanError.swift     # 错误域定义
 │   └── Service/
-│       ├── AIServiceProtocol.swift      # AI 服务抽象协议
-│       ├── AIRequest.swift              # 请求模型
-│       └── AIResponse.swift             # 响应模型
+│       └── AIServiceProtocol.swift      # AI 服务抽象协议
 │
 ├── Data/                         # 数据层 — 持久化与外部服务
 │   ├── Persistence/
-│   │   ├── SwiftDataContainer.swift     # SwiftData ModelContainer 配置
+│   │   ├── TaskEntity.swift            # 任务 SwiftData 实体
+│   │   ├── ThoughtEntity.swift         # 想法 SwiftData 实体
+│   │   ├── SessionLogEntity.swift      # 计时记录 SwiftData 实体
+│   │   ├── DailySummaryEntity.swift    # 日终总结 SwiftData 实体
 │   │   └── Repository/
-│   │       ├── ThoughtRepository.swift  # 想法数据操作
-│   │       ├── TaskRepository.swift     # 任务数据操作
+│   │       ├── TaskRepository.swift
+│   │       ├── ThoughtRepository.swift
 │   │       ├── SessionLogRepository.swift
 │   │       └── SummaryRepository.swift
 │   ├── AI/
-│   │   ├── ZhipuAIService.swift         # 智谱 GLM-5.1 实现
-│   │   ├── ZhipuAPIModels.swift         # API 请求/响应 DTO
-│   │   └── PromptTemplates.swift        # Prompt 模板管理
+│   │   ├── DeepSeekAIService.swift     # DeepSeek API 实现
+│   │   ├── DeepSeekAPIModels.swift     # API 请求/响应 DTO
+│   │   └── PromptTemplates.swift       # Prompt 模板管理
 │   ├── Sync/
-│   │   └── AppleNotesService.swift      # 备忘录同步（AppleScript）
+│   │   └── AppleNotesService.swift     # 备忘录同步（AppleScript）
 │   └── Security/
-│       └── KeychainStore.swift          # API Key 安全存储
+│       └── KeychainStore.swift         # API Key 安全存储
 │
 ├── Infrastructure/               # 基础设施
-│   ├── Network/
-│   │   └── NetworkMonitor.swift         # 网络状态监控
 │   ├── Extensions/
-│   │   ├── Date+Extension.swift
-│   │   ├── String+Extension.swift
-│   │   └── Color+Extension.swift
+│   │   └── Date+Extension.swift        # Date/Int 扩展
 │   └── Constants/
-│       └── AppConstants.swift           # 全局常量
+│       └── AppConstants.swift          # 全局常量
 │
 └── Resources/                    # 资源文件
-    ├── Assets.xcassets
-    └── Localizable.strings        # 多语言（预留）
+    └── Assets.xcassets
 ```
 
 ---
@@ -220,36 +228,43 @@ NLPlan/
 
 ```swift
 actor TaskManager {
-    
+
     // MARK: - 想法池操作
-    
-    /// 提交自然语言 → AI 解析 → 进入想法池
-    func submitThought(rawText: String) async throws -> [Task]
-    
+
+    /// 仅调用 AI 解析，不保存（供确认流程使用）
+    func parseThoughts(rawText: String, existingTaskTitles: [String]) async throws -> [ParsedTask]
+
+    /// 根据用户指令修改已解析的任务（供确认流程使用）
+    func refineParsedTasks(originalInput: String, currentTasks: [ParsedTask], userInstruction: String) async throws -> [ParsedTask]
+
+    /// 将已解析的任务保存到想法池（供确认流程使用）
+    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [TaskEntity]
+
+    /// 提交自然语言 → AI 解析 → 进入想法池（一步到位）
+    func submitThought(rawText: String) async throws -> [TaskEntity]
+
     /// 从想法池中挑选任务加入必做项
-    func promoteToMustDo(taskIds: [UUID]) async throws
-    
+    func promoteToMustDo(taskId: UUID) async throws
+
     /// 将必做项移回想法池
-    func demoteToIdeaPool(taskId: UUID) async throws
-    
+    func demoteToIdeaPool(taskId: UUID, markAttempted: Bool) async throws
+
     /// 删除想法池中的任务
     func deleteFromIdeaPool(taskId: UUID) async throws
-    
+
     // MARK: - 必做项操作
-    
-    /// 调整必做项顺序
-    func reorderMustDo(taskId: UUID, to position: Int) async throws
-    
+
+    /// 开始执行任务
+    func startTask(taskId: UUID) async throws
+
     /// 标记任务完成
     func markComplete(taskId: UUID) async throws
-    
+
     // MARK: - 查询
-    
-    /// 获取指定日期的想法池任务
-    func fetchIdeaPool(date: Date) async -> [Task]
-    
-    /// 获取指定日期的必做项
-    func fetchMustDo(date: Date) async -> [Task]
+
+    func fetchIdeaPool() async throws -> [TaskEntity]
+    func fetchMustDo(date: Date) async throws -> [TaskEntity]
+    func fetchRunningTasks() async throws -> [TaskEntity]
 }
 ```
 
@@ -257,6 +272,7 @@ actor TaskManager {
 - 使用 `actor` 而非 `class`，确保任务状态变更的线程安全
 - 所有写操作通过 actor isolation 串行化，避免竞态条件
 - 内部依赖 `AIServiceProtocol` 和 `TaskRepository`
+- `parseThoughts` / `refineParsedTasks` / `saveParsedTasks` 三步拆分，支持用户确认流程
 
 ### 5.2 TimerEngine（计时引擎）
 
@@ -264,43 +280,35 @@ actor TaskManager {
 
 ```swift
 actor TimerEngine {
-    
-    /// 当前正在计时的任务 ID（支持多个，默认最多 1 个）
+
     private var activeTaskIds: Set<UUID> = []
-    
-    /// 计时开始时间记录
     private var startTimes: [UUID: Date] = [:]
-    
-    /// 是否允许并行计时
     private var allowParallel: Bool = false
-    
+
     // MARK: - 计时控制
-    
+
     /// 开始执行任务（如果并行关闭，先停止当前任务）
-    func startTask(_ taskId: UUID) async throws -> SessionLog?
-    // 返回被停止任务的 SessionLog（如有）
-    
-    /// 停止指定任务，返回 SessionLog
-    func stopTask(_ taskId: UUID) async -> SessionLog?
-    
+    /// 返回被停止任务的信息列表
+    func startTask(_ taskId: UUID) -> [(taskId: UUID, startedAt: Date)]
+
+    /// 停止指定任务
+    func stopTask(_ taskId: UUID) -> (taskId: UUID, startedAt: Date)?
+
     /// 停止所有运行中任务
-    func stopAll() async -> [SessionLog]
-    
+    func stopAll() -> [(taskId: UUID, startedAt: Date)]
+
     // MARK: - 查询
-    
-    /// 获取指定任务当前已计时的总秒数
-    func elapsedSeconds(for taskId: UUID) async -> Int
-    
-    /// 获取当前活跃任务列表
-    func activeTasks() async -> [UUID]
-    
-    /// 获取当前计时显示文本（如 "00:32:15"）
-    func timerDisplay(for taskId: UUID) async -> String
+
+    func elapsedSeconds(for taskId: UUID) -> Int
+    func activeTasks() -> [UUID]
+    func hasActiveTasks() -> Bool
+    func timerDisplay(for taskId: UUID) -> String
+    func primaryTimerDisplay() -> String
 }
 ```
 
 **关键设计决策**：
-- `startTask` 返回 `SessionLog?`，调用方（ViewModel）负责持久化
+- `startTask` 返回被停止任务的信息，调用方（TaskManager/ViewModel）负责持久化 SessionLog
 - 计时精度：基于 `Date` 差值计算，不依赖 Timer tick。UI 层每秒刷新显示即可
 - 并行模式通过 `allowParallel` 控制，V1 默认 `false`
 
@@ -310,28 +318,27 @@ actor TimerEngine {
 
 ```swift
 actor DayManager {
-    
+
     /// 结束今天：停止所有任务 → 生成统计 → 调用 AI 评分
-    func endDay() async throws -> DailySummary
-    
+    func endDay() async throws -> DailySummaryEntity
+
     /// 获取今日统计（不触发 AI 评分）
-    func todayStats() async -> DayStats
-    
+    func todayStats() async throws -> DayStats
+
     /// 检查是否需要触发昨日的自动评分
-    func checkAndGradeYesterday() async -> DailySummary?
-    
+    func checkAndGradeYesterday() async throws -> DailySummaryEntity?
+
     /// 同步日终总结到备忘录
-    func syncToNotes(summary: DailySummary) async throws
-    
+    func syncToNotes(summary: DailySummaryEntity) async throws
+
     /// 跨天迁移：将昨日未完成的必做项移回想法池
-    /// - 已开始过的任务标记 `attempted = true`
-    /// - 未开始的任务仅移动，不标记
-    func migrateUnfinishedMustDo() async throws
-    
+    func migrateUnfinishedMustDo() async throws -> [TaskEntity]
+
     /// 驳斥评分：调用 AI 重新评分，每日最多 3 次
-    /// - Returns: 新评分结果（含评分依据）
-    /// - Throws: 超过 3 次限制时抛出错误
-    func appealGrade(userFeedback: String) async throws -> DailyGrade
+    func appealGrade(date: Date, userFeedback: String) async throws -> DailySummaryEntity
+
+    func fetchTodaySummary() async throws -> DailySummaryEntity?
+    func fetchHistory(from: Date, to: Date) async throws -> [DailySummaryEntity]
 }
 ```
 
@@ -340,30 +347,35 @@ actor DayManager {
 ```swift
 /// AI 服务抽象协议 — 所有 AI 实现必须遵循
 protocol AIServiceProtocol: Sendable {
-    
+
     /// 解析自然语言为结构化任务列表
     /// - Parameters:
     ///   - input: 用户原始输入文本
-    ///   - existingTasks: 想法池中已有任务（用于去重）
+    ///   - existingTaskTitles: 想法池中已有任务标题（用于去重）
     /// - Returns: 解析后的任务列表
     func parseThoughts(
         input: String,
-        existingTasks: [Task]
+        existingTaskTitles: [String]
     ) async throws -> [ParsedTask]
-    
+
+    /// 根据用户修改指令调整已解析的任务
+    /// - Parameters:
+    ///   - originalInput: 用户原始输入
+    ///   - currentTasks: 当前解析结果
+    ///   - userInstruction: 用户修改指令
+    /// - Returns: 修改后的完整任务列表
+    func refineTasks(
+        originalInput: String,
+        currentTasks: [ParsedTask],
+        userInstruction: String
+    ) async throws -> [ParsedTask]
+
     /// 日终评分
-    /// - Parameter summaryInput: 当日任务完成数据
-    /// - Returns: 评分结果
     func generateDailyGrade(
         summaryInput: DailySummaryInput
     ) async throws -> DailyGrade
-    
+
     /// 驳斥评分：AI 根据用户反馈重新评分
-    /// - Parameters:
-    ///   - originalGrade: 原始评分结果
-    ///   - originalInput: 原始评分输入数据
-    ///   - userFeedback: 用户驳斥理由
-    /// - Returns: 重新评分结果（含评分依据）
     func appealGrade(
         originalGrade: DailyGrade,
         originalInput: DailySummaryInput,
@@ -372,11 +384,11 @@ protocol AIServiceProtocol: Sendable {
 }
 
 /// 解析后的任务模型（DTO，非持久化）
-struct ParsedTask: Sendable {
-    let title: String
-    let category: String
-    let estimatedMinutes: Int
-    let priority: TaskPriority
+struct ParsedTask: Sendable, Identifiable {
+    let id: UUID
+    var title: String
+    var category: String
+    var estimatedMinutes: Int
     let recommended: Bool
     let reason: String
 }
@@ -393,7 +405,8 @@ struct DailySummaryInput: Sendable {
 }
 
 /// 单个任务的完成详情（用于 AI 评分输入）
-struct TaskDetail: Sendable {
+struct TaskDetail: Sendable, Identifiable {
+    let id: UUID
     let title: String
     let estimatedMinutes: Int
     let actualMinutes: Int
@@ -406,64 +419,58 @@ struct DailyGrade: Sendable {
     let summary: String
     let stats: GradeStats
     let suggestion: String
+    let gradingBasis: String
 }
 
 /// 评分统计数据
 struct GradeStats: Sendable {
-    let totalTasks: Int             // 必做项总数
-    let completedTasks: Int         // 完成数
-    let totalPlannedMinutes: Int    // 计划总时长
-    let totalActualMinutes: Int     // 实际总时长
-    let deviationRate: Double       // 时间偏差率
-    let extraCompleted: Int         // 额外完成想法池任务数
+    let totalTasks: Int
+    let completedTasks: Int
+    let totalPlannedMinutes: Int
+    let totalActualMinutes: Int
+    let deviationRate: Double
+    let extraCompleted: Int
 }
 ```
 
-### 5.5 智谱 AI 实现（ZhipuAIService）
+### 5.5 DeepSeek AI 实现（DeepSeekAIService）
 
 ```swift
-/// 智谱 GLM-5.1 默认实现
-final class ZhipuAIService: AIServiceProtocol, @unchecked Sendable {
-    
+/// DeepSeek API 默认实现
+/// 兼容 OpenAI 格式
+final class DeepSeekAIService: AIServiceProtocol {
+
     private let apiKey: String         // 从 Keychain 读取
-    private let endpoint: URL
+    private let endpoint: URL          // https://api.deepseek.com/chat/completions
     private let urlSession: URLSession
-    
+    private let model: String          // "deepseek-chat" / "deepseek-reasoner"
+
     // MARK: - AIServiceProtocol
-    
-    func parseThoughts(input: String, existingTasks: [Task]) async throws -> [ParsedTask] {
-        let prompt = PromptTemplates.parseThought(
-            input: input,
-            existingTasks: existingTasks
-        )
-        let response: ZhipuAPIResponse = try await sendRequest(prompt: prompt)
-        return try parseTasksResponse(response)
+
+    func parseThoughts(input: String, existingTaskTitles: [String]) async throws -> [ParsedTask] {
+        let prompt = PromptTemplates.parseThought(input: input, existingTaskTitles: existingTaskTitles)
+        let responseContent = try await sendRequest(systemPrompt: "...", userPrompt: prompt)
+        let parsedResponse = try parseJSON(responseContent, as: ParsedTasksResponse.self)
+        return parsedResponse.tasks.map { ... }
     }
-    
-    func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade {
-        let prompt = PromptTemplates.dailyGrade(input: summaryInput)
-        let response: ZhipuAPIResponse = try await sendRequest(prompt: prompt)
-        return try parseGradeResponse(response)
+
+    func refineTasks(originalInput: String, currentTasks: [ParsedTask], userInstruction: String) async throws -> [ParsedTask] {
+        let prompt = PromptTemplates.refineParsedTasks(...)
+        let responseContent = try await sendRequest(...)
+        return ...
     }
-    
-    func appealGrade(originalGrade: DailyGrade, originalInput: DailySummaryInput, userFeedback: String) async throws -> DailyGrade {
-        let prompt = PromptTemplates.appealGrade(
-            originalGrade: originalGrade,
-            originalInput: originalInput,
-            userFeedback: userFeedback
-        )
-        let response: ZhipuAPIResponse = try await sendRequest(prompt: prompt)
-        return try parseGradeResponse(response)
-    }
-    
+
+    func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade { ... }
+    func appealGrade(...) async throws -> DailyGrade { ... }
+
     // MARK: - Private
-    
-    private func sendRequest(prompt: String) async throws -> ZhipuAPIResponse {
-        // 1. 构建请求体
+
+    private func sendRequest(systemPrompt: String, userPrompt: String) async throws -> String {
+        // 1. 构建请求体（OpenAI 兼容格式）
         // 2. 设置 HTTP Header (Authorization: Bearer <apiKey>)
         // 3. 发送 POST 请求
         // 4. 解析 JSON 响应
-        // 5. 超时 30s，失败重试最多 2 次
+        // 5. 超时（chat: 30s, reasoner: 更长），失败重试最多 2 次
     }
 }
 ```
@@ -471,15 +478,17 @@ final class ZhipuAIService: AIServiceProtocol, @unchecked Sendable {
 **调用链路**：
 
 ```
-ViewModel.submitThought()
+InputViewModel.submit()
     ↓
-TaskManager.submitThought()          // actor 隔离
+InputViewModel.processNextInQueue()      // 串行队列处理
     ↓
-AIServiceProtocol.parseThoughts()    // 协议调用，不依赖具体实现
+TaskManager.parseThoughts()              // actor 隔离
     ↓
-ZhipuAIService.sendRequest()         // 具体实现
+AIServiceProtocol.parseThoughts()        // 协议调用，不依赖具体实现
+    ↓
+DeepSeekAIService.sendRequest()          // 具体实现
     ↓ HTTPS POST
-智谱 GLM-5.1 API
+DeepSeek API
 ```
 
 ---
@@ -504,7 +513,7 @@ final class ThoughtEntity {
     var rawText: String
     var createdAt: Date
     var processed: Bool
-    
+
     @Relationship(deleteRule: .cascade)
     var tasks: [TaskEntity] = []
 }
@@ -516,7 +525,6 @@ final class TaskEntity {
     var title: String
     var category: String
     var estimatedMinutes: Int
-    var priority: String     // "high" / "medium" / "low"
     var aiRecommended: Bool
     var recommendationReason: String?
     var pool: String         // "idea_pool" / "must_do"
@@ -525,10 +533,10 @@ final class TaskEntity {
     var date: Date           // 任务所属日期
     var createdDate: Date    // 任务创建日期（跨天迁移后 date 变化但 createdDate 不变）
     var attempted: Bool      // 是否曾经尝试过（跨天迁移标记）
-    
-    @Relationship(deleteRule: .cascade)
+
+    @Relationship(deleteRule: .cascade, inverse: \SessionLogEntity.task)
     var sessionLogs: [SessionLogEntity] = []
-    
+
     @Transient
     var totalElapsedSeconds: Int {
         sessionLogs.reduce(0) { $0 + $1.durationSeconds }
@@ -542,8 +550,8 @@ final class SessionLogEntity {
     var startedAt: Date
     var endedAt: Date?
     var durationSeconds: Int
-    var date: Date           // 记录所属日期（同一任务可有多条记录，每天执行都会新增）
-    
+    var date: Date           // 记录所属日期
+
     var task: TaskEntity?
 }
 
@@ -561,8 +569,8 @@ final class DailySummaryEntity {
     var totalCount: Int
     var syncedToNotes: Bool
     var createdAt: Date
-    var appealCount: Int     // 当日已使用驳斥次数（上限 3）
-    var gradingBasis: String? // AI 评分依据（驳斥时展示给用户）
+    var appealCount: Int
+    var gradingBasis: String?
 }
 ```
 
@@ -571,9 +579,11 @@ final class DailySummaryEntity {
 ```swift
 @main
 struct NLPlanApp: App {
-    
+
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var appState: AppState
     let container: ModelContainer
-    
+
     init() {
         do {
             let schema = Schema([
@@ -583,20 +593,26 @@ struct NLPlanApp: App {
                 DailySummaryEntity.self
             ])
             let config = ModelConfiguration(schema: schema)
-            container = try ModelContainer(for: schema, configurations: [config])
+            let mc = try ModelContainer(for: schema, configurations: [config])
+            container = mc
+
+            let engine = TimerEngine()
+            _appState = State(initialValue: AppState(modelContainer: mc, timerEngine: engine))
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
     }
-    
+
     var body: some Scene {
         MenuBarExtra {
-            PopoverView()
+            MainContentView()
                 .modelContainer(container)
+                .environment(appState)
+                .preferredColorScheme(appState.appearanceMode.colorScheme)
         } label: {
-            MenuBarLabelView()
+            MenuBarLabelView(appState: appState)
         }
-        .menuBarExtraStyle(.window)  // 使用 .window 支持 Popover
+        .menuBarExtraStyle(.window)
     }
 }
 ```
@@ -606,22 +622,29 @@ struct NLPlanApp: App {
 每个实体对应一个 Repository，封装 SwiftData 操作：
 
 ```swift
-protocol TaskRepositoryProtocol: Sendable {
-    func create(_ task: TaskEntity) async throws
-    func update(_ task: TaskEntity) async throws
-    func delete(id: UUID) async throws
-    func fetch(date: Date, pool: TaskPool) async throws -> [TaskEntity]
-    func fetchById(_ id: UUID) async throws -> TaskEntity?
+class TaskRepository {
+    func create(title:category:estimatedMinutes:...) throws -> TaskEntity
+    func update(_ task: TaskEntity) throws
+    func delete(_ task: TaskEntity) throws
+    func fetchById(_ id: UUID) throws -> TaskEntity?
+    func fetchTasks(date: Date, pool: TaskPool) throws -> [TaskEntity]
+    func fetchAllIdeaPoolTasks() throws -> [TaskEntity]
+    func fetchActiveRunningTasks() throws -> [TaskEntity]
+    func moveToMustDo(_ task: TaskEntity) throws
+    func moveToIdeaPool(_ task: TaskEntity, markAttempted: Bool) throws
+    func markComplete(_ task: TaskEntity) throws
+    func updateStatus(_ task: TaskEntity, status: TaskStatus) throws
+    func migrateUnfinishedMustDo() throws
 }
 ```
 
-> **注意**：SwiftData 的 `ModelContext` 不是线程安全的，Repository 内部需通过 `@ModelActor` 或手动管理主线程调度。
+> **注意**：SwiftData 的 `ModelContext` 不是线程安全的，Repository 操作在主线程执行。
 
 ---
 
 ## 7. 数据流设计
 
-### 7.1 核心数据流 — 输入到执行
+### 7.1 核心数据流 — 输入到想法池（队列模式）
 
 ```
 用户输入文本
@@ -629,22 +652,39 @@ protocol TaskRepositoryProtocol: Sendable {
      ▼
 InputViewModel.submit()
      │  1. 验证输入（非空、长度）
-     │  2. 禁用提交按钮，显示加载状态
+     │  2. 创建 ParseQueueItem(.waiting)
+     │  3. 追加到 queueItems 数组
+     │  4. 清空输入框（立即可用）
+     │  5. 调用 processNextInQueue()
      │
      ▼
-TaskManager.submitThought(rawText:)
-     │  1. 保存 ThoughtEntity（processed=false）
-     │  2. 调用 AIService.parseThoughts()
-     │  3. 解析结果转为 TaskEntity，pool=ideaPool
-     │  4. 批量保存到 SwiftData
-     │  5. 标记 ThoughtEntity（processed=true）
+InputViewModel.processNextInQueue()      // 串行递归处理
+     │  1. 检查是否有 .processing 项 → 有则 return
+     │  2. 取第一个 .waiting 项 → 设为 .processing
+     │  3. await TaskManager.parseThoughts()
+     │  4. 成功 → 设为 .completed，存储 parsedTasks
+     │     失败 → 设为 .failed，存储 errorMessage
+     │  5. 递归调用 processNextInQueue()
      │
      ▼
-返回 [Task] 给 ViewModel
+队列列表 UI 更新（ParseQueueSection）
+     │  用户点击已完成项
      │
      ▼
-IdeaPoolViewModel 刷新列表
-     │  UI 自动更新（@Query 或手动刷新）
+AppState.currentPage = .queueDetail(itemID)
+     │  路由到 QueueDetailView
+     │
+     ▼
+用户在详情页确认/编辑/与 AI 对话
+     │
+     ▼
+InputViewModel.confirmQueueItem(id:)
+     │  1. await TaskManager.saveParsedTasks()
+     │  2. 移除队列项
+     │  3. 调用 onSubmitSuccess 回调
+     │
+     ▼
+IdeaPoolViewModel.refresh()  → UI 自动更新
 ```
 
 ### 7.2 核心数据流 — 任务执行与切换
@@ -656,24 +696,23 @@ IdeaPoolViewModel 刷新列表
 MustDoViewModel.startTask(id:)
      │
      ▼
-TimerEngine.startTask(taskId)
-     │  1. 如果 allowParallel == false
-     │     → 遍历 activeTaskIds，逐个调用 stopTask()
-     │     → 收集被停止任务的 SessionLog
-     │  2. 记录 startTimes[taskId] = Date.now
-     │  3. 将 taskId 加入 activeTaskIds
-     │  4. 返回被停止任务的 SessionLog 列表
+TaskManager.startTask(taskId)
+     │  1. 验证任务存在且在 must_do 池
+     │  2. await TimerEngine.startTask(taskId)
+     │     → 如果 allowParallel == false，停止当前任务
+     │     → 返回被停止任务信息
+     │  3. 持久化被停止任务的 SessionLog
+     │  4. 为新任务创建 open session
+     │  5. 更新 TaskEntity.status
      │
      ▼
-MustDoViewModel 收到返回的 SessionLog
-     │  1. 持久化每条 SessionLog 到 SwiftData
-     │  2. 更新 TaskEntity.status
-     │  3. 刷新 UI
+AppState 更新计时显示
+     │  菜单栏每秒刷新
      │
      ▼
-TimerViewModel 每秒刷新
+TimerViewModel / MenuBarLabelView
      │  调用 TimerEngine.elapsedSeconds(for:)
-     │  更新菜单栏显示文本
+     │  更新显示文本
 ```
 
 ### 7.3 核心数据流 — 日终评分
@@ -694,7 +733,7 @@ DayManager.endDay()
      │  6. 保存 DailySummaryEntity
      │
      ▼
-返回 DailySummary 给 ViewModel
+返回 DailySummaryEntity 给 ViewModel
      │
      ▼
 SummaryView 展示评分结果
@@ -711,86 +750,121 @@ SummaryView 展示评分结果
 /// 全局应用状态
 @Observable
 final class AppState {
-    
-    /// 当前是否有任务在计时（决定菜单栏显示）
+
+    enum AppearanceMode: String, CaseIterable {
+        case system, light, dark
+    }
+
+    enum Page: Equatable {
+        case main
+        case summary
+        case history
+        case settings
+        case queueDetail(UUID)    // 关联队列项 ID
+    }
+
+    // MARK: - Dependencies
+    let modelContainer: ModelContainer
+    let timerEngine: TimerEngine
+
+    // MARK: - Timer Display
     var isTimerRunning: Bool = false
-    
-    /// 当前计时显示文本（如 "00:32:15"）
     var timerDisplayText: String = ""
-    
-    /// 当前运行中的任务名称
     var currentTaskTitle: String = ""
-    
-    /// 当前日期
-    var today: Date = .now
-    
-    /// 今日是否已评分
-    var hasGradedToday: Bool = false
-    
-    /// AI 是否正在处理中
-    var isAIProcessing: Bool = false
-    
-    /// 网络是否可用
-    var isNetworkAvailable: Bool = true
+
+    // MARK: - Navigation
+    var currentPage: Page = .main
+    var appearanceMode: AppearanceMode = .system
+
+    // MARK: - ViewModels（全局持有，避免面板关闭后重建丢失状态）
+    var inputViewModel: InputViewModel?
+    var ideaPoolViewModel: IdeaPoolViewModel?
+    var mustDoViewModel: MustDoViewModel?
+
+    // MARK: - API Key
+    var isAPIKeyConfigured: Bool = false
+
+    // MARK: - Factory
+    func makeAIService() -> AIServiceProtocol
 }
 ```
 
-### 8.2 ViewModel 层状态
+### 8.2 页面路由
 
-每个 ViewModel 负责：
-1. 持有 UI 需要的数据（从 Domain Layer 获取）
-2. 处理用户交互（调用 Domain Layer）
-3. 更新 UI 状态（loading / error / data）
+`MainContentView` 根据 `appState.currentPage` 切换显示不同容器视图：
+
+| Page 值 | 容器视图 |
+|---------|---------|
+| `.main` | PopoverContainerView |
+| `.summary` | SummaryContainerView |
+| `.history` | HistoryContainerView |
+| `.settings` | SettingsContainerView |
+| `.queueDetail(UUID)` | QueueDetailContainerView |
+
+### 8.3 ViewModel 层状态
 
 ```swift
-/// 输入区 ViewModel 示例
+/// 输入区 ViewModel（队列模式）
 @Observable
 final class InputViewModel {
-    
+
     var inputText: String = ""
-    var isProcessing: Bool = false
     var errorMessage: String?
-    
-    private let taskManager: TaskManager
-    
-    func submit() async {
-        // 1. 验证
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
-        // 2. 状态更新
-        isProcessing = true
-        errorMessage = nil
-        
-        // 3. 调用 Domain
-        do {
-            _ = try await taskManager.submitThought(rawText: inputText)
-            inputText = ""
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        
-        // 4. 恢复状态
-        isProcessing = false
-    }
+    var successMessage: String?
+
+    /// 解析队列
+    var queueItems: [ParseQueueItem] = []
+
+    /// 当前正在 AI 调整的队列项 ID
+    var activeDetailItemID: UUID?
+
+    /// 对话输入（详情页用）
+    var chatInput: String = ""
+
+    /// 提交成功回调
+    var onSubmitSuccess: (([UUID]) async -> Void)?
+
+    // MARK: - 队列操作
+
+    /// 提交 → 入队 → 触发串行处理
+    func submit() async
+
+    /// 确认队列项 → 保存到想法池 → 移除
+    func confirmQueueItem(id: UUID) async
+
+    /// 取消队列项 → 移除（不可取消 processing 项）
+    func cancelQueueItem(id: UUID)
+
+    /// 重试失败项
+    func retryQueueItem(id: UUID) async
+
+    /// 与 AI 对话修改解析结果
+    func sendModification(queueItemID: UUID) async
+
+    /// 编辑/删除解析结果中的单个任务
+    func updateParsedTask(queueItemID:taskIndex:title:category:estimatedMinutes:)
+    func removeParsedTask(queueItemID:taskIndex:)
+
+    /// 判断指定队列项是否正在 AI 调整中
+    func isItemChatProcessing(id: UUID) -> Bool
 }
 ```
 
-### 8.3 计时器刷新机制
+### 8.4 计时器刷新机制
 
 ```
 ┌──────────────┐     每秒 tick      ┌─────────────────┐
 │  Timer       │ ──────────────────→ │  TimerViewModel │
-│  (Timer.publish)                   │                 │
-└──────────────┘                     │  调用 TimerEngine.elapsedSeconds()
-                                     │  更新 timerDisplayText
-                                     │  更新 currentTaskTitle
-                                     │
+│  (Timer      │                     │                 │
+│   .publish)  │                     │  await engine   │
+└──────────────┘                     │  .elapsedSeconds│
+                                     │  更新 display   │
                                      └──────┬──────────┘
                                             │ @Observable
                                             ▼
                                      ┌─────────────────┐
-                                     │  MenuBarView    │
-                                     │  显示 ⏱ 00:32:15 │
+                                     │ MenuBarLabelView │
+                                     │ 显示 ⏱ 00:32:15 │
                                      └─────────────────┘
 ```
 
@@ -800,18 +874,17 @@ final class InputViewModel {
 /// 菜单栏计时显示 ViewModel
 @Observable
 final class TimerViewModel {
-    
+
     var displayText: String = ""
     var taskTitle: String = ""
-    
+
     private let timerEngine: TimerEngine
-    private var cancellable: AnyCancellable?
-    
+
     init(timerEngine: TimerEngine) {
         self.timerEngine = timerEngine
         startTicker()
     }
-    
+
     private func startTicker() {
         Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
@@ -821,7 +894,6 @@ final class TimerViewModel {
                     let activeIds = await self.timerEngine.activeTasks()
                     if let firstId = activeIds.first {
                         self.displayText = await self.timerEngine.timerDisplay(for: firstId)
-                        // 从 TaskManager 获取任务标题
                     } else {
                         self.displayText = ""
                         self.taskTitle = ""
@@ -832,6 +904,8 @@ final class TimerViewModel {
     }
 }
 ```
+
+> 注：TimerViewModel 内部使用 Combine 的 `Timer.publish` + `sink` 作为定时器源，但外部状态管理使用 `@Observable`，不对外暴露 Combine。
 
 ---
 
@@ -870,6 +944,17 @@ final class TimerViewModel {
 | `.menu` | 下拉菜单样式，不支持复杂 UI | ❌ |
 | ✅ `.window` | 独立窗口样式，支持完整 SwiftUI 视图 | ✅ 适合 Popover 交互 |
 
+### 9.5 为什么解析队列用递归而非 AsyncStream？
+
+| 方案 | 说明 | 问题 |
+|------|------|------|
+| ❌ AsyncStream | 需要维护流的生命周期，增加复杂度 | 过度设计 |
+| ✅ 递归 processNextInQueue | 简单直观，await 挂起时不阻塞 MainActor | 代码少，易维护 |
+
+### 9.6 为什么详情页用全屏 Popover 而非 Sheet？
+
+MenuBarExtra 的 `.window` 样式下，Sheet 弹窗可能导致焦点问题和层级异常。全屏替换 Popover 内容（通过 `AppState.Page` 路由）更稳定可靠。
+
 ---
 
 ## 10. 并发与线程模型
@@ -893,14 +978,14 @@ final class TimerViewModel {
 │         │ async call                │
 │         ▼                           │
 │  ┌──────────────┐                   │
-│  │ ZhipuAI      │                   │
+│  │ DeepSeekAI   │                   │
 │  │ Service      │  ← URLSession    │
 │  │ (class)      │    异步网络请求    │
 │  └──────────────┘                   │
 │                                     │
 │  ┌──────────────┐                   │
 │  │ Repository   │  ← SwiftData     │
-│  │ (Actor)      │    主线程写入     │
+│  │ (class)      │    主线程写入     │
 │  └──────────────┘                   │
 └─────────────────────────────────────┘
 ```
@@ -908,7 +993,7 @@ final class TimerViewModel {
 **规则**：
 1. UI 操作必须在 Main Thread
 2. Actor 内部逻辑在 Cooperative Thread Pool 执行
-3. SwiftData 写操作需要 dispatch 到 Main Thread（SwiftData 限制）
+3. SwiftData 写操作在 Main Thread（SwiftData 限制）
 4. 网络请求在 URLSession 的后台线程
 
 ---
@@ -922,38 +1007,27 @@ enum NLPlanError: LocalizedError {
     // 输入错误
     case emptyInput
     case inputTooLong(max: Int)
-    
+
     // AI 服务错误
     case aiServiceUnavailable
     case aiRequestTimeout
     case aiResponseParseError
     case aiAPIError(statusCode: Int, message: String)
-    
+
     // 数据错误
     case dataSaveFailed(underlying: Error)
     case dataNotFound(entity: String, id: UUID)
-    
+
     // 同步错误
     case notesSyncFailed(underlying: Error)
-    
+
+    // 业务错误
+    case appealLimitExceeded
+    case taskNotInExpectedPool(expected: TaskPool, actual: TaskPool)
+    case apiKeyNotConfigured
+
     // 网络错误
     case networkUnavailable
-    
-    var errorDescription: String? {
-        switch self {
-        case .emptyInput:
-            return "请输入内容后再提交"
-        case .aiServiceUnavailable:
-            return "AI 服务暂时不可用，请稍后重试"
-        case .aiRequestTimeout:
-            return "AI 服务响应超时，请稍后重试"
-        case .aiResponseParseError:
-            return "AI 解析失败，请尝试重新描述"
-        case .networkUnavailable:
-            return "网络不可用，请检查网络连接"
-        // ...
-        }
-    }
 }
 ```
 
@@ -973,10 +1047,10 @@ View (显示错误提示)
 
 | 场景 | 降级方案 |
 |------|----------|
-| AI 服务不可用 | 提示用户，保留输入文本，允许重试 |
+| AI 服务不可用 | 队列项标记 failed，可重试，不影响其他队列项 |
 | 日终 AI 评分失败 | 使用基于规则的基础评分（仅按完成率计算等级） |
 | 备忘录同步失败 | 提示用户重试，提供"复制到剪贴板"备选 |
-| 网络断开 | 本地计时正常运行，暂存输入文本 |
+| 网络断开 | 本地计时正常运行，队列项等待重试 |
 
 ---
 
@@ -997,7 +1071,7 @@ View (显示错误提示)
 |--------|------|
 | 冷启动 | MenuBarExtra 轻量初始化，SwiftData lazy load |
 | 计时精度 | 基于 Date 差值，非累加 tick |
-| UI 流畅度 | AI 调用异步，不阻塞主线程 |
+| UI 流畅度 | AI 调用异步，不阻塞主线程；队列处理不阻塞输入 |
 | 内存 | 无大量图片/缓存，预计 < 50MB |
 | 查询性能 | SwiftData 按日期 + pool 建索引 |
 
@@ -1007,7 +1081,7 @@ View (显示错误提示)
 @Model
 final class TaskEntity {
     // ...
-    
+
     #Index<TaskEntity>([\.date, \.pool], [\.status], [\.date])
 }
 ```
@@ -1022,7 +1096,7 @@ final class TaskEntity {
 |------|----------|------|------|
 | Data | 单元测试 | Repository CRUD、AI 响应解析 | XCTest |
 | Domain | 单元测试 | TaskManager 逻辑、TimerEngine 切换、评分规则 | XCTest |
-| ViewModel | 单元测试 | 状态变更、错误处理 | XCTest |
+| ViewModel | 单元测试 | 状态变更、错误处理、队列处理 | XCTest |
 | UI | UI 测试 | 核心流程端到端 | XCUITest |
 
 ### 14.2 Mock 策略
@@ -1033,21 +1107,25 @@ final class MockAIService: AIServiceProtocol {
     var mockParsedTasks: [ParsedTask] = []
     var mockGrade: DailyGrade?
     var shouldThrow: Bool = false
-    
-    func parseThoughts(input: String, existingTasks: [Task]) async throws -> [ParsedTask] {
+
+    func parseThoughts(input: String, existingTaskTitles: [String]) async throws -> [ParsedTask] {
         if shouldThrow { throw NLPlanError.aiServiceUnavailable }
         return mockParsedTasks
     }
-    
+
+    func refineTasks(originalInput: String, currentTasks: [ParsedTask], userInstruction: String) async throws -> [ParsedTask] {
+        if shouldThrow { throw NLPlanError.aiServiceUnavailable }
+        return currentTasks
+    }
+
     func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade {
         if shouldThrow { throw NLPlanError.aiServiceUnavailable }
         return mockGrade!
     }
-    
+
     func appealGrade(originalGrade: DailyGrade, originalInput: DailySummaryInput, userFeedback: String) async throws -> DailyGrade {
         if shouldThrow { throw NLPlanError.aiServiceUnavailable }
-        // Mock: 返回提升一级的评分
-        return mockGrade ?? DailyGrade(grade: .b, summary: "Mock appeal result", stats: GradeStats(totalTasks: 5, completedTasks: 4, totalPlannedMinutes: 240, totalActualMinutes: 265, deviationRate: 0.1, extraCompleted: 0), suggestion: "Keep going!")
+        return mockGrade ?? DailyGrade(grade: .b, summary: "Mock", stats: GradeStats(...), suggestion: "Mock", gradingBasis: "Mock")
     }
 }
 ```
@@ -1057,12 +1135,11 @@ final class MockAIService: AIServiceProtocol {
 | 用例 | 覆盖模块 | 描述 |
 |------|----------|------|
 | 输入空文本 → 不提交 | InputViewModel | 验证输入校验 |
-| 输入有效文本 → AI 解析 → 进入想法池 | TaskManager | 验证完整解析流程 |
-| AI 失败 → 保留输入 → 显示错误 | TaskManager + ViewModel | 验证降级策略 |
+| 输入有效文本 → 入队 → AI 解析 → 用户确认 → 进入想法池 | TaskManager + InputViewModel | 验证完整队列流程 |
+| AI 失败 → 队列项标记 failed → 重试 | InputViewModel | 验证降级策略 |
+| 连续输入 3 次 → 队列串行处理 | InputViewModel | 验证串行队列机制 |
 | 点击任务A → 点击任务B → A 停止，B 开始 | TimerEngine | 验证切换逻辑 |
-| 点击任务A → A 开始 → 再点 A → 不变 | TimerEngine | 验证幂等性 |
 | 结束今天 → 停止所有 → AI 评分 → 存储 | DayManager | 验证日终流程 |
-| 并行关闭 → 同时只能一个任务 | TimerEngine | 验证串行模式 |
 
 ---
 
@@ -1104,7 +1181,7 @@ V1 不引入任何第三方依赖。
     └── 运行时：
          ├── 本地：SwiftData 数据库（~/Library/Application Support/NLPlan/）
          ├── Keychain：API Key
-         └── 网络：HTTPS → 智谱 AI API
+         └── 网络：HTTPS → DeepSeek API
 ```
 
 ---

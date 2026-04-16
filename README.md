@@ -4,7 +4,8 @@
 
 ## 功能
 
-- 📝 **自然语言输入** — 用一句话描述你的计划，AI 自动拆解为任务
+- 📝 **自然语言输入** — 用一句话描述你的计划，AI 自动拆解为任务，支持连续输入非阻塞处理
+- 📋 **解析队列** — 提交后立即可以继续输入，队列逐个处理并展示实时状态
 - ⏱ **专注计时** — 为每个任务启动计时，菜单栏实时显示进度
 - 💡 **想法池** — 随时记录灵感，稍后转化为任务
 - 📊 **AI 日终总结** — 自动评分、生成总结和明日建议
@@ -32,7 +33,7 @@ swift build
 
 | 权限 | 用途 | 触发时机 |
 |------|------|----------|
-| **钥匙串（Keychain）** | 安全存储智谱 AI API Key | 首次保存或读取 API Key 时 |
+| **钥匙串（Keychain）** | 安全存储 AI API Key | 首次保存或读取 API Key 时 |
 
 应用使用 macOS 钥匙串来安全存储你的 API Key，首次访问时会弹出系统授权弹窗：
 
@@ -46,13 +47,13 @@ swift build
 
 1. 点击菜单栏图标打开面板
 2. 点击底部「设置」按钮
-3. 输入你的[智谱 AI API Key](https://open.bigmodel.cn/) 并保存
+3. 输入你的 [DeepSeek API Key](https://platform.deepseek.com/) 并保存
 
 ## 技术栈
 
 - **UI**：SwiftUI + MenuBarExtra
 - **数据持久化**：SwiftData
-- **AI 服务**：智谱 GLM-5.1
+- **AI 服务**：DeepSeek（通过 AIServiceProtocol 抽象，可扩展）
 - **安全存储**：Keychain Services
 
 ## License
