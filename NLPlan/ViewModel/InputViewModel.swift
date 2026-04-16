@@ -14,6 +14,9 @@ final class InputViewModel {
     /// AI 解析结果，待用户确认
     var pendingParsedTasks: [ParsedTask]?
 
+    /// AI 对话调整成功提示
+    var chatSuccessMessage: String?
+
     /// 对话输入
     var chatInput: String = ""
     /// 是否正在处理对话修改
@@ -126,6 +129,7 @@ final class InputViewModel {
         isChatProcessing = true
         chatInput = ""
         errorMessage = nil
+        chatSuccessMessage = nil
 
         do {
             pendingParsedTasks = try await taskManager.refineParsedTasks(
@@ -133,6 +137,7 @@ final class InputViewModel {
                 currentTasks: currentTasks,
                 userInstruction: instruction
             )
+            chatSuccessMessage = "✅ 已调整"
         } catch {
             errorMessage = error.localizedDescription
         }

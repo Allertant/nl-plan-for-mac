@@ -58,6 +58,7 @@ struct InputSection: View {
                     parsedTasks: parsedTasks,
                     chatInput: $viewModel.chatInput,
                     isChatProcessing: viewModel.isChatProcessing,
+                    chatSuccessMessage: $viewModel.chatSuccessMessage,
                     onConfirm: {
                         Task { await viewModel.confirm() }
                     },
@@ -109,6 +110,7 @@ private struct ParsedTaskConfirmation: View {
     let parsedTasks: [ParsedTask]
     @Binding var chatInput: String
     let isChatProcessing: Bool
+    @Binding var chatSuccessMessage: String?
     let onConfirm: () -> Void
     let onCancel: () -> Void
     let onEdit: (_ index: Int, _ title: String, _ category: String, _ minutes: Int) -> Void
@@ -152,6 +154,20 @@ private struct ParsedTaskConfirmation: View {
                 )
             }
 
+            // AI 调整成功提示
+            if let chatSuccess = chatSuccessMessage {
+                Text(chatSuccess)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            chatSuccessMessage = nil
+                        }
+                    }
+            }
+
             // AI 对话输入区
             HStack(alignment: .top) {
                 TextField("告诉 AI 你想怎么调整...", text: $chatInput, axis: .vertical)
@@ -190,6 +206,7 @@ private struct ParsedTaskConfirmation: View {
                 }
                 .buttonStyle(.borderless)
                 .keyboardShortcut(.cancelAction)
+                .disabled(isChatProcessing)
 
                 Spacer()
 
@@ -201,6 +218,7 @@ private struct ParsedTaskConfirmation: View {
                 }
                 .buttonStyle(.borderless)
                 .keyboardShortcut(.defaultAction)
+                .disabled(isChatProcessing)
             }
             .padding(.top, 2)
         }
