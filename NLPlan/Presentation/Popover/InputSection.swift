@@ -186,6 +186,7 @@ private struct ParsedTaskRow: View {
     let onDelete: () -> Void
 
     @State private var isEditing = false
+    @State private var showDeleteConfirm = false
     @State private var editTitle: String = ""
     @State private var editCategory: String = ""
     @State private var editMinutes: String = ""
@@ -235,15 +236,35 @@ private struct ParsedTaskRow: View {
                     .buttonStyle(.plain)
                     .help("编辑")
 
-                    Button {
-                        onDelete()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red.opacity(0.5))
+                    if showDeleteConfirm {
+                        Button {
+                            showDeleteConfirm = false
+                        } label: {
+                            Text("取消")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+
+                        Button {
+                            onDelete()
+                        } label: {
+                            Text("删除")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            showDeleteConfirm = true
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red.opacity(0.5))
+                        }
+                        .buttonStyle(.plain)
+                        .help("删除")
                     }
-                    .buttonStyle(.plain)
-                    .help("删除")
                 }
             }
 

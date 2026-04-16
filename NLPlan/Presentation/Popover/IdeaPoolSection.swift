@@ -109,6 +109,7 @@ struct IdeaPoolTaskRow: View {
     let onDelete: () -> Void
 
     @State private var flashCount = 0
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -167,15 +168,35 @@ struct IdeaPoolTaskRow: View {
                 .buttonStyle(.plain)
                 .help("加入必做项")
 
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red.opacity(0.6))
+                if showDeleteConfirm {
+                    Button {
+                        showDeleteConfirm = false
+                    } label: {
+                        Text("取消")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+
+                    Button {
+                        onDelete()
+                    } label: {
+                        Text("删除")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        showDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .help("删除")
                 }
-                .buttonStyle(.plain)
-                .help("删除")
             }
         }
         .padding(8)
