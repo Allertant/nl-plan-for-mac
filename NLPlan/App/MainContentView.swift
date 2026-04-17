@@ -85,80 +85,6 @@ struct PopoverContainerView: View {
     }
 }
 
-// MARK: - Summary Container
-
-/// Summary 容器视图
-struct SummaryContainerView: View {
-    @Environment(AppState.self) private var appState
-
-    @State private var summaryVM: SummaryViewModel?
-
-    var body: some View {
-        Group {
-            if let summaryVM {
-                SummaryView(viewModel: summaryVM) {
-                    appState.currentPage = .main
-                }
-            } else {
-                ProgressView("加载中...")
-                    .frame(width: 360, height: 520)
-            }
-        }
-        .task {
-            let context = appState.modelContainer.mainContext
-            let taskRepo = TaskRepository(modelContext: context)
-            let sessionLogRepo = SessionLogRepository(modelContext: context)
-            let summaryRepo = SummaryRepository(modelContext: context)
-            let aiService = appState.makeAIService()
-
-            let dayMgr = DayManager(
-                taskRepo: taskRepo,
-                summaryRepo: summaryRepo,
-                sessionLogRepo: sessionLogRepo,
-                timerEngine: appState.timerEngine,
-                aiService: aiService
-            )
-            self.summaryVM = SummaryViewModel(dayManager: dayMgr)
-        }
-    }
-}
-
-// MARK: - History Container
-
-/// History 容器视图
-struct HistoryContainerView: View {
-    @Environment(AppState.self) private var appState
-
-    @State private var historyVM: HistoryViewModel?
-
-    var body: some View {
-        Group {
-            if let historyVM {
-                HistoryView(dayManager: historyVM.dayManager)
-            } else {
-                ProgressView("加载中...")
-                    .frame(width: 360, height: 520)
-            }
-        }
-        .task {
-            let context = appState.modelContainer.mainContext
-            let taskRepo = TaskRepository(modelContext: context)
-            let sessionLogRepo = SessionLogRepository(modelContext: context)
-            let summaryRepo = SummaryRepository(modelContext: context)
-            let aiService = appState.makeAIService()
-
-            let dayMgr = DayManager(
-                taskRepo: taskRepo,
-                summaryRepo: summaryRepo,
-                sessionLogRepo: sessionLogRepo,
-                timerEngine: appState.timerEngine,
-                aiService: aiService
-            )
-            self.historyVM = HistoryViewModel(dayManager: dayMgr)
-        }
-    }
-}
-
 // MARK: - Settings Container
 
 /// Settings 容器视图
@@ -170,29 +96,5 @@ struct SettingsContainerView: View {
             appState.currentPage = .main
         })
         .environment(appState)
-    }
-}
-
-// MARK: - Queue Detail Container
-
-/// 队列详情容器视图
-struct QueueDetailContainerView: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        Group {
-            if let inputVM = appState.inputViewModel,
-               let queueItemID = appState.currentPage.queueItemID,
-               let queueItem = inputVM.queueItems.first(where: { $0.id == queueItemID }) {
-                QueueDetailView(viewModel: inputVM, queueItem: queueItem)
-            } else {
-                // 找不到队列项，返回主页面
-                Color.clear
-                    .frame(width: 360, height: 520)
-                    .onAppear {
-                        appState.currentPage = .main
-                    }
-            }
-        }
     }
 }
