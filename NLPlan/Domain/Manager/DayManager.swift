@@ -36,59 +36,15 @@ actor DayManager {
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
                 try sessionLogRepo.endSession(openLog)
             }
-
             if let task = try taskRepo.fetchById(stopInfo.taskId) {
                 try taskRepo.updateStatus(task, status: .pending)
             }
         }
 
-        // 2. 汇总今日统计
+        // 2. 评分并保存
         let mustDoTasks = try taskRepo.fetchTasks(date: today, pool: .mustDo)
-        let stats = computeStats(tasks: mustDoTasks)
-
-        // 3. 构造 AI 输入
-        let summaryInput = DailySummaryInput(
-            totalTasks: stats.totalTasks,
-            completedTasks: stats.completedTasks,
-            totalPlannedMinutes: stats.totalPlannedMinutes,
-            totalActualMinutes: stats.totalActualMinutes,
-            deviationRate: stats.deviationRate,
-            extraCompleted: stats.extraCompleted,
-            taskDetails: mustDoTasks.map { task in
-                TaskDetail(
-                    title: task.title,
-                    estimatedMinutes: task.estimatedMinutes,
-                    actualMinutes: max(0, task.totalElapsedSeconds / 60),
-                    completed: task.status == TaskStatus.done.rawValue
-                )
-            }
-        )
-
-        // 4. 调用 AI 评分（带降级方案）
-        let grade: DailyGrade
-        do {
-            grade = try await aiService.generateDailyGrade(summaryInput: summaryInput)
-        } catch {
-            // 降级：使用基于规则的基础评分
-            let fallbackGrade = stats.fallbackGrade
-            grade = DailyGrade(
-                grade: fallbackGrade,
-                summary: "AI 评分不可用，使用基础评分。完成率：\(String(format: "%.0f%%", stats.completionRate * 100))",
-                stats: GradeStats(
-                    totalTasks: stats.totalTasks,
-                    completedTasks: stats.completedTasks,
-                    totalPlannedMinutes: stats.totalPlannedMinutes,
-                    totalActualMinutes: stats.totalActualMinutes,
-                    deviationRate: stats.deviationRate,
-                    extraCompleted: stats.extraCompleted
-                ),
-                suggestion: "明天继续加油！",
-                gradingBasis: "基于规则的降级评分（AI 不可用）"
-            )
-        }
-
-        // 5. 保存评分结果
-        let summary = try summaryRepo.create(
+        let grade = try await gradeWithFallback(tasks: mustDoTasks)
+        return try summaryRepo.create(
             date: today,
             grade: grade.grade,
             summary: grade.summary,
@@ -99,8 +55,6 @@ actor DayManager {
             totalCount: grade.stats.totalTasks,
             gradingBasis: grade.gradingBasis
         )
-
-        return summary
     }
 
     // MARK: - Check Yesterday
@@ -112,59 +66,19 @@ actor DayManager {
 
         // 检查昨天是否已有评分
         if try summaryRepo.fetch(date: yesterdayStart) != nil {
-            return nil // 已评分
+            return nil
         }
 
         // 检查昨天是否有必做项
         let yesterdayTasks = try taskRepo.fetchTasks(date: yesterdayStart, pool: .mustDo)
         if yesterdayTasks.isEmpty {
-            return nil // 没有任务，无需评分
+            return nil
         }
 
-        // 执行评分
-        // 先迁移未完成的任务
+        // 先迁移未完成的任务，然后评分
         _ = try taskRepo.migrateUnfinishedMustDo(date: yesterdayStart)
 
-        // 然后评分
-        let stats = computeStats(tasks: yesterdayTasks)
-        let summaryInput = DailySummaryInput(
-            totalTasks: stats.totalTasks,
-            completedTasks: stats.completedTasks,
-            totalPlannedMinutes: stats.totalPlannedMinutes,
-            totalActualMinutes: stats.totalActualMinutes,
-            deviationRate: stats.deviationRate,
-            extraCompleted: stats.extraCompleted,
-            taskDetails: yesterdayTasks.map { task in
-                TaskDetail(
-                    title: task.title,
-                    estimatedMinutes: task.estimatedMinutes,
-                    actualMinutes: max(0, task.totalElapsedSeconds / 60),
-                    completed: task.status == TaskStatus.done.rawValue
-                )
-            }
-        )
-
-        let grade: DailyGrade
-        do {
-            grade = try await aiService.generateDailyGrade(summaryInput: summaryInput)
-        } catch {
-            let fallbackGrade = stats.fallbackGrade
-            grade = DailyGrade(
-                grade: fallbackGrade,
-                summary: "自动补评（AI 不可用）。完成率：\(String(format: "%.0f%%", stats.completionRate * 100))",
-                stats: GradeStats(
-                    totalTasks: stats.totalTasks,
-                    completedTasks: stats.completedTasks,
-                    totalPlannedMinutes: stats.totalPlannedMinutes,
-                    totalActualMinutes: stats.totalActualMinutes,
-                    deviationRate: stats.deviationRate,
-                    extraCompleted: stats.extraCompleted
-                ),
-                suggestion: "",
-                gradingBasis: "基于规则的降级评分（AI 不可用）"
-            )
-        }
-
+        let grade = try await gradeWithFallback(tasks: yesterdayTasks, fallbackSummary: "自动补评（AI 不可用）")
         return try summaryRepo.create(
             date: yesterdayStart,
             grade: grade.grade,
@@ -197,33 +111,13 @@ actor DayManager {
         guard let summary = try summaryRepo.fetch(date: date) else {
             throw NLPlanError.dataNotFound(entity: "DailySummary", id: UUID())
         }
-
-        // 检查申诉次数
         guard summary.appealCount < 3 else {
             throw NLPlanError.appealLimitExceeded
         }
 
-        // 获取原始任务数据
         let tasks = try taskRepo.fetchTasks(date: date, pool: .mustDo)
         let stats = computeStats(tasks: tasks)
-
-        let originalInput = DailySummaryInput(
-            totalTasks: stats.totalTasks,
-            completedTasks: stats.completedTasks,
-            totalPlannedMinutes: stats.totalPlannedMinutes,
-            totalActualMinutes: stats.totalActualMinutes,
-            deviationRate: stats.deviationRate,
-            extraCompleted: stats.extraCompleted,
-            taskDetails: tasks.map { task in
-                TaskDetail(
-                    title: task.title,
-                    estimatedMinutes: task.estimatedMinutes,
-                    actualMinutes: max(0, task.totalElapsedSeconds / 60),
-                    completed: task.status == TaskStatus.done.rawValue
-                )
-            }
-        )
-
+        let originalInput = buildSummaryInput(tasks: tasks, stats: stats)
         let originalGrade = DailyGrade(
             grade: summary.gradeEnum,
             summary: summary.summary,
@@ -245,7 +139,6 @@ actor DayManager {
             userFeedback: userFeedback
         )
 
-        // 更新评分
         summary.grade = newGrade.grade.rawValue
         summary.summary = newGrade.summary
         summary.suggestion = newGrade.suggestion
@@ -277,6 +170,51 @@ actor DayManager {
     }
 
     // MARK: - Private
+
+    /// 从任务列表构建 AI 评分输入
+    private func buildSummaryInput(tasks: [TaskEntity], stats: DayStats) -> DailySummaryInput {
+        DailySummaryInput(
+            totalTasks: stats.totalTasks,
+            completedTasks: stats.completedTasks,
+            totalPlannedMinutes: stats.totalPlannedMinutes,
+            totalActualMinutes: stats.totalActualMinutes,
+            deviationRate: stats.deviationRate,
+            extraCompleted: stats.extraCompleted,
+            taskDetails: tasks.map { task in
+                TaskDetail(
+                    title: task.title,
+                    estimatedMinutes: task.estimatedMinutes,
+                    actualMinutes: max(0, task.totalElapsedSeconds / 60),
+                    completed: task.status == TaskStatus.done.rawValue
+                )
+            }
+        )
+    }
+
+    /// AI 评分（带降级方案）
+    private func gradeWithFallback(tasks: [TaskEntity], fallbackSummary: String = "AI 评分不可用，使用基础评分。") async throws -> DailyGrade {
+        let stats = computeStats(tasks: tasks)
+        let input = buildSummaryInput(tasks: tasks, stats: stats)
+
+        do {
+            return try await aiService.generateDailyGrade(summaryInput: input)
+        } catch {
+            return DailyGrade(
+                grade: stats.fallbackGrade,
+                summary: "\(fallbackSummary)完成率：\(String(format: "%.0f%%", stats.completionRate * 100))",
+                stats: GradeStats(
+                    totalTasks: stats.totalTasks,
+                    completedTasks: stats.completedTasks,
+                    totalPlannedMinutes: stats.totalPlannedMinutes,
+                    totalActualMinutes: stats.totalActualMinutes,
+                    deviationRate: stats.deviationRate,
+                    extraCompleted: stats.extraCompleted
+                ),
+                suggestion: "明天继续加油！",
+                gradingBasis: "基于规则的降级评分（AI 不可用）"
+            )
+        }
+    }
 
     private func computeStats(tasks: [TaskEntity]) -> DayStats {
         let totalTasks = tasks.count
