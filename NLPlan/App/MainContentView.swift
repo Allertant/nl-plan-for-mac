@@ -90,11 +90,23 @@ struct PopoverContainerView: View {
 /// Settings 容器视图
 struct SettingsContainerView: View {
     @Environment(AppState.self) private var appState
+    @State private var viewModel: SettingsViewModel?
 
     var body: some View {
-        SettingsView(onClose: {
-            appState.currentPage = .main
-        })
-        .environment(appState)
+        Group {
+            if let viewModel {
+                SettingsView(viewModel: viewModel, onClose: {
+                    appState.currentPage = .main
+                })
+            } else {
+                ProgressView("加载中...")
+                    .frame(width: 360, height: 520)
+            }
+        }
+        .task {
+            if viewModel == nil {
+                viewModel = SettingsViewModel(appState: appState)
+            }
+        }
     }
 }
