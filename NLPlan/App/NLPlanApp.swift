@@ -16,7 +16,8 @@ struct NLPlanApp: App {
                 ThoughtEntity.self,
                 TaskEntity.self,
                 SessionLogEntity.self,
-                DailySummaryEntity.self
+                DailySummaryEntity.self,
+                ParseQueueItemEntity.self
             ])
             let config = ModelConfiguration(schema: schema)
             let mc = try ModelContainer(for: schema, configurations: [config])

@@ -180,7 +180,15 @@ final class AppState {
             timerEngine: timerEngine
         )
 
-        inputViewModel = InputViewModel(taskManager: taskMgr)
+        let parseQueueRepo = ParseQueueRepository(modelContext: context)
+
+        inputViewModel = InputViewModel(taskManager: taskMgr, parseQueueRepo: parseQueueRepo)
+
+        // 恢复未处理的队列项并继续处理
+        inputViewModel?.loadQueue()
+        Task {
+            await inputViewModel?.resumeQueueProcessing()
+        }
         ideaPoolViewModel = IdeaPoolViewModel(taskManager: taskMgr)
         mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
 

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 /// 输入区 ViewModel（队列模式）
 @Observable
@@ -9,8 +8,8 @@ final class InputViewModel {
     var errorMessage: String?
     var successMessage: String?
 
-    /// 解析队列
-    var queueItems: [ParseQueueItem] = []
+    /// 解析队列（从 SwiftData 加载）
+    var queueItems: [ParseQueueItemEntity] = []
 
     /// 当前正在查看详情的队列项 ID
     var activeDetailItemID: UUID?
@@ -19,17 +18,42 @@ final class InputViewModel {
     var chatInput: String = ""
 
     private let taskManager: TaskManager
+    private let parseQueueRepo: ParseQueueRepository
 
     /// 提交成功后的回调，传入新增任务 ID（用于通知想法池刷新并高亮）
     var onSubmitSuccess: (([UUID]) async -> Void)?
 
-    init(taskManager: TaskManager) {
+    init(taskManager: TaskManager, parseQueueRepo: ParseQueueRepository) {
         self.taskManager = taskManager
+        self.parseQueueRepo = parseQueueRepo
+    }
+
+    // MARK: - 加载
+
+    /// 从 SwiftData 恢复队列
+    func loadQueue() {
+        do {
+            queueItems = try parseQueueRepo.fetchAll()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 应用重启后恢复队列处理（将残留的 processing 重置为 waiting）
+    func resumeQueueProcessing() async {
+        let stuckItems = queueItems.filter { $0.parseStatus == .processing || $0.parseStatus == .waiting }
+        for item in stuckItems where item.parseStatus == .processing {
+            item.parseStatus = .waiting
+            try? parseQueueRepo.update(item)
+        }
+        if !stuckItems.isEmpty {
+            await processNextInQueue()
+        }
     }
 
     // MARK: - 提交
 
-    /// 提交输入 → 入队 → 触发串行处理
+    /// 提交输入 → 入队 → 持久化 → 触发串行处理
     func submit() async {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -41,9 +65,15 @@ final class InputViewModel {
             return
         }
 
-        // 入队并清空输入框
-        let item = ParseQueueItem(rawText: trimmed)
-        queueItems.append(item)
+        // 入队并持久化
+        do {
+            let item = try parseQueueRepo.create(rawText: trimmed)
+            queueItems.append(item)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+
         inputText = ""
         errorMessage = nil
 
@@ -56,12 +86,12 @@ final class InputViewModel {
     /// 串行处理队列中下一个 waiting 项
     private func processNextInQueue() async {
         // 已有正在处理的项则跳过
-        guard !queueItems.contains(where: { $0.status == .processing }) else { return }
+        guard !queueItems.contains(where: { $0.parseStatus == .processing }) else { return }
 
         // 取第一个 waiting 项
-        guard let item = queueItems.first(where: { $0.status == .waiting }) else { return }
+        guard let item = queueItems.first(where: { $0.parseStatus == .waiting }) else { return }
 
-        item.status = .processing
+        item.parseStatus = .processing
 
         do {
             let existingTasks = try await taskManager.fetchIdeaPool()
@@ -71,11 +101,14 @@ final class InputViewModel {
                 existingTaskTitles: existingTitles
             )
             item.parsedTasks = parsedTasks
-            item.status = .completed
+            item.parseStatus = .completed
         } catch {
             item.errorMessage = error.localizedDescription
-            item.status = .failed
+            item.parseStatus = .failed
         }
+
+        // 持久化状态变更
+        try? parseQueueRepo.update(item)
 
         // 递归处理下一个
         await processNextInQueue()
@@ -83,7 +116,7 @@ final class InputViewModel {
 
     // MARK: - 队列操作
 
-    /// 确认队列项 → 保存到想法池 → 移除
+    /// 确认队列项 → 保存到想法池 → 删除队列实体
     func confirmQueueItem(id: UUID) async {
         guard let index = queueItems.firstIndex(where: { $0.id == id }) else { return }
         let item = queueItems[index]
@@ -97,27 +130,37 @@ final class InputViewModel {
             successMessage = "✅ 已添加到想法池"
             let taskIds = createdTasks.map { $0.id }
             await onSubmitSuccess?(taskIds)
+
+            // 删除队列实体
+            try parseQueueRepo.delete(item)
             queueItems.remove(at: index)
         } catch {
             item.errorMessage = error.localizedDescription
         }
     }
 
-    /// 取消队列项 → 移除
+    /// 取消队列项 → 删除实体
     func cancelQueueItem(id: UUID) {
         guard let index = queueItems.firstIndex(where: { $0.id == id }) else { return }
         let item = queueItems[index]
         // 处理中的不能取消，等它完成后再移除
-        guard item.status != .processing else { return }
-        queueItems.remove(at: index)
+        guard item.parseStatus != .processing else { return }
+
+        do {
+            try parseQueueRepo.delete(item)
+            queueItems.remove(at: index)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     /// 重试失败的队列项
     func retryQueueItem(id: UUID) async {
         guard let item = queueItems.first(where: { $0.id == id }) else { return }
-        guard item.status == .failed else { return }
-        item.status = .waiting
+        guard item.parseStatus == .failed else { return }
+        item.parseStatus = .waiting
         item.errorMessage = nil
+        try? parseQueueRepo.update(item)
         await processNextInQueue()
     }
 
@@ -132,6 +175,7 @@ final class InputViewModel {
         tasks[taskIndex].category = category
         tasks[taskIndex].estimatedMinutes = estimatedMinutes
         item.parsedTasks = tasks
+        try? parseQueueRepo.update(item)
     }
 
     /// 删除队列项中的某个任务
@@ -141,6 +185,7 @@ final class InputViewModel {
               taskIndex >= 0, taskIndex < tasks.count else { return }
         tasks.remove(at: taskIndex)
         item.parsedTasks = tasks
+        try? parseQueueRepo.update(item)
     }
 
     /// 与 AI 对话修改队列项的解析结果
@@ -163,6 +208,7 @@ final class InputViewModel {
                 userInstruction: instruction
             )
             item.parsedTasks = newTasks
+            try? parseQueueRepo.update(item)
             successMessage = "✅ 已调整"
         } catch {
             errorMessage = error.localizedDescription

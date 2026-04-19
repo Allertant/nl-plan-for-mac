@@ -22,7 +22,7 @@ struct ParseQueueSection: View {
 
 /// 队列中的单行
 private struct ParseQueueRow: View {
-    let item: ParseQueueItem
+    let item: ParseQueueItemEntity
     let onTap: () -> Void
     let onRetry: () -> Void
 
@@ -43,7 +43,7 @@ private struct ParseQueueRow: View {
         .cornerRadius(6)
         .contentShape(Rectangle())
         .onTapGesture {
-            switch item.status {
+            switch item.parseStatus {
             case .completed:
                 onTap()
             case .failed:
@@ -58,7 +58,7 @@ private struct ParseQueueRow: View {
 
     @ViewBuilder
     private var statusIcon: some View {
-        switch item.status {
+        switch item.parseStatus {
         case .waiting:
             Image(systemName: "clock")
                 .font(.system(size: 11))
@@ -81,7 +81,7 @@ private struct ParseQueueRow: View {
 
     @ViewBuilder
     private var statusLabel: some View {
-        switch item.status {
+        switch item.parseStatus {
         case .waiting:
             Text("等待中")
                 .font(.system(size: 10))

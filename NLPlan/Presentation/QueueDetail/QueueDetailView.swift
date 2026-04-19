@@ -4,7 +4,7 @@ import SwiftUI
 struct QueueDetailView: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: InputViewModel
-    let queueItem: ParseQueueItem
+    let queueItem: ParseQueueItemEntity
 
     private var isLocked: Bool {
         viewModel.isItemChatProcessing(id: queueItem.id)

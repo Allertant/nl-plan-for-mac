@@ -1,13 +1,22 @@
 import Foundation
 
 /// AI 解析后的任务模型（DTO，非持久化）
-struct ParsedTask: Sendable, Identifiable {
-    let id = UUID()
+struct ParsedTask: Sendable, Identifiable, Codable {
+    let id: UUID
     var title: String
     var category: String
     var estimatedMinutes: Int
     let recommended: Bool
     let reason: String
+
+    init(id: UUID = UUID(), title: String, category: String, estimatedMinutes: Int, recommended: Bool, reason: String) {
+        self.id = id
+        self.title = title
+        self.category = category
+        self.estimatedMinutes = estimatedMinutes
+        self.recommended = recommended
+        self.reason = reason
+    }
 }
 
 /// AI 推荐输入（想法池/必做项任务摘要）
