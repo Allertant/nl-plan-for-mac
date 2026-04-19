@@ -94,3 +94,25 @@ struct GradeStatsDTO: Decodable {
         case deviationRate = "deviation_rate"
     }
 }
+
+// MARK: - Recommendation Response (from AI JSON)
+
+struct RecommendationResponse: Decodable {
+    let recommendations: [RecommendationDTO]
+    let overallReason: String
+
+    enum CodingKeys: String, CodingKey {
+        case recommendations
+        case overallReason = "overall_reason"
+    }
+}
+
+struct RecommendationDTO: Decodable {
+    let taskId: String
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case reason
+    }
+}

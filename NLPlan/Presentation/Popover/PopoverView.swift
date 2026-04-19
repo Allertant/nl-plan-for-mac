@@ -17,6 +17,15 @@ struct PopoverView: View {
         (hasScrollOverflow || ideaPoolViewModel.tasks.count >= 5)
     }
 
+    private var remainingWorkHours: Double {
+        let workEndHour = UserDefaults.standard.double(forKey: AppConstants.workEndTimeKey)
+        let endHour = workEndHour > 0 ? workEndHour : AppConstants.defaultWorkEndHour
+        let now = Date()
+        let calendar = Calendar.current
+        let currentTime = Double(calendar.component(.hour, from: now)) + Double(calendar.component(.minute, from: now)) / 60.0
+        return max(0, endHour - currentTime)
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             VStack(spacing: 0) {
@@ -42,7 +51,12 @@ struct PopoverView: View {
                         IdeaPoolSection(viewModel: ideaPoolViewModel)
 
                         // 必做项
-                        MustDoSection(viewModel: mustDoViewModel, timerEngine: timerEngine)
+                        MustDoSection(
+                            viewModel: mustDoViewModel,
+                            ideaPoolTasks: ideaPoolViewModel.tasks,
+                            remainingWorkHours: remainingWorkHours,
+                            timerEngine: timerEngine
+                        )
                     }
                     .padding(12)
                     .background(ScrollViewScrollerHider())

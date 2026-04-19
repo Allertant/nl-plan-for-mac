@@ -200,5 +200,10 @@ final class AppState {
         mustDoViewModel?.onDemotedToIdeaPool = { [weak self] in
             await self?.ideaPoolViewModel?.refresh()
         }
+
+        // 连接回调：推荐加入必做项后刷新想法池
+        mustDoViewModel?.onIdeaPoolChanged = { [weak self] in
+            await self?.ideaPoolViewModel?.refresh()
+        }
     }
 }

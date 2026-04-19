@@ -10,6 +10,33 @@ struct ParsedTask: Sendable, Identifiable {
     let reason: String
 }
 
+/// AI 推荐输入（想法池/必做项任务摘要）
+struct TaskRecommendationInput: Sendable {
+    let id: UUID
+    let title: String
+    let category: String
+    let estimatedMinutes: Int
+    let attempted: Bool
+    let status: String
+}
+
+/// AI 推荐结果（单条）
+struct TaskRecommendation: Sendable, Identifiable, Equatable {
+    let id = UUID()
+    let taskId: UUID
+    let reason: String
+
+    static func == (lhs: TaskRecommendation, rhs: TaskRecommendation) -> Bool {
+        lhs.taskId == rhs.taskId
+    }
+}
+
+/// AI 推荐响应（整体）
+struct RecommendationResult: Sendable, Equatable {
+    let recommendations: [TaskRecommendation]
+    let overallReason: String
+}
+
 /// 日终评分输入
 struct DailySummaryInput: Sendable {
     let totalTasks: Int

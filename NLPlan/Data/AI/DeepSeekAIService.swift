@@ -39,8 +39,11 @@ final class DeepSeekAIService: AIServiceProtocol {
             input: input,
             existingTaskTitles: existingTaskTitles
         )
-        let responseContent = try await sendRequest(systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。", userPrompt: prompt)
-        let parsedResponse = try parseJSON(responseContent, as: ParsedTasksResponse.self)
+        let parsedResponse = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ParsedTasksResponse.self
+        )
 
         return parsedResponse.tasks.map { dto in
             ParsedTask(
@@ -63,8 +66,11 @@ final class DeepSeekAIService: AIServiceProtocol {
             currentTasks: currentTasks,
             userInstruction: userInstruction
         )
-        let responseContent = try await sendRequest(systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。", userPrompt: prompt)
-        let parsedResponse = try parseJSON(responseContent, as: ParsedTasksResponse.self)
+        let parsedResponse = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ParsedTasksResponse.self
+        )
 
         return parsedResponse.tasks.map { dto in
             ParsedTask(
@@ -79,8 +85,11 @@ final class DeepSeekAIService: AIServiceProtocol {
 
     func generateDailyGrade(summaryInput: DailySummaryInput) async throws -> DailyGrade {
         let prompt = PromptTemplates.dailyGrade(input: summaryInput)
-        let responseContent = try await sendRequest(systemPrompt: "你是一个效率教练，只输出 JSON 格式。", userPrompt: prompt)
-        let gradeResponse = try parseJSON(responseContent, as: GradeResponse.self)
+        let gradeResponse = try await requestAndParse(
+            systemPrompt: "你是一个效率教练，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: GradeResponse.self
+        )
 
         return DailyGrade(
             grade: Grade(rawValue: gradeResponse.grade) ?? .D,
@@ -108,8 +117,11 @@ final class DeepSeekAIService: AIServiceProtocol {
             originalInput: originalInput,
             userFeedback: userFeedback
         )
-        let responseContent = try await sendRequest(systemPrompt: "你是一个效率教练，只输出 JSON 格式。请根据用户反馈重新评分。", userPrompt: prompt)
-        let gradeResponse = try parseJSON(responseContent, as: GradeResponse.self)
+        let gradeResponse = try await requestAndParse(
+            systemPrompt: "你是一个效率教练，只输出 JSON 格式。请根据用户反馈重新评分。",
+            userPrompt: prompt,
+            as: GradeResponse.self
+        )
 
         return DailyGrade(
             grade: Grade(rawValue: gradeResponse.grade) ?? .D,
@@ -127,7 +139,72 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
     }
 
+    func recommendTasks(
+        ideaPoolTasks: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) async throws -> RecommendationResult {
+        let prompt = PromptTemplates.recommendTasks(
+            ideaPoolTasks: ideaPoolTasks,
+            mustDoTasks: mustDoTasks,
+            remainingHours: remainingHours
+        )
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: RecommendationResponse.self
+        )
+
+        let recommendations = response.recommendations.compactMap { dto -> TaskRecommendation? in
+            guard let uuid = UUID(uuidString: dto.taskId) else { return nil }
+            return TaskRecommendation(taskId: uuid, reason: dto.reason)
+        }
+
+        return RecommendationResult(
+            recommendations: recommendations,
+            overallReason: response.overallReason
+        )
+    }
+
     // MARK: - Private
+
+    /// 发送请求并解析 JSON，失败时携带原始响应和错误信息重试一次
+    private func requestAndParse<T: Decodable>(
+        systemPrompt: String,
+        userPrompt: String,
+        as type: T.Type
+    ) async throws -> T {
+        let raw = try await sendRequest(systemPrompt: systemPrompt, userPrompt: userPrompt)
+
+        do {
+            return try parseJSON(raw, as: type)
+        } catch {
+            // 解析失败，构建纠错 prompt 重试一次
+            print("⚠️ JSON 解析失败，尝试纠错重试。错误：\(error.localizedDescription)")
+            let correctionPrompt = buildCorrectionPrompt(rawResponse: raw, parseError: error)
+            let secondRaw = try await sendRequest(
+                systemPrompt: "请修正你上一次返回的 JSON，只输出完整的正确 JSON，不要解释。",
+                userPrompt: correctionPrompt
+            )
+            return try parseJSON(secondRaw, as: type)
+        }
+    }
+
+    /// 构建纠错 prompt：将原始响应和错误信息发送给 AI
+    private func buildCorrectionPrompt(rawResponse: String, parseError: Error) -> String {
+        """
+        你上一次返回的内容解析失败，请修正后重新输出。
+
+        ## 你上次的返回内容
+        \(rawResponse)
+
+        ## 解析失败的错误信息
+        \(parseError.localizedDescription)
+
+        ## 要求
+        请根据错误信息修正，只返回完整的正确 JSON，不要添加任何解释。
+        """
+    }
 
     private func sendRequest(systemPrompt: String, userPrompt: String) async throws -> String {
         let timeoutInterval = Self.timeoutInterval(for: model)
@@ -203,8 +280,9 @@ final class DeepSeekAIService: AIServiceProtocol {
         }
         do {
             return try JSONDecoder().decode(type, from: data)
-        } catch {
-            throw NLPlanError.aiResponseParseError
+        } catch let decodingError {
+            print("❌ JSON 解码失败：\(decodingError)")
+            throw decodingError
         }
     }
 

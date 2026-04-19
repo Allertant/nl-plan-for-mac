@@ -26,6 +26,18 @@ protocol AIServiceProtocol: Sendable {
         summaryInput: DailySummaryInput
     ) async throws -> DailyGrade
 
+    /// 从想法池中推荐今日待做任务
+    /// - Parameters:
+    ///   - ideaPoolTasks: 想法池中的全部任务
+    ///   - mustDoTasks: 当前必做项列表
+    ///   - remainingHours: 剩余可用工作小时数
+    /// - Returns: 推荐结果
+    func recommendTasks(
+        ideaPoolTasks: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) async throws -> RecommendationResult
+
     /// 驳斥评分：AI 根据用户反馈重新评分
     /// - Parameters:
     ///   - originalGrade: 原始评分结果

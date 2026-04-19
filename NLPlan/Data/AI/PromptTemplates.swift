@@ -137,6 +137,58 @@ enum PromptTemplates {
         """
     }
 
+    // MARK: - AI 推荐
+
+    static func recommendTasks(
+        ideaPoolTasks: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) -> String {
+        let mustDoList = mustDoTasks.enumerated().map { i, t in
+            "\(i + 1). \(t.title) - \(t.estimatedMinutes)分钟 - \(t.status == "running" ? "进行中" : "待开始")"
+        }.joined(separator: "\n")
+
+        let ideaList = ideaPoolTasks.enumerated().map { i, t in
+            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")"
+        }.joined(separator: "\n")
+
+        let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + $1.estimatedMinutes }
+        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
+
+        return """
+        你是一个任务管理助手。请根据用户今天的情况，从想法池中推荐最合适的任务加入今日必做项。
+
+        ## 当前时间
+        剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
+
+        ## 今日必做项（已有）
+        \(mustDoTasks.isEmpty ? "（无）" : mustDoList)
+
+        必做项预计总时长：\(mustDoTotalMinutes) 分钟
+
+        ## 想法池（可选任务）
+        \(ideaList)
+
+        ## 剩余可用空余时间
+        约 \(String(format: "%.1f", freeHours)) 小时
+
+        ## 要求
+        从想法池中选出 1-3 项最适合今天完成的任务，考虑：
+        1. 剩余空余时间是否充足
+        2. 已尝试过（attempted）的任务优先级适当降低
+        3. 分类尽量分散
+        4. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
+
+        输出严格的 JSON 格式：
+        {
+          "recommendations": [
+            { "task_id": "想法池中任务的 UUID", "reason": "推荐理由" }
+          ],
+          "overall_reason": "整体推荐说明"
+        }
+        """
+    }
+
     // MARK: - 驳斥评分
 
     static func appealGrade(
