@@ -142,7 +142,8 @@ enum PromptTemplates {
     static func recommendTasks(
         ideaPoolTasks: [TaskRecommendationInput],
         mustDoTasks: [TaskRecommendationInput],
-        remainingHours: Double
+        remainingHours: Double,
+        strategy: MustDoViewModel.RecommendationStrategy
     ) -> String {
         let mustDoList = mustDoTasks.enumerated().map { i, t in
             "\(i + 1). \(t.title) - \(t.estimatedMinutes)分钟 - \(t.status == "running" ? "进行中" : "待开始")"
@@ -155,8 +156,19 @@ enum PromptTemplates {
         let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + $1.estimatedMinutes }
         let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
 
+        let strategyHint: String
+        switch strategy {
+        case .quickWin:
+            strategyHint = "优先推荐预估时间短、容易完成的任务，让用户快速积累完成感。按预估时间从短到长排列推荐结果。"
+        case .hardFirst:
+            strategyHint = "优先推荐预估时间长、挑战性高的任务，趁用户精力充沛时先完成困难事项。按预估时间从长到短排列推荐结果。"
+        }
+
         return """
         你是一个任务管理助手。请根据用户今天的情况，从想法池中推荐最合适的任务加入今日必做项。
+
+        ## 推荐策略
+        \(strategyHint)
 
         ## 当前时间
         剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
@@ -177,7 +189,8 @@ enum PromptTemplates {
         1. 剩余空余时间是否充足
         2. 已尝试过（attempted）的任务优先级适当降低
         3. 分类尽量分散
-        4. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
+        4. 按推荐执行顺序排列（第一个最应该先做）
+        5. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
 
         输出严格的 JSON 格式：
         {

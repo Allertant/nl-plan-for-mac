@@ -15,6 +15,21 @@ final class MustDoViewModel {
 
     // MARK: - AI 推荐
 
+    /// 推荐策略
+    enum RecommendationStrategy: String, CaseIterable, Identifiable {
+        case quickWin = "quick_win"       // 快速完成优先
+        case hardFirst = "hard_first"     // 高难度优先
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .quickWin: return "快速完成优先"
+            case .hardFirst: return "高难度优先"
+            }
+        }
+    }
+
     enum RecommendationState: Equatable {
         case idle
         case loading
@@ -23,9 +38,13 @@ final class MustDoViewModel {
     }
 
     var recommendationState: RecommendationState = .idle
+    var recommendationStrategy: RecommendationStrategy = .quickWin
 
     /// 已加入的推荐项 taskId
     var acceptedRecommendationIds: Set<UUID> = []
+
+    /// 每条推荐项的用户选择优先级
+    var selectedPriorities: [UUID: TaskPriority] = [:]
 
     /// 当前推荐结果（便利访问）
     var currentRecommendations: RecommendationResult? {
@@ -127,6 +146,7 @@ final class MustDoViewModel {
         recommendationState = .loading
         errorMessage = nil
         acceptedRecommendationIds = []
+        selectedPriorities = [:]
 
         let ideaInputs = ideaPoolTasks.map { task in
             TaskRecommendationInput(
@@ -155,7 +175,8 @@ final class MustDoViewModel {
             let result = try await aiService.recommendTasks(
                 ideaPoolTasks: ideaInputs,
                 mustDoTasks: mustDoInputs,
-                remainingHours: remainingHours
+                remainingHours: remainingHours,
+                strategy: recommendationStrategy
             )
 
             // 过滤掉不存在的 taskId
@@ -166,6 +187,17 @@ final class MustDoViewModel {
                 overallReason: result.overallReason
             )
 
+            // 设置默认优先级：按推荐顺序递减
+            for (index, rec) in validRecs.enumerated() {
+                let priority: TaskPriority
+                switch index {
+                case 0: priority = .high
+                case 1: priority = .medium
+                default: priority = .low
+                }
+                selectedPriorities[rec.taskId] = priority
+            }
+
             recommendationState = .loaded(filteredResult)
         } catch {
             recommendationState = .error(error.localizedDescription)
@@ -174,8 +206,10 @@ final class MustDoViewModel {
 
     /// 接受单条推荐
     func acceptRecommendation(taskId: UUID) async {
+        let priority = selectedPriorities[taskId] ?? .medium
+        let order = currentRecommendations?.recommendations.firstIndex(where: { $0.taskId == taskId }) ?? 0
         do {
-            try await taskManager.promoteToMustDo(taskId: taskId)
+            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority, sortOrder: order)
             acceptedRecommendationIds.insert(taskId)
             await refresh()
             await onIdeaPoolChanged?()
@@ -187,11 +221,19 @@ final class MustDoViewModel {
     /// 接受所有未操作的推荐
     func acceptAllRecommendations() async {
         guard let recs = currentRecommendations else { return }
-        for rec in recs.recommendations {
+        for (index, rec) in recs.recommendations.enumerated() {
             if !acceptedRecommendationIds.contains(rec.taskId) {
-                await acceptRecommendation(taskId: rec.taskId)
+                let priority = selectedPriorities[rec.taskId] ?? .medium
+                do {
+                    try await taskManager.promoteToMustDo(taskId: rec.taskId, priority: priority, sortOrder: index)
+                    acceptedRecommendationIds.insert(rec.taskId)
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
             }
         }
+        await refresh()
+        await onIdeaPoolChanged?()
     }
 
     /// 关闭推荐面板

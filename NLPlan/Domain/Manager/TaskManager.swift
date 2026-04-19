@@ -84,13 +84,15 @@ actor TaskManager {
     }
 
     /// 从想法池中挑选任务加入必做项
-    func promoteToMustDo(taskId: UUID) async throws {
+    func promoteToMustDo(taskId: UUID, priority: TaskPriority? = nil, sortOrder: Int? = nil) async throws {
         guard let task = try taskRepo.fetchById(taskId) else {
             throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
         }
         guard task.pool == TaskPool.ideaPool.rawValue else {
             throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
         }
+        if let priority { task.taskPriority = priority }
+        if let sortOrder { task.sortOrder = sortOrder }
         try taskRepo.moveToMustDo(task)
     }
 

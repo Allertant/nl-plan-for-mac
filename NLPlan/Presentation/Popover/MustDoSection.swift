@@ -90,36 +90,41 @@ private struct AIRecommendButton: View {
     let remainingWorkHours: Double
 
     var body: some View {
-        Button {
-            if viewModel.isRecommendationLoading {
-                return
+        HStack(spacing: 6) {
+            Picker("策略", selection: $viewModel.recommendationStrategy) {
+                ForEach(MustDoViewModel.RecommendationStrategy.allCases) { strategy in
+                    Text(strategy.displayName)
+                        .font(.system(size: 10))
+                        .tag(strategy)
+                }
             }
-            Task {
-                await viewModel.fetchRecommendations(
-                    ideaPoolTasks: ideaPoolTasks,
-                    remainingHours: remainingWorkHours
-                )
-            }
-        } label: {
-            HStack(spacing: 4) {
-                if viewModel.isRecommendationLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
+            .pickerStyle(.segmented)
+            .frame(width: 180)
+
+            Spacer()
+
+            Button {
+                Task {
+                    await viewModel.fetchRecommendations(
+                        ideaPoolTasks: ideaPoolTasks,
+                        remainingHours: remainingWorkHours
+                    )
+                }
+            } label: {
+                HStack(spacing: 4) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11))
+                    Text("AI 推荐")
+                        .font(.system(size: 11))
                 }
-                Text("AI 推荐")
-                    .font(.system(size: 11))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(6)
             }
-            .foregroundStyle(Color.accentColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.accentColor.opacity(0.1))
-            .cornerRadius(6)
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isRecommendationLoading)
         .padding(.horizontal, 12)
         .padding(.top, 4)
     }
@@ -186,6 +191,10 @@ private struct AIRecommendPanel: View {
                                 task: task,
                                 reason: rec.reason,
                                 isAccepted: viewModel.acceptedRecommendationIds.contains(rec.taskId),
+                                selectedPriority: Binding(
+                                    get: { viewModel.selectedPriorities[rec.taskId] ?? .medium },
+                                    set: { viewModel.selectedPriorities[rec.taskId] = $0 }
+                                ),
                                 onAccept: {
                                     Task { await viewModel.acceptRecommendation(taskId: rec.taskId) }
                                 }
@@ -244,6 +253,7 @@ private struct RecommendationRow: View {
     let task: TaskEntity
     let reason: String
     let isAccepted: Bool
+    @Binding var selectedPriority: TaskPriority
     let onAccept: () -> Void
 
     var body: some View {
@@ -276,6 +286,29 @@ private struct RecommendationRow: View {
                     Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
+
+                    // 优先级选择
+                    if !isAccepted {
+                        Menu {
+                            ForEach(TaskPriority.allCases, id: \.self) { p in
+                                Button {
+                                    selectedPriority = p
+                                } label: {
+                                    Label(p.displayName, systemImage: p == .high ? "flag.fill" : "flag")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: priorityIcon)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(priorityColor)
+                                Text(selectedPriority.displayName)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(priorityColor)
+                            }
+                        }
+                        .menuStyle(.borderlessButton)
+                    }
                 }
             }
 
@@ -300,6 +333,22 @@ private struct RecommendationRow: View {
             : Color(nsColor: .textBackgroundColor)
         )
         .cornerRadius(6)
+    }
+
+    private var priorityIcon: String {
+        switch selectedPriority {
+        case .high: return "flag.fill"
+        case .medium: return "flag"
+        case .low: return "flag"
+        }
+    }
+
+    private var priorityColor: Color {
+        switch selectedPriority {
+        case .high: return .red
+        case .medium: return .orange
+        case .low: return .blue
+        }
     }
 }
 
