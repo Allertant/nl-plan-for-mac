@@ -82,8 +82,8 @@ struct IdeaPoolSection: View {
                     } else {
                         LazyVStack(spacing: 4) {
                             ForEach(filteredTasks, id: \.id) { task in
-                                IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) {
-                                    Task { await viewModel.promoteToMustDo(taskId: task.id) }
+                                IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) { priority in
+                                    Task { await viewModel.promoteToMustDo(taskId: task.id, priority: priority) }
                                 } onDelete: {
                                     Task { await viewModel.deleteTask(taskId: task.id) }
                                 }
@@ -105,7 +105,7 @@ struct IdeaPoolSection: View {
 struct IdeaPoolTaskRow: View {
     let task: TaskEntity
     var isNew: Bool = false
-    let onPromote: () -> Void
+    let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
 
     @State private var flashCount = 0
@@ -158,14 +158,20 @@ struct IdeaPoolTaskRow: View {
             Spacer()
 
             VStack(spacing: 4) {
-                Button {
-                    onPromote()
+                Menu {
+                    ForEach(TaskPriority.allCases, id: \.self) { priority in
+                        Button {
+                            onPromote(priority)
+                        } label: {
+                            Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag")
+                        }
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(.green)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
                 .help("加入必做项")
 
                 if showDeleteConfirm {

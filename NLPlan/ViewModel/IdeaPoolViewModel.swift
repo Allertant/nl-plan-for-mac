@@ -37,9 +37,9 @@ final class IdeaPoolViewModel {
     }
 
     /// 加入必做项
-    func promoteToMustDo(taskId: UUID) async {
+    func promoteToMustDo(taskId: UUID, priority: TaskPriority = .medium) async {
         do {
-            try await taskManager.promoteToMustDo(taskId: taskId)
+            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority)
             await refresh()
             await onPromotedToMustDo?()
         } catch {
