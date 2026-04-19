@@ -58,8 +58,8 @@ struct MustDoSection: View {
                 }
             }
 
-            // AI 推荐按钮
-            if !ideaPoolTasks.isEmpty {
+            // AI 推荐按钮（面板展开时隐藏，避免两个 spinner 同时出现）
+            if !ideaPoolTasks.isEmpty && !viewModel.showRecommendationPanel {
                 AIRecommendButton(
                     viewModel: viewModel,
                     ideaPoolTasks: ideaPoolTasks,
