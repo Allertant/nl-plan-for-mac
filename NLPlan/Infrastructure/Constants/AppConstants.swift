@@ -29,6 +29,12 @@ enum AppConstants {
     /// 外观模式持久化 key
     static let appearanceModeKey = "nlplan_appearance_mode"
 
+    /// 工作结束时间持久化 key
+    static let workEndTimeKey = "nlplan_work_end_time"
+
+    /// 默认工作结束时间（小时）
+    static let defaultWorkEndHour: Double = 18.0
+
     /// 默认模型
     static let defaultModel = "deepseek-chat"
 

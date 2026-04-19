@@ -33,6 +33,36 @@ final class SettingsViewModel {
 
     var allowParallel: Bool = false
     var syncToNotes: Bool = true
+    var workEndHour: Double = AppConstants.defaultWorkEndHour
+
+    /// 根据当前时间计算剩余工作小时数
+    var remainingWorkHours: Double {
+        let now = Date()
+        let calendar = Calendar.current
+        let currentHour = Double(calendar.component(.hour, from: now))
+        let currentMinute = Double(calendar.component(.minute, from: now)) / 60.0
+        let currentTime = currentHour + currentMinute
+        return max(0, workEndHour - currentTime)
+    }
+
+    /// 今天工作时间是否已结束
+    var isWorkTimeEnded: Bool {
+        remainingWorkHours <= 0
+    }
+
+    // MARK: - 工作结束时间
+
+    func loadWorkEndTime() {
+        workEndHour = UserDefaults.standard.double(forKey: AppConstants.workEndTimeKey)
+        if workEndHour == 0 {
+            workEndHour = AppConstants.defaultWorkEndHour
+        }
+    }
+
+    func saveWorkEndTime(_ hour: Double) {
+        workEndHour = hour
+        UserDefaults.standard.set(hour, forKey: AppConstants.workEndTimeKey)
+    }
 
     // MARK: - 开机自启
 
@@ -61,6 +91,7 @@ final class SettingsViewModel {
         loadAPIKey()
         loadSelectedModel()
         loadLaunchAtLoginState()
+        loadWorkEndTime()
     }
 
     // MARK: - API Key

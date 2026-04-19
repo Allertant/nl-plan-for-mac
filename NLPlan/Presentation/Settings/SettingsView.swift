@@ -86,6 +86,32 @@ struct SettingsView: View {
 
                     Toggle("同步到备忘录", isOn: $viewModel.syncToNotes)
                         .font(.system(size: 12))
+
+                    HStack {
+                        Text("工作结束时间")
+                            .font(.system(size: 12))
+                        Spacer()
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: {
+                                    let calendar = Calendar.current
+                                    var comps = DateComponents()
+                                    comps.hour = Int(viewModel.workEndHour)
+                                    comps.minute = Int((viewModel.workEndHour - Double(Int(viewModel.workEndHour))) * 60)
+                                    return calendar.date(from: comps) ?? Date()
+                                },
+                                set: { date in
+                                    let calendar = Calendar.current
+                                    let hour = Double(calendar.component(.hour, from: date))
+                                    let minute = Double(calendar.component(.minute, from: date)) / 60.0
+                                    viewModel.saveWorkEndTime(hour + minute)
+                                }
+                            ),
+                            displayedComponents: .hourAndMinute
+                        )
+                        .labelsHidden()
+                    }
                 }
                 .padding(10)
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
