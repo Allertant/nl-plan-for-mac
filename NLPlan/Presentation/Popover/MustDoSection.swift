@@ -373,6 +373,13 @@ struct MustDoTaskRow: View {
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
+                    Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
+                        .font(.system(size: 9))
+                        .foregroundStyle(
+                            task.taskPriority == .high ? .red :
+                            task.taskPriority == .medium ? .orange : .blue
+                        )
+
                     Label("预计\(task.estimatedMinutes)分钟", systemImage: "clock")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)

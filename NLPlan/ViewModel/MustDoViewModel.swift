@@ -126,9 +126,16 @@ final class MustDoViewModel {
         tasks.filter { $0.status == TaskStatus.done.rawValue }
     }
 
-    /// 未完成的任务
+    /// 未完成的任务（按优先级排序：高 → 中 → 低）
     var pendingTasks: [TaskEntity] {
-        tasks.filter { $0.status != TaskStatus.done.rawValue }
+        let priorityOrder: [String: Int] = [
+            TaskPriority.high.rawValue: 0,
+            TaskPriority.medium.rawValue: 1,
+            TaskPriority.low.rawValue: 2
+        ]
+        return tasks
+            .filter { $0.status != TaskStatus.done.rawValue }
+            .sorted { (priorityOrder[$0.priority] ?? 1) < (priorityOrder[$1.priority] ?? 1) }
     }
 
     /// 正在运行的任务
