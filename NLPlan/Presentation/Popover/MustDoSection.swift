@@ -4,7 +4,6 @@ import SwiftUI
 struct MustDoSection: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolTasks: [TaskEntity]
-    let remainingWorkHours: Double
     let timerEngine: TimerEngine
 
     var body: some View {
@@ -75,6 +74,11 @@ struct MustDoSection: View {
                             }
                         )
                     }
+
+                    // 为底部浮动按钮留出空间
+                    if !ideaPoolTasks.isEmpty && !viewModel.showRecommendationPanel {
+                        Color.clear.frame(height: 36)
+                    }
                 }
                 .padding(.horizontal, 8)
 
@@ -92,15 +96,6 @@ struct MustDoSection: View {
                 }
             }
 
-            // AI 推荐按钮（面板展开时隐藏，避免两个 spinner 同时出现）
-            if !ideaPoolTasks.isEmpty && !viewModel.showRecommendationPanel {
-                AIRecommendButton(
-                    viewModel: viewModel,
-                    ideaPoolTasks: ideaPoolTasks,
-                    remainingWorkHours: remainingWorkHours
-                )
-            }
-
             // AI 推荐面板
             if viewModel.showRecommendationPanel {
                 AIRecommendPanel(viewModel: viewModel, ideaPoolTasks: ideaPoolTasks)
@@ -113,54 +108,6 @@ struct MustDoSection: View {
                     .padding(.horizontal, 12)
             }
         }
-    }
-}
-
-// MARK: - AI 推荐按钮
-
-private struct AIRecommendButton: View {
-    @Bindable var viewModel: MustDoViewModel
-    let ideaPoolTasks: [TaskEntity]
-    let remainingWorkHours: Double
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Picker("策略", selection: $viewModel.recommendationStrategy) {
-                ForEach(MustDoViewModel.RecommendationStrategy.allCases) { strategy in
-                    Text(strategy.displayName)
-                        .font(.system(size: 10))
-                        .tag(strategy)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 180)
-
-            Spacer()
-
-            Button {
-                Task {
-                    await viewModel.fetchRecommendations(
-                        ideaPoolTasks: ideaPoolTasks,
-                        remainingHours: remainingWorkHours
-                    )
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11))
-                    Text("AI 推荐")
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(Color.accentColor)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.accentColor.opacity(0.1))
-                .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
     }
 }
 

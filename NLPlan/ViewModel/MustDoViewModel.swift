@@ -31,6 +31,13 @@ final class MustDoViewModel {
             case .hardFirst: return "高难度优先"
             }
         }
+
+        var shortName: String {
+            switch self {
+            case .quickWin: return "快速"
+            case .hardFirst: return "挑战"
+            }
+        }
     }
 
     enum RecommendationState: Equatable {

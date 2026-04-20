@@ -54,7 +54,6 @@ struct PopoverView: View {
                         MustDoSection(
                             viewModel: mustDoViewModel,
                             ideaPoolTasks: ideaPoolViewModel.tasks,
-                            remainingWorkHours: remainingWorkHours,
                             timerEngine: timerEngine
                         )
                     }
@@ -104,6 +103,7 @@ struct PopoverView: View {
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
+                // 回到顶部按钮
                 if showBackToTopButton {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -125,6 +125,18 @@ struct PopoverView: View {
                     .padding(.trailing, 14)
                     .padding(.bottom, 78)
                     .zIndex(10)
+                }
+
+                // AI 推荐浮动按钮
+                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel {
+                    AIRecommendFloatingButton(
+                        viewModel: mustDoViewModel,
+                        ideaPoolTasks: ideaPoolViewModel.tasks,
+                        remainingWorkHours: remainingWorkHours
+                    )
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 48)
+                    .zIndex(9)
                 }
             }
             .onAppear {
@@ -150,5 +162,70 @@ struct APIKeyNotConfiguredBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.orange.opacity(0.1))
+    }
+}
+
+// MARK: - AI 推荐浮动按钮
+
+private struct AIRecommendFloatingButton: View {
+    @Bindable var viewModel: MustDoViewModel
+    let ideaPoolTasks: [TaskEntity]
+    let remainingWorkHours: Double
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            // 策略小球（从底部向上弹出）
+            if isExpanded {
+                ForEach(Array(MustDoViewModel.RecommendationStrategy.allCases.enumerated()), id: \.element) { index, strategy in
+                    strategyBall(strategy, offsetIndex: MustDoViewModel.RecommendationStrategy.allCases.count - 1 - index)
+                }
+            }
+
+            // 主按钮
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                Image(systemName: isExpanded ? "xmark" : "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(isExpanded ? Color.secondary : Color.accentColor)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy, offsetIndex: Int) -> some View {
+        Button {
+            viewModel.recommendationStrategy = strategy
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isExpanded = false
+            }
+            Task {
+                await viewModel.fetchRecommendations(
+                    ideaPoolTasks: ideaPoolTasks,
+                    remainingHours: remainingWorkHours
+                )
+            }
+        } label: {
+            Text(strategy.shortName)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.accentColor)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+        .offset(y: CGFloat(offsetIndex + 1) * -40)
+        .transition(.scale(scale: 0.5).combined(with: .opacity))
     }
 }
