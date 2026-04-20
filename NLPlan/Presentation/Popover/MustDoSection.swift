@@ -108,6 +108,9 @@ struct MustDoSection: View {
                     .padding(.horizontal, 12)
             }
         }
+        .padding(8)
+        .background(Color.green.opacity(0.06))
+        .cornerRadius(8)
     }
 }
 

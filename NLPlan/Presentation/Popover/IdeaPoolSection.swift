@@ -96,7 +96,7 @@ struct IdeaPoolSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
+        .background(Color.yellow.opacity(0.08))
         .cornerRadius(8)
     }
 }
