@@ -20,6 +20,27 @@ struct MustDoSection: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+
+                if !viewModel.pendingTasks.isEmpty && !viewModel.isEditMode {
+                    Button {
+                        viewModel.isEditMode = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("排序")
+                }
+
+                if viewModel.isEditMode {
+                    Button("完成") {
+                        viewModel.isEditMode = false
+                    }
+                    .font(.system(size: 11))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -32,13 +53,26 @@ struct MustDoSection: View {
             } else {
                 // 未完成任务
                 LazyVStack(spacing: 4) {
-                    ForEach(viewModel.pendingTasks, id: \.id) { task in
+                    ForEach(Array(viewModel.pendingTasks.enumerated()), id: \.element.id) { index, task in
                         MustDoTaskRow(
                             task: task,
+                            isEditMode: viewModel.isEditMode,
+                            canMoveUp: viewModel.canMoveUp(at: index),
+                            canMoveDown: viewModel.canMoveDown(at: index),
                             timerEngine: timerEngine,
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
-                            onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } }
+                            onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
+                            onMoveUp: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.moveUp(at: index)
+                                }
+                            },
+                            onMoveDown: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.moveDown(at: index)
+                                }
+                            }
                         )
                     }
                 }
@@ -355,88 +389,128 @@ private struct RecommendationRow: View {
 /// 必做项任务卡片
 struct MustDoTaskRow: View {
     let task: TaskEntity
+    var isEditMode: Bool = false
+    var canMoveUp: Bool = false
+    var canMoveDown: Bool = false
     let timerEngine: TimerEngine
     let onStart: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+
+    private var isRunning: Bool { task.status == TaskStatus.running.rawValue }
 
     var body: some View {
         HStack(spacing: 8) {
-            // 状态图标
-            Image(systemName: task.taskStatus.iconName)
-                .font(.system(size: 16))
-                .foregroundStyle(task.status == TaskStatus.running.rawValue ? Color.green : Color.secondary)
+            statusIcon
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
 
-                HStack(spacing: 8) {
-                    Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
-                        .font(.system(size: 9))
-                        .foregroundStyle(
-                            task.taskPriority == .high ? .red :
-                            task.taskPriority == .medium ? .orange : .blue
-                        )
-
-                    Label("预计\(task.estimatedMinutes)分钟", systemImage: "clock")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-
-                    if task.status == TaskStatus.running.rawValue {
-                        RunningTimerView(taskId: task.id, timerEngine: timerEngine)
-                    }
-                }
+                taskInfoLine
             }
 
             Spacer()
 
-            HStack(spacing: 4) {
-                if task.status != TaskStatus.running.rawValue {
-                    Button {
-                        onStart()
-                    } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.green)
-                    }
-                    .buttonStyle(.plain)
-                    .help("开始执行")
-                }
-
-                Button {
-                    onComplete()
-                } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(.plain)
-                .help("标记完成")
-
-                Button {
-                    onDemote()
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("移回想法池")
+            if isEditMode {
+                reorderButtons
+            } else {
+                actionButtons
             }
         }
         .padding(8)
-        .background(
-            task.status == TaskStatus.running.rawValue
-            ? Color.green.opacity(0.08)
-            : Color(nsColor: .textBackgroundColor)
-        )
+        .background(rowBackground)
         .cornerRadius(6)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(task.status == TaskStatus.running.rawValue ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
-        )
+        .overlay(rowBorder)
+    }
+
+    // MARK: - Subviews
+
+    private var statusIcon: some View {
+        Image(systemName: task.taskStatus.iconName)
+            .font(.system(size: 16))
+            .foregroundStyle(isRunning ? Color.green : Color.secondary)
+    }
+
+    private var taskInfoLine: some View {
+        HStack(spacing: 8) {
+            Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
+                .font(.system(size: 9))
+                .foregroundStyle(
+                    task.taskPriority == .high ? .red :
+                    task.taskPriority == .medium ? .orange : .blue
+                )
+
+            Label("预计\(task.estimatedMinutes)分钟", systemImage: "clock")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+
+            if isRunning {
+                RunningTimerView(taskId: task.id, timerEngine: timerEngine)
+            }
+        }
+    }
+
+    private var reorderButtons: some View {
+        VStack(spacing: 2) {
+            Button(action: onMoveUp) {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(canMoveUp ? Color.primary : Color.gray.opacity(0.3))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveUp)
+
+            Button(action: onMoveDown) {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(canMoveDown ? Color.primary : Color.gray.opacity(0.3))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveDown)
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 4) {
+            if !isRunning {
+                Button(action: onStart) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help("开始执行")
+            }
+
+            Button(action: onComplete) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.blue)
+            }
+            .buttonStyle(.plain)
+            .help("标记完成")
+
+            Button(action: onDemote) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("移回想法池")
+        }
+    }
+
+    private var rowBackground: Color {
+        isRunning ? Color.green.opacity(0.08) : Color(nsColor: .textBackgroundColor)
+    }
+
+    private var rowBorder: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .stroke(isRunning ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
     }
 }
 
@@ -465,5 +539,18 @@ struct CompletedTaskRow: View {
         .padding(8)
         .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
         .cornerRadius(6)
+    }
+}
+
+// MARK: - View Extension
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 }

@@ -7,6 +7,9 @@ final class MustDoViewModel {
     var tasks: [TaskEntity] = []
     var errorMessage: String?
 
+    /// 编辑模式（上下箭头排序）
+    var isEditMode: Bool = false
+
     /// 移回想法池后的回调（用于通知想法池刷新）
     var onDemotedToIdeaPool: (() async -> Void)?
 
@@ -121,12 +124,62 @@ final class MustDoViewModel {
         }
     }
 
+    /// 是否可以上移（同优先级内有上一个）
+    func canMoveUp(at index: Int) -> Bool {
+        let pending = pendingTasks
+        guard index > 0 && index < pending.count else { return false }
+        return pending[index].priority == pending[index - 1].priority
+    }
+
+    /// 是否可以下移（同优先级内有下一个）
+    func canMoveDown(at index: Int) -> Bool {
+        let pending = pendingTasks
+        guard index >= 0 && index < pending.count - 1 else { return false }
+        return pending[index].priority == pending[index + 1].priority
+    }
+
+    /// 上移（仅在同优先级内交换 sortOrder）
+    func moveUp(at index: Int) {
+        let pending = pendingTasks
+        guard index > 0,
+              pending[index].priority == pending[index - 1].priority else { return }
+
+        let currentTask = pending[index]
+        let aboveTask = pending[index - 1]
+        let tempOrder = currentTask.sortOrder
+        currentTask.sortOrder = aboveTask.sortOrder
+        aboveTask.sortOrder = tempOrder
+
+        Task {
+            try? await taskManager.saveTaskOrders()
+            await refresh()
+        }
+    }
+
+    /// 下移（仅在同优先级内交换 sortOrder）
+    func moveDown(at index: Int) {
+        let pending = pendingTasks
+        guard index < pending.count - 1,
+              pending[index].priority == pending[index + 1].priority else { return }
+
+        let currentTask = pending[index]
+        let belowTask = pending[index + 1]
+        let tempOrder = currentTask.sortOrder
+        currentTask.sortOrder = belowTask.sortOrder
+        belowTask.sortOrder = tempOrder
+
+        Task {
+            try? await taskManager.saveTaskOrders()
+            await refresh()
+        }
+    }
+
     /// 已完成的任务
     var completedTasks: [TaskEntity] {
         tasks.filter { $0.status == TaskStatus.done.rawValue }
     }
 
-    /// 未完成的任务（按优先级排序：高 → 中 → 低）
+    /// 未完成的任务（按优先级排序，同优先级内按 sortOrder）
     var pendingTasks: [TaskEntity] {
         let priorityOrder: [String: Int] = [
             TaskPriority.high.rawValue: 0,
@@ -135,7 +188,12 @@ final class MustDoViewModel {
         ]
         return tasks
             .filter { $0.status != TaskStatus.done.rawValue }
-            .sorted { (priorityOrder[$0.priority] ?? 1) < (priorityOrder[$1.priority] ?? 1) }
+            .sorted {
+                let p0 = priorityOrder[$0.priority] ?? 1
+                let p1 = priorityOrder[$1.priority] ?? 1
+                if p0 != p1 { return p0 < p1 }
+                return $0.sortOrder < $1.sortOrder
+            }
     }
 
     /// 正在运行的任务

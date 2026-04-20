@@ -193,4 +193,12 @@ actor TaskManager {
     func fetchRunningTasks() async throws -> [TaskEntity] {
         try taskRepo.fetchActiveRunningTasks()
     }
+
+    /// 保存任务的排序顺序（拖拽排序后调用）
+    func saveTaskOrders() async throws {
+        let tasks = try taskRepo.fetchTasks(date: .now, pool: .mustDo)
+        if let anyTask = tasks.first {
+            try taskRepo.update(anyTask)
+        }
+    }
 }
