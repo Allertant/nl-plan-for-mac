@@ -399,6 +399,8 @@ struct MustDoTaskRow: View {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
 
+    @State private var showCompleteConfirm = false
+
     private var isRunning: Bool { task.status == TaskStatus.running.rawValue }
 
     var body: some View {
@@ -486,13 +488,24 @@ struct MustDoTaskRow: View {
                 .help("开始执行")
             }
 
-            Button(action: onComplete) {
-                Image(systemName: "checkmark")
+            Button {
+                if isRunning {
+                    onComplete()
+                } else if showCompleteConfirm {
+                    onComplete()
+                } else {
+                    showCompleteConfirm = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        showCompleteConfirm = false
+                    }
+                }
+            } label: {
+                Image(systemName: showCompleteConfirm ? "checkmark.circle.fill" : "checkmark")
                     .font(.system(size: 12))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(showCompleteConfirm ? .red : .blue)
             }
             .buttonStyle(.plain)
-            .help("标记完成")
+            .help(showCompleteConfirm ? "再次点击确认完成" : "标记完成")
 
             Button(action: onDemote) {
                 Image(systemName: "arrow.uturn.backward")
