@@ -95,6 +95,8 @@ final class MustDoViewModel {
     func refresh() async {
         do {
             tasks = try await taskManager.fetchMustDo()
+            // 刷新后统一重编 sortOrder，避免碰撞
+            reindexAllPendingSortOrders()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -145,40 +147,40 @@ final class MustDoViewModel {
         return pending[index].priority == pending[index + 1].priority
     }
 
-    /// 上移（仅在同优先级内交换 sortOrder）
+    /// 上移（同优先级内前移一位，重编 sortOrder）
     func moveUp(at index: Int) {
         let pending = pendingTasks
         guard index > 0,
               pending[index].priority == pending[index - 1].priority else { return }
 
-        let currentTask = pending[index]
-        let aboveTask = pending[index - 1]
-        let tempOrder = currentTask.sortOrder
-        currentTask.sortOrder = aboveTask.sortOrder
-        aboveTask.sortOrder = tempOrder
+        let targetId = pending[index].id
+        let priority = pending[index].priority
+        var samePriority = pending.filter { $0.priority == priority }
 
-        Task {
-            try? await taskManager.saveTaskOrders()
-            await refresh()
-        }
+        guard let localIdx = samePriority.firstIndex(where: { $0.id == targetId }),
+              localIdx > 0 else { return }
+
+        samePriority.swapAt(localIdx, localIdx - 1)
+        reindexSortOrder(samePriority)
+        Task { await refresh() }
     }
 
-    /// 下移（仅在同优先级内交换 sortOrder）
+    /// 下移（同优先级内后移一位，重编 sortOrder）
     func moveDown(at index: Int) {
         let pending = pendingTasks
         guard index < pending.count - 1,
               pending[index].priority == pending[index + 1].priority else { return }
 
-        let currentTask = pending[index]
-        let belowTask = pending[index + 1]
-        let tempOrder = currentTask.sortOrder
-        currentTask.sortOrder = belowTask.sortOrder
-        belowTask.sortOrder = tempOrder
+        let targetId = pending[index].id
+        let priority = pending[index].priority
+        var samePriority = pending.filter { $0.priority == priority }
 
-        Task {
-            try? await taskManager.saveTaskOrders()
-            await refresh()
-        }
+        guard let localIdx = samePriority.firstIndex(where: { $0.id == targetId }),
+              localIdx < samePriority.count - 1 else { return }
+
+        samePriority.swapAt(localIdx, localIdx + 1)
+        reindexSortOrder(samePriority)
+        Task { await refresh() }
     }
 
     /// 已完成的任务
@@ -206,6 +208,43 @@ final class MustDoViewModel {
     /// 正在运行的任务
     var runningTask: TaskEntity? {
         tasks.first { $0.status == TaskStatus.running.rawValue }
+    }
+
+    // MARK: - SortOrder 管理
+
+    /// 统一重编 sortOrder（0, 1, 2...）
+    private func reindexSortOrder(_ tasks: [TaskEntity]) {
+        for (i, task) in tasks.enumerated() {
+            task.sortOrder = i
+        }
+    }
+
+    /// 刷新后对所有未完成任务的 sortOrder 做一次紧凑重编
+    private func reindexAllPendingSortOrders() {
+        let priorityOrder: [String: Int] = [
+            TaskPriority.high.rawValue: 0,
+            TaskPriority.medium.rawValue: 1,
+            TaskPriority.low.rawValue: 2
+        ]
+        let sorted = tasks
+            .filter { $0.status != TaskStatus.done.rawValue }
+            .sorted {
+                let p0 = priorityOrder[$0.priority] ?? 1
+                let p1 = priorityOrder[$1.priority] ?? 1
+                if p0 != p1 { return p0 < p1 }
+                return $0.sortOrder < $1.sortOrder
+            }
+
+        var counter = 0
+        var currentPriority = ""
+        for task in sorted {
+            if task.priority != currentPriority {
+                currentPriority = task.priority
+                counter = 0
+            }
+            task.sortOrder = counter
+            counter += 1
+        }
     }
 
     // MARK: - AI 推荐
