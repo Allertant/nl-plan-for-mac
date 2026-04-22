@@ -17,6 +17,7 @@ final class TaskEntity {
     var date: Date           // 任务所属日期
     var createdDate: Date    // 任务创建日期（跨天迁移后 date 变化但 createdDate 不变）
     var attempted: Bool      // 是否曾经尝试过（跨天迁移标记）
+    var note: String?        // 用户备注
 
     @Relationship(deleteRule: .cascade, inverse: \SessionLogEntity.task)
     var sessionLogs: [SessionLogEntity] = []
@@ -57,7 +58,8 @@ final class TaskEntity {
         status: String = "pending",
         date: Date = .now,
         createdDate: Date = .now,
-        attempted: Bool = false
+        attempted: Bool = false,
+        note: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -72,5 +74,6 @@ final class TaskEntity {
         self.date = date
         self.createdDate = createdDate
         self.attempted = attempted
+        self.note = note
     }
 }

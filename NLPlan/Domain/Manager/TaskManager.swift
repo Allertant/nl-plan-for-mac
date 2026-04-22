@@ -184,6 +184,16 @@ actor TaskManager {
         try taskRepo.fetchAllIdeaPoolTasks()
     }
 
+    /// 获取想法池中的单个任务
+    func fetchIdeaPoolTask(taskId: UUID) async throws -> TaskEntity? {
+        try taskRepo.fetchById(taskId)
+    }
+
+    /// 更新任务（直接保存已有实体的修改）
+    func updateTask(_ task: TaskEntity) async throws {
+        try taskRepo.update(task)
+    }
+
     /// 获取指定日期的必做项
     func fetchMustDo(date: Date = .now) async throws -> [TaskEntity] {
         try taskRepo.fetchTasks(date: date, pool: .mustDo)

@@ -90,6 +90,8 @@ struct IdeaPoolSection: View {
                                     Task { await viewModel.promoteToMustDo(taskId: task.id, priority: priority) }
                                 } onDelete: {
                                     Task { await viewModel.deleteTask(taskId: task.id) }
+                                } onUpdate: { title, category, note in
+                                    Task { await viewModel.updateTask(taskId: task.id, title: title, category: category, note: note) }
                                 }
                             }
                         }
@@ -154,23 +156,46 @@ struct IdeaPoolSection: View {
     }
 }
 
-
 struct IdeaPoolTaskRow: View {
     let task: TaskEntity
     var isNew: Bool = false
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
+    let onUpdate: (_ title: String?, _ category: String?, _ note: String?) -> Void
 
     @State private var flashCount = 0
     @State private var showDeleteConfirm = false
+    @State private var editingTitle = false
+    @State private var editingNote = false
+    @State private var draftTitle: String = ""
+    @State private var draftNote: String = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case title, note
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
+                // 标题行
                 HStack(spacing: 4) {
-                    Text(task.title)
-                        .font(.system(size: 12, weight: .medium))
-                        .lineLimit(2)
+                    if editingTitle {
+                        TextField("任务标题", text: $draftTitle)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .medium))
+                            .focused($focusedField, equals: .title)
+                            .onSubmit { commitTitleEdit() }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.1))
+                            .cornerRadius(3)
+                    } else {
+                        Text(task.title)
+                            .font(.system(size: 12, weight: .medium))
+                            .lineLimit(2)
+                            .onTapGesture { startEditingTitle() }
+                    }
 
                     if task.aiRecommended {
                         Image(systemName: "star.fill")
@@ -189,10 +214,31 @@ struct IdeaPoolTaskRow: View {
                     }
                 }
 
+                // 标签 + 时长 + 日期
                 HStack(spacing: 8) {
-                    Label(task.category, systemImage: "tag")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                    Menu {
+                        let tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
+                        ForEach(tags, id: \.self) { tag in
+                            Button {
+                                if tag != task.category {
+                                    onUpdate(nil, tag, nil)
+                                }
+                            } label: {
+                                if tag == task.category {
+                                    Label(tag, systemImage: "checkmark")
+                                } else {
+                                    Text(tag)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(task.category, systemImage: "tag")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
 
                     Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
                         .font(.system(size: 10))
@@ -203,8 +249,28 @@ struct IdeaPoolTaskRow: View {
                         .foregroundStyle(.tertiary)
                 }
 
+                // AI 推荐理由
                 if task.aiRecommended, let reason = task.recommendationReason {
                     TooltipText(text: "💡 \(reason)", tooltip: reason)
+                }
+
+                // 备注
+                if editingNote {
+                    TextField("添加备注...", text: $draftNote)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .focused($focusedField, equals: .note)
+                        .onSubmit { commitNoteEdit() }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                } else {
+                    Text(task.note?.isEmpty ?? true ? "添加备注..." : task.note ?? "")
+                        .font(.system(size: 10))
+                        .foregroundStyle((task.note?.isEmpty ?? true) ? .tertiary : .secondary)
+                        .onTapGesture { startEditingNote() }
                 }
             }
 
@@ -263,6 +329,16 @@ struct IdeaPoolTaskRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor))
         .cornerRadius(6)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField = nil
+        }
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil {
+                if editingTitle { commitTitleEdit() }
+                if editingNote { commitNoteEdit() }
+            }
+        }
         .onAppear {
             if isNew {
                 // 闪烁两次
@@ -285,6 +361,43 @@ struct IdeaPoolTaskRow: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Inline Editing
+
+    private func startEditingTitle() {
+        // 如果正在编辑备注，先提交备注
+        if editingNote {
+            commitNoteEdit()
+        }
+        draftTitle = task.title
+        editingTitle = true
+        focusedField = .title
+    }
+
+    private func commitTitleEdit() {
+        editingTitle = false
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != task.title else { return }
+        onUpdate(trimmed, nil, nil)
+    }
+
+    private func startEditingNote() {
+        // 如果正在编辑标题，先提交标题
+        if editingTitle {
+            commitTitleEdit()
+        }
+        draftNote = task.note ?? ""
+        editingNote = true
+        focusedField = .note
+    }
+
+    private func commitNoteEdit() {
+        editingNote = false
+        let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != (task.note ?? "") {
+            onUpdate(nil, nil, trimmed)
         }
     }
 }

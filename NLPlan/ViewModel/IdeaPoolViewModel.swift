@@ -93,6 +93,20 @@ final class IdeaPoolViewModel {
         }
     }
 
+    /// 更新任务字段（标题/标签/备注）
+    func updateTask(taskId: UUID, title: String? = nil, category: String? = nil, note: String? = nil) async {
+        do {
+            if let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) {
+                if let title { task.title = title }
+                if let category { task.category = category }
+                if let note { task.note = note }
+                try await taskManager.updateTask(task)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - AI 清理
 
     /// 请求 AI 分析可清理的任务
