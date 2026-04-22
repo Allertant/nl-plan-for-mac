@@ -50,10 +50,10 @@ struct PopoverView: View {
                 Divider()
 
                 // 底部操作栏
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     Spacer()
 
-                    Button {
+                    ToolbarIconButton {
                         appState.currentPage = .ideaPool
                     } label: {
                         HStack(spacing: 3) {
@@ -68,37 +68,25 @@ struct PopoverView: View {
                                     .clipShape(Capsule())
                             }
                         }
-                        .font(.system(size: 11))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.secondary)
 
-                    Button {
+                    ToolbarIconButton {
                         appState.currentPage = .summary
                     } label: {
                         Image(systemName: "chart.bar")
-                            .font(.system(size: 11))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.secondary)
 
-                    Button {
+                    ToolbarIconButton {
                         appState.currentPage = .history
                     } label: {
                         Image(systemName: "calendar")
-                            .font(.system(size: 11))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.secondary)
 
-                    Button {
+                    ToolbarIconButton {
                         appState.currentPage = .settings
                     } label: {
                         Image(systemName: "gear")
-                            .font(.system(size: 11))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.secondary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -203,5 +191,32 @@ private struct AIRecommendFloatingButton: View {
         .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
         .offset(y: CGFloat(offsetIndex + 1) * -40)
         .transition(.scale(scale: 0.5).combined(with: .opacity))
+    }
+}
+
+// MARK: - 底部工具栏图标按钮
+
+private struct ToolbarIconButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            label()
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
