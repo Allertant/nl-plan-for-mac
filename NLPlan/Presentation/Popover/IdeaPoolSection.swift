@@ -4,11 +4,60 @@ import SwiftUI
 struct IdeaPoolSection: View {
     @Bindable var viewModel: IdeaPoolViewModel
     @State private var searchText: String = ""
+    @State private var selectedSearchTags: [String] = []
+    @State private var highlightedTag: String?
+    @FocusState private var isSearchFieldFocused: Bool
 
     private var filteredTasks: [TaskEntity] {
-        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return viewModel.tasks }
-        return viewModel.tasks.filter { $0.title.localizedCaseInsensitiveContains(keyword) }
+        let keyword = plainSearchKeyword
+        let hasKeyword = !keyword.isEmpty
+        let hasTags = !selectedSearchTags.isEmpty
+        guard hasKeyword || hasTags else { return viewModel.tasks }
+
+        return viewModel.tasks.filter { task in
+            let matchesKeyword = !hasKeyword || task.title.localizedCaseInsensitiveContains(keyword)
+            let matchesTag = !hasTags || selectedSearchTags.contains(task.category)
+            return matchesKeyword && matchesTag
+        }
+    }
+
+    private var availableTags: [String] {
+        UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
+    }
+
+    private var activeTagQuery: String? {
+        let text = searchText
+        guard let percentIndex = text.lastIndex(of: "%") else { return nil }
+
+        let prefix = text[..<percentIndex]
+        if let lastPrefix = prefix.last, !lastPrefix.isWhitespace {
+            return nil
+        }
+
+        let suffixStart = text.index(after: percentIndex)
+        let suffix = String(text[suffixStart...])
+        if suffix.contains(where: \.isWhitespace) {
+            return nil
+        }
+
+        return suffix
+    }
+
+    private var matchingTags: [String] {
+        guard let query = activeTagQuery else { return [] }
+
+        let candidates = availableTags.filter { !selectedSearchTags.contains($0) }
+        guard !query.isEmpty else { return candidates }
+        return candidates.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var hasSearchTokens: Bool {
+        !selectedSearchTags.isEmpty || !(activeTagQuery?.isEmpty ?? true)
+    }
+
+    private var plainSearchKeyword: String {
+        removeActiveTagQuery(from: searchText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     @Environment(AppState.self) private var appState
@@ -56,20 +105,82 @@ struct IdeaPoolSection: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 16)
                 } else {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if hasSearchTokens {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(selectedSearchTags, id: \.self) { tag in
+                                        SearchTagToken(text: tag) {
+                                            removeSearchTag(tag)
+                                        }
+                                    }
 
-                        TextField("搜索计划名称", text: $searchText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12))
+                                    if let activeTagQuery {
+                                        DraftSearchTagToken(text: activeTagQuery)
+                                    }
+                                }
+                                .padding(.vertical, 1)
+                            }
+                        }
 
-                        Text("\(filteredTasks.count)条")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
 
-                        cleanupButton
+                            TextField("搜索标题，输入 % 按标签筛选", text: $searchText)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .focused($isSearchFieldFocused)
+                                .onSubmit {
+                                    commitActiveTagIfNeeded()
+                                }
+                                .onChange(of: searchText) { _, _ in
+                                    syncHighlightedTag()
+                                }
+                                .onKeyPress(.leftArrow) {
+                                    guard isSearchFieldFocused, matchingTags.count > 1 else {
+                                        return .ignored
+                                    }
+                                    moveHighlightedTag(step: -1)
+                                    return .handled
+                                }
+                                .onKeyPress(.rightArrow) {
+                                    guard isSearchFieldFocused, matchingTags.count > 1 else {
+                                        return .ignored
+                                    }
+                                    moveHighlightedTag(step: 1)
+                                    return .handled
+                                }
+
+                            Text("\(filteredTasks.count)条")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+
+                            cleanupButton
+                        }
+
+                        if !matchingTags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(matchingTags, id: \.self) { tag in
+                                        Button {
+                                            addSearchTag(tag)
+                                        } label: {
+                                            TagChip(text: tag)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .overlay {
+                                            if highlightedTag == tag {
+                                                RoundedRectangle(cornerRadius: 999)
+                                                    .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 1)
+                            }
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
@@ -107,6 +218,59 @@ struct IdeaPoolSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.yellow.opacity(0.08))
         .cornerRadius(8)
+    }
+
+    private func removeActiveTagQuery(from text: String) -> String {
+        guard let percentIndex = text.lastIndex(of: "%") else { return text }
+
+        let prefix = text[..<percentIndex]
+        if let lastPrefix = prefix.last, !lastPrefix.isWhitespace {
+            return text
+        }
+
+        let suffixStart = text.index(after: percentIndex)
+        let suffix = String(text[suffixStart...])
+        if suffix.contains(where: \.isWhitespace) {
+            return text
+        }
+
+        return String(prefix)
+    }
+
+    private func syncHighlightedTag() {
+        if let highlightedTag, matchingTags.contains(highlightedTag) {
+            return
+        }
+        self.highlightedTag = matchingTags.first
+    }
+
+    private func commitActiveTagIfNeeded() {
+        guard let tag = highlightedTag ?? matchingTags.first else { return }
+        addSearchTag(tag)
+    }
+
+    private func moveHighlightedTag(step: Int) {
+        guard !matchingTags.isEmpty else { return }
+
+        let currentIndex = highlightedTag.flatMap { matchingTags.firstIndex(of: $0) } ?? 0
+        let nextIndex = (currentIndex + step + matchingTags.count) % matchingTags.count
+        highlightedTag = matchingTags[nextIndex]
+    }
+
+    private func addSearchTag(_ tag: String) {
+        guard !selectedSearchTags.contains(tag) else { return }
+        selectedSearchTags.append(tag)
+
+        let plainText = removeActiveTagQuery(from: searchText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        searchText = plainText.isEmpty ? "" : plainText + " "
+        highlightedTag = nil
+        isSearchFieldFocused = true
+    }
+
+    private func removeSearchTag(_ tag: String) {
+        selectedSearchTags.removeAll { $0 == tag }
+        syncHighlightedTag()
     }
 
     // MARK: - 清理按钮
@@ -153,6 +317,48 @@ struct IdeaPoolSection: View {
                 .help("重试 AI 清理")
             }
         }
+    }
+}
+
+private struct SearchTagToken: View {
+    let text: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TagChip(text: text)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.trailing, 2)
+    }
+}
+
+private struct DraftSearchTagToken: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "tag.fill")
+                .font(.system(size: 7, weight: .semibold))
+            Text(text.isEmpty ? "输入标签..." : text)
+                .font(.system(size: 9))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.accentColor.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 999)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                .foregroundStyle(Color.accentColor.opacity(0.35))
+        )
+        .clipShape(Capsule())
+        .foregroundStyle(Color.accentColor)
     }
 }
 
