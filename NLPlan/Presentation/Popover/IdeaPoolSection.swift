@@ -47,7 +47,7 @@ struct IdeaPoolSection: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            if viewModel.isExpanded {
+            VStack(spacing: 0) {
                 Divider()
 
                 if viewModel.tasks.isEmpty {
@@ -98,6 +98,9 @@ struct IdeaPoolSection: View {
                     }
                 }
             }
+            .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
+            .clipped()
+            .opacity(viewModel.isExpanded ? 1 : 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.yellow.opacity(0.08))
