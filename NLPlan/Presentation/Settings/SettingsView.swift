@@ -12,17 +12,17 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Text("设置")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
                 Button {
                     onClose?()
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
+
+                Text("设置")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
