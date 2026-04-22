@@ -388,9 +388,10 @@ struct IdeaPoolTaskRow: View {
                 // 标题行
                 HStack(spacing: 4) {
                     if editingTitle {
-                        TextField("任务标题", text: $draftTitle)
+                        TextField("任务标题", text: $draftTitle, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 12, weight: .medium))
+                            .lineLimit(1...2)
                             .focused($focusedField, equals: .title)
                             .onSubmit { commitTitleEdit() }
                             .padding(.horizontal, 4)
