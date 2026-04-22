@@ -242,7 +242,7 @@ struct IdeaPoolSection: View {
                     }
                 }
             }
-            .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
+            .frame(maxHeight: viewModel.isExpanded ? nil : 0, alignment: .top)
             .clipped()
             .opacity(viewModel.isExpanded ? 1 : 0)
         }
