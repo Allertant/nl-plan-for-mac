@@ -71,34 +71,34 @@ struct PopoverView: View {
                         .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.yellow)
+                    .foregroundStyle(Color.secondary)
 
                     Button {
                         appState.currentPage = .summary
                     } label: {
-                        Label("今日总结", systemImage: "chart.bar")
+                        Image(systemName: "chart.bar")
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.secondary)
 
                     Button {
                         appState.currentPage = .history
                     } label: {
-                        Label("历史", systemImage: "calendar")
+                        Image(systemName: "calendar")
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.secondary)
 
                     Button {
                         appState.currentPage = .settings
                     } label: {
-                        Label("设置", systemImage: "gear")
+                        Image(systemName: "gear")
                             .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
