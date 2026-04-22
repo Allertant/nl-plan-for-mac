@@ -127,8 +127,8 @@ struct PopoverView: View {
                     .zIndex(10)
                 }
 
-                // AI 推荐浮动按钮
-                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel {
+                // AI 推荐浮动按钮（想法池展开时隐藏，避免与回到顶部按钮重叠）
+                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel && !ideaPoolViewModel.isExpanded {
                     AIRecommendFloatingButton(
                         viewModel: mustDoViewModel,
                         ideaPoolTasks: ideaPoolViewModel.tasks,
