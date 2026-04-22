@@ -16,6 +16,9 @@ final class MustDoViewModel {
     /// 想法池刷新回调（推荐后需要同步）
     var onIdeaPoolChanged: (() async -> Void)?
 
+    /// 项目来源绑定变化后的回调
+    var onProjectLinkChanged: ((UUID?) async -> Void)?
+
     // MARK: - AI 推荐
 
     /// 推荐策略
@@ -50,7 +53,7 @@ final class MustDoViewModel {
     var recommendationState: RecommendationState = .idle
     var recommendationStrategy: RecommendationStrategy = .quickWin
 
-    /// 已加入的推荐项 taskId
+    /// 已加入的推荐项 id
     var acceptedRecommendationIds: Set<UUID> = []
 
     /// 每条推荐项的用户选择优先级
@@ -80,7 +83,7 @@ final class MustDoViewModel {
     /// 所有推荐项是否都已加入
     var allRecommendationsAccepted: Bool {
         guard let recs = currentRecommendations else { return false }
-        return recs.recommendations.allSatisfy { acceptedRecommendationIds.contains($0.taskId) }
+        return recs.recommendations.allSatisfy { acceptedRecommendationIds.contains($0.id) }
     }
 
     private let taskManager: TaskManager
@@ -266,7 +269,8 @@ final class MustDoViewModel {
                 category: task.category,
                 estimatedMinutes: task.estimatedMinutes,
                 attempted: task.attempted,
-                status: task.status
+                status: task.status,
+                isProject: task.isProjectTask
             )
         }
 
@@ -277,7 +281,8 @@ final class MustDoViewModel {
                 category: task.category,
                 estimatedMinutes: task.estimatedMinutes,
                 attempted: task.attempted,
-                status: task.status
+                status: task.status,
+                isProject: false
             )
         }
 
@@ -292,7 +297,15 @@ final class MustDoViewModel {
 
             // 过滤掉不存在的 taskId
             let ideaIds = Set(ideaPoolTasks.map { $0.id })
-            let validRecs = result.recommendations.filter { ideaIds.contains($0.taskId) }
+            let validRecs = result.recommendations.filter { recommendation in
+                if let taskId = recommendation.taskId {
+                    return ideaIds.contains(taskId)
+                }
+                if let sourceIdeaId = recommendation.sourceIdeaId {
+                    return ideaIds.contains(sourceIdeaId)
+                }
+                return false
+            }
             let filteredResult = RecommendationResult(
                 recommendations: validRecs,
                 overallReason: result.overallReason
@@ -306,7 +319,7 @@ final class MustDoViewModel {
                 case 1: priority = .medium
                 default: priority = .low
                 }
-                selectedPriorities[rec.taskId] = priority
+                selectedPriorities[rec.id] = priority
             }
 
             recommendationState = .loaded(filteredResult)
@@ -316,14 +329,18 @@ final class MustDoViewModel {
     }
 
     /// 接受单条推荐
-    func acceptRecommendation(taskId: UUID) async {
-        let priority = selectedPriorities[taskId] ?? .medium
-        let order = currentRecommendations?.recommendations.firstIndex(where: { $0.taskId == taskId }) ?? 0
+    func acceptRecommendation(recommendationId: UUID) async {
+        guard let recommendation = currentRecommendations?.recommendations.first(where: { $0.id == recommendationId }) else {
+            return
+        }
+        let priority = selectedPriorities[recommendation.id] ?? .medium
+        let order = currentRecommendations?.recommendations.firstIndex(where: { $0.id == recommendation.id }) ?? 0
         do {
-            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority, sortOrder: order)
-            acceptedRecommendationIds.insert(taskId)
+            try await applyRecommendation(recommendation, priority: priority, sortOrder: order)
+            acceptedRecommendationIds.insert(recommendation.id)
             await refresh()
             await onIdeaPoolChanged?()
+            await onProjectLinkChanged?(recommendation.sourceIdeaId)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -333,11 +350,12 @@ final class MustDoViewModel {
     func acceptAllRecommendations() async {
         guard let recs = currentRecommendations else { return }
         for (index, rec) in recs.recommendations.enumerated() {
-            if !acceptedRecommendationIds.contains(rec.taskId) {
-                let priority = selectedPriorities[rec.taskId] ?? .medium
+            if !acceptedRecommendationIds.contains(rec.id) {
+                let priority = selectedPriorities[rec.id] ?? .medium
                 do {
-                    try await taskManager.promoteToMustDo(taskId: rec.taskId, priority: priority, sortOrder: index)
-                    acceptedRecommendationIds.insert(rec.taskId)
+                    try await applyRecommendation(rec, priority: priority, sortOrder: index)
+                    acceptedRecommendationIds.insert(rec.id)
+                    await onProjectLinkChanged?(rec.sourceIdeaId)
                 } catch {
                     errorMessage = error.localizedDescription
                 }
@@ -359,5 +377,37 @@ final class MustDoViewModel {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
         return DeepSeekAIService(apiKey: apiKey, model: model)
+    }
+
+    private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {
+        if let taskId = recommendation.taskId {
+            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority, sortOrder: sortOrder)
+        } else {
+            _ = try await taskManager.createMustDoTask(
+                title: recommendation.title,
+                category: recommendation.category,
+                estimatedMinutes: recommendation.estimatedMinutes,
+                priority: priority,
+                sortOrder: sortOrder,
+                sourceIdeaId: recommendation.sourceIdeaId,
+                recommendationReason: recommendation.reason
+            )
+        }
+    }
+
+    func updateSource(taskId: UUID, sourceIdeaId: UUID?) async {
+        do {
+            guard let task = try await taskManager.fetchMustDo(date: .now).first(where: { $0.id == taskId }) else { return }
+            let previousSourceIdeaId = task.sourceIdeaId
+            task.sourceIdeaId = sourceIdeaId
+            try await taskManager.updateTask(task)
+            await refresh()
+            await onProjectLinkChanged?(previousSourceIdeaId)
+            if sourceIdeaId != previousSourceIdeaId {
+                await onProjectLinkChanged?(sourceIdeaId)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

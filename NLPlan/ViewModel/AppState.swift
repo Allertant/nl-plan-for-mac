@@ -214,5 +214,10 @@ final class AppState {
         mustDoViewModel?.onIdeaPoolChanged = { [weak self] in
             await self?.ideaPoolViewModel?.refresh()
         }
+
+        mustDoViewModel?.onProjectLinkChanged = { [weak self] ideaId in
+            guard let ideaId else { return }
+            await self?.ideaPoolViewModel?.refreshProjectAnalyses(taskId: ideaId)
+        }
     }
 }

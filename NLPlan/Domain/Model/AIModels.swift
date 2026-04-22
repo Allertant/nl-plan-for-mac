@@ -8,14 +8,24 @@ struct ParsedTask: Sendable, Identifiable, Codable {
     var estimatedMinutes: Int
     let recommended: Bool
     let reason: String
+    var isProject: Bool?
 
-    init(id: UUID = UUID(), title: String, category: String, estimatedMinutes: Int, recommended: Bool, reason: String) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        category: String,
+        estimatedMinutes: Int,
+        recommended: Bool,
+        reason: String,
+        isProject: Bool? = nil
+    ) {
         self.id = id
         self.title = title
         self.category = category
         self.estimatedMinutes = estimatedMinutes
         self.recommended = recommended
         self.reason = reason
+        self.isProject = isProject
     }
 }
 
@@ -27,16 +37,23 @@ struct TaskRecommendationInput: Sendable {
     let estimatedMinutes: Int
     let attempted: Bool
     let status: String
+    let isProject: Bool
 }
 
 /// AI 推荐结果（单条）
 struct TaskRecommendation: Sendable, Identifiable, Equatable {
     let id = UUID()
-    let taskId: UUID
+    let taskId: UUID?
+    let sourceIdeaId: UUID?
+    let title: String
+    let category: String
+    let estimatedMinutes: Int
     let reason: String
 
     static func == (lhs: TaskRecommendation, rhs: TaskRecommendation) -> Bool {
-        lhs.taskId == rhs.taskId
+        lhs.taskId == rhs.taskId &&
+        lhs.sourceIdeaId == rhs.sourceIdeaId &&
+        lhs.title == rhs.title
     }
 }
 
@@ -61,6 +78,40 @@ struct CleanupSuggestion: Sendable, Identifiable, Equatable {
 struct CleanupResult: Sendable, Equatable {
     let items: [CleanupSuggestion]
     let overallReason: String
+}
+
+struct ProjectClassificationInput: Sendable {
+    let id: UUID
+    let title: String
+    let category: String
+    let estimatedMinutes: Int
+}
+
+struct ProjectClassification: Sendable, Equatable {
+    let ideaId: UUID
+    let isProject: Bool
+    let reason: String
+}
+
+struct ProjectLinkedTaskInput: Sendable {
+    let id: UUID
+    let title: String
+    let estimatedMinutes: Int
+    let completed: Bool
+}
+
+struct ProjectProgressInput: Sendable {
+    let ideaId: UUID
+    let title: String
+    let category: String
+    let completedTasks: [ProjectLinkedTaskInput]
+    let pendingTasks: [ProjectLinkedTaskInput]
+}
+
+struct ProjectProgressAnalysis: Sendable, Equatable {
+    let ideaId: UUID
+    let progress: Double
+    let summary: String
 }
 
 /// 日终评分输入

@@ -158,6 +158,20 @@ struct IdeaPoolSection: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
 
+                            Button {
+                                Task { await viewModel.refreshProjectAnalyses() }
+                            } label: {
+                                RefreshingIcon(
+                                    systemName: "arrow.triangle.2.circlepath",
+                                    isAnimating: viewModel.isRefreshingProjects
+                                )
+                                .font(.system(size: 11))
+                                .foregroundStyle(.indigo)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.isRefreshingProjects || !viewModel.refreshingProjectIds.isEmpty)
+                            .help("刷新项目分析")
+
                             cleanupButton
                         }
 
@@ -198,7 +212,11 @@ struct IdeaPoolSection: View {
                     } else {
                         LazyVStack(spacing: 4) {
                             ForEach(filteredTasks, id: \.id) { task in
-                                IdeaPoolTaskRow(task: task, isNew: viewModel.newlyAddedTaskIds.contains(task.id)) { priority in
+                                IdeaPoolTaskRow(
+                                    task: task,
+                                    isNew: viewModel.newlyAddedTaskIds.contains(task.id),
+                                    isRefreshingProject: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(task.id)
+                                ) { priority in
                                     Task { await viewModel.promoteToMustDo(taskId: task.id, priority: priority) }
                                 } onDelete: {
                                     Task { await viewModel.deleteTask(taskId: task.id) }
@@ -212,6 +230,10 @@ struct IdeaPoolSection: View {
                                             note: note
                                         )
                                     }
+                                } onRefreshProject: {
+                                    Task { await viewModel.refreshProjectAnalyses(taskId: task.id) }
+                                } onUpdateProjectState: { isProject in
+                                    Task { await viewModel.updateProjectState(taskId: task.id, isProject: isProject) }
                                 }
                             }
                         }
@@ -374,9 +396,12 @@ private struct DraftSearchTagToken: View {
 struct IdeaPoolTaskRow: View {
     let task: TaskEntity
     var isNew: Bool = false
+    var isRefreshingProject: Bool = false
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
     let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?) -> Void
+    let onRefreshProject: () -> Void
+    let onUpdateProjectState: (Bool) -> Void
 
     @State private var flashCount = 0
     @State private var showDeleteConfirm = false
@@ -421,6 +446,28 @@ struct IdeaPoolTaskRow: View {
                             .font(.system(size: 9))
                             .foregroundStyle(.orange)
                     }
+
+                    Menu {
+                        Button(task.isProjectTask ? "设为普通想法" : "设为项目") {
+                            onUpdateProjectState(!task.isProjectTask)
+                        }
+                    } label: {
+                        if task.isProjectTask {
+                            Text("项目")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.indigo)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.indigo.opacity(0.12))
+                                .cornerRadius(4)
+                        } else {
+                            Image(systemName: "chevron.down.circle")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
 
                     if task.attempted {
                         Text("已尝试")
@@ -475,6 +522,37 @@ struct IdeaPoolTaskRow: View {
                 // AI 推荐理由
                 if task.aiRecommended, let reason = task.recommendationReason {
                     TooltipText(text: "💡 \(reason)", tooltip: reason)
+                }
+
+                if task.isProjectTask {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            ProgressView(value: (task.projectProgress ?? 0) / 100)
+                                .progressViewStyle(.linear)
+                                .tint(.indigo)
+                            Text("\(Int(task.projectProgress ?? 0))%")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Button(action: onRefreshProject) {
+                                RefreshingIcon(
+                                    systemName: "arrow.clockwise",
+                                    isAnimating: isRefreshingProject
+                                )
+                                .font(.system(size: 10))
+                                .foregroundStyle(.indigo)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isRefreshingProject)
+                            .help("刷新项目进度")
+                        }
+
+                        if let summary = task.projectProgressSummary, !summary.isEmpty {
+                            Text(summary)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
                 }
 
                 // 备注
@@ -703,5 +781,24 @@ struct IdeaPoolTaskRow: View {
             let endLocation = textView.string.count
             textView.setSelectedRange(NSRange(location: endLocation, length: 0))
         }
+    }
+}
+
+private struct RefreshingIcon: View {
+    let systemName: String
+    let isAnimating: Bool
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            Image(systemName: systemName)
+                .rotationEffect(.degrees(rotationAngle(at: context.date)))
+        }
+    }
+
+    private func rotationAngle(at date: Date) -> Double {
+        guard isAnimating else { return 0 }
+        let cycleDuration = 0.9
+        let progress = date.timeIntervalSinceReferenceDate.remainder(dividingBy: cycleDuration) / cycleDuration
+        return progress * 360
     }
 }

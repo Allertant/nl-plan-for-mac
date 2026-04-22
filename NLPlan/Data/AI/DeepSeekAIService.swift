@@ -162,8 +162,17 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
 
         let recommendations = response.recommendations.compactMap { dto -> TaskRecommendation? in
-            guard let uuid = UUID(uuidString: dto.taskId) else { return nil }
-            return TaskRecommendation(taskId: uuid, reason: dto.reason)
+            let taskId = dto.taskId.flatMap(UUID.init(uuidString:))
+            let sourceIdeaId = dto.sourceIdeaId.flatMap(UUID.init(uuidString:))
+            guard taskId != nil || sourceIdeaId != nil else { return nil }
+            return TaskRecommendation(
+                taskId: taskId,
+                sourceIdeaId: sourceIdeaId,
+                title: dto.title,
+                category: dto.category,
+                estimatedMinutes: dto.estimatedMinutes,
+                reason: dto.reason
+            )
         }
 
         return RecommendationResult(
@@ -186,6 +195,38 @@ final class DeepSeekAIService: AIServiceProtocol {
         }
 
         return CleanupResult(items: items, overallReason: response.overallReason)
+    }
+
+    func classifyProjects(tasks: [ProjectClassificationInput]) async throws -> [ProjectClassification] {
+        let prompt = PromptTemplates.classifyProjects(tasks: tasks)
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ProjectClassificationResponse.self
+        )
+
+        return response.items.compactMap { item in
+            guard let ideaId = UUID(uuidString: item.ideaId) else { return nil }
+            return ProjectClassification(ideaId: ideaId, isProject: item.isProject, reason: item.reason)
+        }
+    }
+
+    func analyzeProjectProgress(projects: [ProjectProgressInput]) async throws -> [ProjectProgressAnalysis] {
+        let prompt = PromptTemplates.analyzeProjectProgress(projects: projects)
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ProjectProgressResponse.self
+        )
+
+        return response.items.compactMap { item in
+            guard let ideaId = UUID(uuidString: item.ideaId) else { return nil }
+            return ProjectProgressAnalysis(
+                ideaId: ideaId,
+                progress: item.progress,
+                summary: item.summary
+            )
+        }
     }
 
     // MARK: - Private

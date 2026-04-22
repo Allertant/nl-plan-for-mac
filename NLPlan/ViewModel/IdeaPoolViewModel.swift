@@ -5,10 +5,17 @@ import SwiftData
 @Observable
 final class IdeaPoolViewModel {
 
+    enum ProjectDecisionSource: String {
+        case ai
+        case user
+    }
+
     var tasks: [TaskEntity] = []
     var isExpanded: Bool = false
     var errorMessage: String?
     var newlyAddedTaskIds: Set<UUID> = []
+    var isRefreshingProjects: Bool = false
+    var refreshingProjectIds: Set<UUID> = []
 
     /// 提升到必做项后的回调（用于通知必做项刷新）
     var onPromotedToMustDo: (() async -> Void)?
@@ -108,6 +115,110 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func updateProjectState(taskId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
+        do {
+            guard let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) else { return }
+            task.isProject = isProject
+            task.projectDecisionSource = source.rawValue
+            if !isProject {
+                task.projectProgress = 0
+                task.projectProgressSummary = nil
+                task.projectProgressUpdatedAt = nil
+            }
+            try await taskManager.updateTask(task)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshProjectAnalyses(taskId: UUID? = nil) async {
+        if let taskId {
+            guard !isRefreshingProjects, !refreshingProjectIds.contains(taskId) else { return }
+            refreshingProjectIds.insert(taskId)
+        } else {
+            guard !isRefreshingProjects, refreshingProjectIds.isEmpty else { return }
+            isRefreshingProjects = true
+        }
+
+        defer {
+            if let taskId {
+                refreshingProjectIds.remove(taskId)
+            } else {
+                isRefreshingProjects = false
+            }
+        }
+
+        do {
+            let allIdeas = try await taskManager.fetchIdeaPool()
+            let allMustDos = try await taskManager.fetchMustDo()
+            let aiService = await makeAIService()
+
+            let targetIdeas = allIdeas.filter { idea in
+                guard let taskId else { return true }
+                return idea.id == taskId
+            }
+
+            let progressTargets = targetIdeas.compactMap { idea -> ProjectProgressInput? in
+                guard idea.isProjectTask else { return nil }
+
+                let linkedMustDos = allMustDos.filter { $0.sourceIdeaId == idea.id }
+                let completed = linkedMustDos.filter { $0.status == TaskStatus.done.rawValue }
+                let pending = linkedMustDos.filter { $0.status != TaskStatus.done.rawValue }
+
+                guard !completed.isEmpty else {
+                    idea.projectProgress = 0
+                    idea.projectProgressSummary = nil
+                    idea.projectProgressUpdatedAt = nil
+                    return nil
+                }
+
+                return ProjectProgressInput(
+                    ideaId: idea.id,
+                    title: idea.title,
+                    category: idea.category,
+                    completedTasks: completed.map {
+                        ProjectLinkedTaskInput(
+                            id: $0.id,
+                            title: $0.title,
+                            estimatedMinutes: $0.estimatedMinutes,
+                            completed: true
+                        )
+                    },
+                    pendingTasks: pending.map {
+                        ProjectLinkedTaskInput(
+                            id: $0.id,
+                            title: $0.title,
+                            estimatedMinutes: $0.estimatedMinutes,
+                            completed: false
+                        )
+                    }
+                )
+            }
+
+            if !progressTargets.isEmpty {
+                let analyses = try await withProjectAnalysisTimeout {
+                    try await aiService.analyzeProjectProgress(projects: progressTargets)
+                }
+                let analysisMap = Dictionary(uniqueKeysWithValues: analyses.map { ($0.ideaId, $0) })
+
+                for idea in targetIdeas where idea.isProjectTask {
+                    guard let analysis = analysisMap[idea.id] else { continue }
+                    idea.projectProgress = min(max(analysis.progress, 0), 100)
+                    idea.projectProgressSummary = analysis.summary
+                    idea.projectProgressUpdatedAt = .now
+                }
+            }
+
+            if let first = targetIdeas.first {
+                try await taskManager.updateTask(first)
+            }
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - AI 清理
 
     /// 请求 AI 分析可清理的任务
@@ -124,7 +235,8 @@ final class IdeaPoolViewModel {
                 category: task.category,
                 estimatedMinutes: task.estimatedMinutes,
                 attempted: task.attempted,
-                status: task.status
+                status: task.status,
+                isProject: task.isProjectTask
             )
         }
 
@@ -197,5 +309,26 @@ final class IdeaPoolViewModel {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
         return DeepSeekAIService(apiKey: apiKey, model: model)
+    }
+
+    private func withProjectAnalysisTimeout<T: Sendable>(
+        seconds: Double = 45,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw NLPlanError.aiRequestTimeout
+            }
+
+            guard let result = try await group.next() else {
+                throw NLPlanError.aiRequestTimeout
+            }
+            group.cancelAll()
+            return result
+        }
     }
 }

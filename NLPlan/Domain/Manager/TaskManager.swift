@@ -47,6 +47,11 @@ actor TaskManager {
         )
     }
 
+    /// 判断解析结果中的任务是否属于项目型想法
+    func classifyProjects(tasks: [ProjectClassificationInput]) async throws -> [ProjectClassification] {
+        try await aiService.classifyProjects(tasks: tasks)
+    }
+
     /// 将已解析的任务保存到想法池（供确认流程使用）
     func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [TaskEntity] {
         // 1. 保存原始想法
@@ -65,6 +70,13 @@ actor TaskManager {
                 date: .now
             )
             task.sortOrder = index
+            if let isProject = parsed.isProject {
+                task.isProject = isProject
+                task.projectDecisionSource = "ai"
+                task.projectProgress = 0
+                task.projectProgressSummary = nil
+                task.projectProgressUpdatedAt = nil
+            }
             try taskRepo.update(task)
             createdTasks.append(task)
         }
@@ -94,6 +106,32 @@ actor TaskManager {
         if let priority { task.taskPriority = priority }
         if let sortOrder { task.sortOrder = sortOrder }
         try taskRepo.moveToMustDo(task)
+    }
+
+    /// 创建新的必做项（用于项目切片）
+    func createMustDoTask(
+        title: String,
+        category: String,
+        estimatedMinutes: Int,
+        priority: TaskPriority = .medium,
+        sortOrder: Int = 0,
+        sourceIdeaId: UUID? = nil,
+        recommendationReason: String? = nil
+    ) async throws -> TaskEntity {
+        let task = try taskRepo.create(
+            title: title,
+            category: category,
+            estimatedMinutes: estimatedMinutes,
+            priority: priority,
+            aiRecommended: true,
+            recommendationReason: recommendationReason,
+            pool: .mustDo,
+            date: .now,
+            sourceIdeaId: sourceIdeaId
+        )
+        task.sortOrder = sortOrder
+        try taskRepo.update(task)
+        return task
     }
 
     /// 将必做项移回想法池

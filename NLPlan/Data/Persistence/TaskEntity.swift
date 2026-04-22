@@ -18,6 +18,12 @@ final class TaskEntity {
     var createdDate: Date    // 任务创建日期（跨天迁移后 date 变化但 createdDate 不变）
     var attempted: Bool      // 是否曾经尝试过（跨天迁移标记）
     var note: String?        // 用户备注
+    var sourceIdeaId: UUID?  // 来源想法 ID（用于项目切片绑定）
+    var isProject: Bool?     // 是否为项目型想法
+    var projectDecisionSource: String? // "ai" / "user"
+    var projectProgress: Double? // 0...100
+    var projectProgressSummary: String?
+    var projectProgressUpdatedAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \SessionLogEntity.task)
     var sessionLogs: [SessionLogEntity] = []
@@ -45,6 +51,11 @@ final class TaskEntity {
         set { priority = newValue.rawValue }
     }
 
+    @Transient
+    var isProjectTask: Bool {
+        isProject ?? false
+    }
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -59,7 +70,13 @@ final class TaskEntity {
         date: Date = .now,
         createdDate: Date = .now,
         attempted: Bool = false,
-        note: String? = nil
+        note: String? = nil,
+        sourceIdeaId: UUID? = nil,
+        isProject: Bool? = nil,
+        projectDecisionSource: String? = nil,
+        projectProgress: Double? = nil,
+        projectProgressSummary: String? = nil,
+        projectProgressUpdatedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -75,5 +92,11 @@ final class TaskEntity {
         self.createdDate = createdDate
         self.attempted = attempted
         self.note = note
+        self.sourceIdeaId = sourceIdeaId
+        self.isProject = isProject
+        self.projectDecisionSource = projectDecisionSource
+        self.projectProgress = projectProgress
+        self.projectProgressSummary = projectProgressSummary
+        self.projectProgressUpdatedAt = projectProgressUpdatedAt
     }
 }

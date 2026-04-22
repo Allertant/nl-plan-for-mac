@@ -21,7 +21,8 @@ final class TaskRepository {
         aiRecommended: Bool = false,
         recommendationReason: String? = nil,
         pool: TaskPool = .ideaPool,
-        date: Date = .now
+        date: Date = .now,
+        sourceIdeaId: UUID? = nil
     ) throws -> TaskEntity {
         let task = TaskEntity(
             title: title,
@@ -32,7 +33,8 @@ final class TaskRepository {
             recommendationReason: recommendationReason,
             pool: pool.rawValue,
             date: date,
-            createdDate: .now
+            createdDate: .now,
+            sourceIdeaId: sourceIdeaId
         )
         modelContext.insert(task)
         try modelContext.save()

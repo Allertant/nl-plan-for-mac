@@ -100,7 +100,7 @@ final class InputViewModel {
                 rawText: item.rawText,
                 existingTaskTitles: existingTitles
             )
-            item.parsedTasks = parsedTasks
+            item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks, force: true)
             item.parseStatus = .completed
         } catch {
             item.errorMessage = error.localizedDescription
@@ -123,8 +123,9 @@ final class InputViewModel {
         guard let parsedTasks = item.parsedTasks else { return }
 
         do {
+            let finalParsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks)
             let createdTasks = try await taskManager.saveParsedTasks(
-                parsedTasks: parsedTasks,
+                parsedTasks: finalParsedTasks,
                 rawText: item.rawText
             )
             successMessage = "✅ 已添加到想法池"
@@ -207,7 +208,7 @@ final class InputViewModel {
                 currentTasks: currentTasks,
                 userInstruction: instruction
             )
-            item.parsedTasks = newTasks
+            item.parsedTasks = try await classifyParsedTasksIfNeeded(newTasks, force: true)
             try? parseQueueRepo.update(item)
             successMessage = "✅ 已调整"
         } catch {
@@ -220,5 +221,36 @@ final class InputViewModel {
     /// 判断指定队列项是否正在 AI 调整中
     func isItemChatProcessing(id: UUID) -> Bool {
         activeDetailItemID == id
+    }
+
+    // MARK: - Private
+
+    private func classifyParsedTasksIfNeeded(
+        _ tasks: [ParsedTask],
+        force: Bool = false
+    ) async throws -> [ParsedTask] {
+        guard !tasks.isEmpty else { return tasks }
+        if !force && tasks.allSatisfy({ $0.isProject != nil }) {
+            return tasks
+        }
+
+        let inputs = tasks.map {
+            ProjectClassificationInput(
+                id: $0.id,
+                title: $0.title,
+                category: $0.category,
+                estimatedMinutes: $0.estimatedMinutes
+            )
+        }
+        let classifications = try await taskManager.classifyProjects(tasks: inputs)
+        let classificationMap = Dictionary(uniqueKeysWithValues: classifications.map { ($0.ideaId, $0) })
+
+        return tasks.map { task in
+            var updated = task
+            if let classification = classificationMap[task.id] {
+                updated.isProject = classification.isProject
+            }
+            return updated
+        }
     }
 }

@@ -108,12 +108,49 @@ struct RecommendationResponse: Decodable {
 }
 
 struct RecommendationDTO: Decodable {
-    let taskId: String
+    let taskId: String?
+    let sourceIdeaId: String?
+    let title: String
+    let category: String
+    let estimatedMinutes: Int
     let reason: String
 
     enum CodingKeys: String, CodingKey {
         case taskId = "task_id"
+        case sourceIdeaId = "source_idea_id"
+        case title, category, reason
+        case estimatedMinutes = "estimated_minutes"
+    }
+}
+
+struct ProjectClassificationResponse: Decodable {
+    let items: [ProjectClassificationDTO]
+}
+
+struct ProjectClassificationDTO: Decodable {
+    let ideaId: String
+    let isProject: Bool
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case ideaId = "idea_id"
+        case isProject = "is_project"
         case reason
+    }
+}
+
+struct ProjectProgressResponse: Decodable {
+    let items: [ProjectProgressDTO]
+}
+
+struct ProjectProgressDTO: Decodable {
+    let ideaId: String
+    let progress: Double
+    let summary: String
+
+    enum CodingKeys: String, CodingKey {
+        case ideaId = "idea_id"
+        case progress, summary
     }
 }
 

@@ -51,4 +51,10 @@ protocol AIServiceProtocol: Sendable {
     /// - Parameter tasks: 想法池中所有任务
     /// - Returns: 建议删除的任务列表及理由
     func cleanupIdeaPool(tasks: [TaskRecommendationInput]) async throws -> CleanupResult
+
+    /// 判断哪些想法属于项目型条目
+    func classifyProjects(tasks: [ProjectClassificationInput]) async throws -> [ProjectClassification]
+
+    /// 基于来源绑定的必做项分析项目进度
+    func analyzeProjectProgress(projects: [ProjectProgressInput]) async throws -> [ProjectProgressAnalysis]
 }

@@ -55,6 +55,7 @@ struct MustDoSection: View {
                     ForEach(Array(viewModel.pendingTasks.enumerated()), id: \.element.id) { index, task in
                         MustDoTaskRow(
                             task: task,
+                            ideaPoolTasks: ideaPoolTasks,
                             isEditMode: viewModel.isEditMode,
                             canMoveUp: viewModel.canMoveUp(at: index),
                             canMoveDown: viewModel.canMoveDown(at: index),
@@ -62,6 +63,9 @@ struct MustDoSection: View {
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
                             onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
+                            onBindSource: { sourceIdeaId in
+                                Task { await viewModel.updateSource(taskId: task.id, sourceIdeaId: sourceIdeaId) }
+                            },
                             onMoveUp: {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     viewModel.moveUp(at: index)
@@ -120,10 +124,6 @@ private struct AIRecommendPanel: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolTasks: [TaskEntity]
 
-    private var ideaPoolLookup: [UUID: TaskEntity] {
-        Dictionary(uniqueKeysWithValues: ideaPoolTasks.map { ($0.id, $0) })
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // 头部
@@ -170,20 +170,18 @@ private struct AIRecommendPanel: View {
                         .padding(.vertical, 8)
                 } else {
                     ForEach(result.recommendations) { rec in
-                        if let task = ideaPoolLookup[rec.taskId] {
-                            RecommendationRow(
-                                task: task,
-                                reason: rec.reason,
-                                isAccepted: viewModel.acceptedRecommendationIds.contains(rec.taskId),
-                                selectedPriority: Binding(
-                                    get: { viewModel.selectedPriorities[rec.taskId] ?? .medium },
-                                    set: { viewModel.selectedPriorities[rec.taskId] = $0 }
-                                ),
-                                onAccept: {
-                                    Task { await viewModel.acceptRecommendation(taskId: rec.taskId) }
-                                }
-                            )
-                        }
+                        RecommendationRow(
+                            task: rec,
+                            reason: rec.reason,
+                            isAccepted: viewModel.acceptedRecommendationIds.contains(rec.id),
+                            selectedPriority: Binding(
+                                get: { viewModel.selectedPriorities[rec.id] ?? .medium },
+                                set: { viewModel.selectedPriorities[rec.id] = $0 }
+                            ),
+                            onAccept: {
+                                Task { await viewModel.acceptRecommendation(recommendationId: rec.id) }
+                            }
+                        )
                     }
 
                     // 全部加入 / 完成 按钮
@@ -234,7 +232,7 @@ private struct AIRecommendPanel: View {
 // MARK: - 推荐任务行
 
 private struct RecommendationRow: View {
-    let task: TaskEntity
+    let task: TaskRecommendation
     let reason: String
     let isAccepted: Bool
     @Binding var selectedPriority: TaskPriority
@@ -339,6 +337,7 @@ private struct RecommendationRow: View {
 /// 必做项任务卡片
 struct MustDoTaskRow: View {
     let task: TaskEntity
+    let ideaPoolTasks: [TaskEntity]
     var isEditMode: Bool = false
     var canMoveUp: Bool = false
     var canMoveDown: Bool = false
@@ -346,12 +345,17 @@ struct MustDoTaskRow: View {
     let onStart: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
+    let onBindSource: (UUID?) -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
 
     @State private var showCompleteConfirm = false
 
     private var isRunning: Bool { task.status == TaskStatus.running.rawValue }
+    private var sourceIdea: TaskEntity? {
+        guard let sourceIdeaId = task.sourceIdeaId else { return nil }
+        return ideaPoolTasks.first(where: { $0.id == sourceIdeaId })
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -363,6 +367,13 @@ struct MustDoTaskRow: View {
                     .lineLimit(1)
 
                 taskInfoLine
+
+                if let sourceIdea {
+                    Label("来源：\(sourceIdea.title)", systemImage: "link")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
@@ -466,6 +477,35 @@ struct MustDoTaskRow: View {
             }
             .buttonStyle(.plain)
             .help("移回想法池")
+
+            Menu {
+                Button("无来源") {
+                    onBindSource(nil)
+                }
+
+                if !ideaPoolTasks.filter(\.isProjectTask).isEmpty {
+                    Divider()
+                }
+
+                ForEach(ideaPoolTasks.filter(\.isProjectTask), id: \.id) { idea in
+                    Button {
+                        onBindSource(idea.id)
+                    } label: {
+                        if task.sourceIdeaId == idea.id {
+                            Label(idea.title, systemImage: "checkmark")
+                        } else {
+                            Text(idea.title)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: task.sourceIdeaId == nil ? "link.badge.plus" : "link")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("绑定来源")
         }
     }
 

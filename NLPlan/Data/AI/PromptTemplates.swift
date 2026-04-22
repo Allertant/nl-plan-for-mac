@@ -190,7 +190,7 @@ enum PromptTemplates {
         }.joined(separator: "\n")
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
-            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")"
+            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
         }.joined(separator: "\n")
 
         let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + $1.estimatedMinutes }
@@ -230,14 +230,99 @@ enum PromptTemplates {
         2. 已尝试过（attempted）的任务优先级适当降低
         3. 分类尽量分散
         4. 按推荐执行顺序排列（第一个最应该先做）
-        5. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
+        5. 如果某条想法是“项目型想法”，优先推荐一个今天可执行的小切片任务，而不是直接推荐整个项目标题
+        6. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
 
         输出严格的 JSON 格式：
         {
           "recommendations": [
-            { "task_id": "想法池中任务的 UUID", "reason": "推荐理由" }
+            {
+              "task_id": "若直接推荐已有想法，则填写想法池中任务 UUID；否则为 null",
+              "source_idea_id": "若推荐项目切片，则填写来源想法 UUID；否则为 null",
+              "title": "展示给用户的推荐标题",
+              "category": "分类",
+              "estimated_minutes": 60,
+              "reason": "推荐理由"
+            }
           ],
           "overall_reason": "整体推荐说明"
+        }
+        """
+    }
+
+    static func classifyProjects(tasks: [ProjectClassificationInput]) -> String {
+        let taskList = tasks.enumerated().map { index, task in
+            "\(index + 1). [id: \(task.id.uuidString)] \(task.title) - \(task.category) - \(task.estimatedMinutes)分钟"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个任务管理助手。请判断下列想法中，哪些属于“项目型想法”。
+
+        项目型想法的标准：
+        1. 明显跨多天推进，无法在一天内整体完成
+        2. 更像长期目标，而不是单次动作
+        3. 如果直接加入今日必做项，容易造成执行压力过大
+
+        普通想法的标准：
+        1. 可以在较短时间内直接执行
+        2. 更像单个任务而不是长期项目
+
+        想法列表：
+        \(taskList)
+
+        输出严格 JSON：
+        {
+          "items": [
+            {
+              "idea_id": "UUID",
+              "is_project": true,
+              "reason": "判断理由"
+            }
+          ]
+        }
+        """
+    }
+
+    static func analyzeProjectProgress(projects: [ProjectProgressInput]) -> String {
+        let projectList = projects.enumerated().map { index, project in
+            let completed = project.completedTasks.map {
+                "- [已完成] \($0.title)（\($0.estimatedMinutes)分钟）"
+            }.joined(separator: "\n")
+            let pending = project.pendingTasks.map {
+                "- [未完成] \($0.title)（\($0.estimatedMinutes)分钟）"
+            }.joined(separator: "\n")
+
+            return """
+            \(index + 1). [idea_id: \(project.ideaId.uuidString)] \(project.title) - \(project.category)
+            已完成绑定必做项：
+            \(completed.isEmpty ? "（无）" : completed)
+            未完成绑定必做项：
+            \(pending.isEmpty ? "（无）" : pending)
+            """
+        }.joined(separator: "\n\n")
+
+        return """
+        你是一个任务管理助手。请根据每个项目已经完成和未完成的绑定必做项，评估其当前进度。
+
+        规则：
+        1. 只有已完成的绑定必做项可以直接计入进度
+        2. 未完成的绑定必做项只作为上下文，不直接计入进度
+        3. progress 返回 0 到 100 的数字
+        4. summary 用一句简短的话概括当前推进情况
+        5. 如果你判断项目已经完成，可以返回 100
+
+        项目列表：
+        \(projectList)
+
+        输出严格 JSON：
+        {
+          "items": [
+            {
+              "idea_id": "UUID",
+              "progress": 35,
+              "summary": "已完成多次相关推进，正在稳定前进"
+            }
+          ]
         }
         """
     }

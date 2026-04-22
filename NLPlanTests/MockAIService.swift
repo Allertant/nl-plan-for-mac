@@ -55,4 +55,37 @@ struct MockAIService: AIServiceProtocol {
             gradingBasis: "根据用户反馈重新评分"
         )
     }
+
+    func recommendTasks(
+        ideaPoolTasks: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        remainingHours: Double,
+        strategy: MustDoViewModel.RecommendationStrategy
+    ) async throws -> RecommendationResult {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return RecommendationResult(recommendations: [], overallReason: "测试推荐")
+    }
+
+    func cleanupIdeaPool(tasks: [TaskRecommendationInput]) async throws -> CleanupResult {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return CleanupResult(items: [], overallReason: "测试清理")
+    }
+
+    func classifyProjects(tasks: [ProjectClassificationInput]) async throws -> [ProjectClassification] {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return tasks.map { ProjectClassification(ideaId: $0.id, isProject: false, reason: "测试") }
+    }
+
+    func analyzeProjectProgress(projects: [ProjectProgressInput]) async throws -> [ProjectProgressAnalysis] {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return projects.map { ProjectProgressAnalysis(ideaId: $0.ideaId, progress: 0, summary: "测试进度") }
+    }
 }
