@@ -7,7 +7,20 @@ struct SummaryView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            // 标题栏
+            HStack {
+                BackButton(action: onDismiss)
+
+                Text("今日总结")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            Divider()
+
             if viewModel.isProcessing {
                 // 评分中
                 VStack(spacing: 16) {
@@ -145,10 +158,6 @@ struct SummaryView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
-
-            // 返回按钮
-            BackButton(action: onDismiss)
-                .padding(.bottom, 8)
         }
         .frame(width: 360, height: 520)
         .onAppear {
