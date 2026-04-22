@@ -116,7 +116,7 @@ struct IdeaPoolSection: View {
                 Button {
                     Task { await viewModel.fetchCleanupSuggestions() }
                 } label: {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "paintbrush")
                         .font(.system(size: 11))
                         .foregroundStyle(.orange)
                 }
@@ -132,7 +132,7 @@ struct IdeaPoolSection: View {
                 Button {
                     appState.currentPage = .cleanupDetail
                 } label: {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "paintbrush")
                         .font(.system(size: 11))
                         .foregroundStyle(.orange)
                 }
