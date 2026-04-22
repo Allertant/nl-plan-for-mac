@@ -36,6 +36,33 @@ extension Date {
         formatter.dateFormat = "MM/dd HH:mm"
         return formatter.string(from: self)
     }
+
+    /// 相对时间展示（刚刚 / N 分钟前 / N 小时前 / N 天前）
+    func relativeTimeString(reference: Date = .now) -> String {
+        let seconds = Int(reference.timeIntervalSince(self))
+        guard seconds > 0 else { return "刚刚" }
+
+        if seconds < 60 {
+            return "刚刚"
+        }
+
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes) 分钟前"
+        }
+
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours) 小时前"
+        }
+
+        let days = hours / 24
+        if days < 7 {
+            return "\(days) 天前"
+        }
+
+        return dateString
+    }
 }
 
 extension Int {

@@ -514,7 +514,7 @@ struct IdeaPoolTaskRow: View {
                             .onTapGesture { startEditingMinutes() }
                     }
 
-                    Text(task.createdDate.dateString)
+                    Text(task.createdDate.relativeTimeString())
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
