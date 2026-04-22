@@ -748,16 +748,17 @@ private struct RefreshingIcon: View {
     let isAnimating: Bool
 
     var body: some View {
-        TimelineView(.animation) { context in
+        if isAnimating {
+            TimelineView(.animation) { context in
+                Image(systemName: systemName)
+                    .rotationEffect(.degrees(angle(at: context.date)))
+            }
+        } else {
             Image(systemName: systemName)
-                .rotationEffect(.degrees(rotationAngle(at: context.date)))
         }
     }
 
-    private func rotationAngle(at date: Date) -> Double {
-        guard isAnimating else { return 0 }
-        let cycleDuration = 0.9
-        let progress = date.timeIntervalSinceReferenceDate.remainder(dividingBy: cycleDuration) / cycleDuration
-        return progress * 360
+    private func angle(at date: Date) -> Double {
+        (date.timeIntervalSinceReferenceDate.remainder(dividingBy: 0.9) / 0.9) * 360
     }
 }
