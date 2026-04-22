@@ -47,12 +47,14 @@ struct SettingsView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(!viewModel.canSave)
 
-                        Button(viewModel.isValidatingAPIKey ? "验证中..." : "验证") {
-                            viewModel.validateAPIKey()
+                        if viewModel.canSave {
+                            Button(viewModel.isValidatingAPIKey ? "验证中..." : "验证") {
+                                viewModel.validateAPIKey()
+                            }
+                            .font(.system(size: 12))
+                            .buttonStyle(.bordered)
+                            .disabled(!viewModel.canValidate)
                         }
-                        .font(.system(size: 12))
-                        .buttonStyle(.bordered)
-                        .disabled(!viewModel.canValidate)
 
                         if viewModel.showSaveSuccess {
                             Text("已保存 ✓")
