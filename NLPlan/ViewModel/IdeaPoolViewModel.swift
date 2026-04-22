@@ -16,6 +16,7 @@ final class IdeaPoolViewModel {
     var newlyAddedTaskIds: Set<UUID> = []
     var isRefreshingProjects: Bool = false
     var refreshingProjectIds: Set<UUID> = []
+    private let minimumRefreshAnimationDuration: TimeInterval = 0.45
 
     /// 提升到必做项后的回调（用于通知必做项刷新）
     var onPromotedToMustDo: (() async -> Void)?
@@ -140,14 +141,7 @@ final class IdeaPoolViewModel {
             guard !isRefreshingProjects, refreshingProjectIds.isEmpty else { return }
             isRefreshingProjects = true
         }
-
-        defer {
-            if let taskId {
-                refreshingProjectIds.remove(taskId)
-            } else {
-                isRefreshingProjects = false
-            }
-        }
+        let startedAt = Date()
 
         do {
             let allIdeas = try await taskManager.fetchIdeaPool()
@@ -217,6 +211,8 @@ final class IdeaPoolViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+
+        await finishProjectRefresh(taskId: taskId, startedAt: startedAt)
     }
 
     // MARK: - AI 清理
@@ -329,6 +325,19 @@ final class IdeaPoolViewModel {
             }
             group.cancelAll()
             return result
+        }
+    }
+
+    private func finishProjectRefresh(taskId: UUID?, startedAt: Date) async {
+        let elapsed = Date().timeIntervalSince(startedAt)
+        if elapsed < minimumRefreshAnimationDuration {
+            try? await Task.sleep(for: .seconds(minimumRefreshAnimationDuration - elapsed))
+        }
+
+        if let taskId {
+            refreshingProjectIds.remove(taskId)
+        } else {
+            isRefreshingProjects = false
         }
     }
 }
