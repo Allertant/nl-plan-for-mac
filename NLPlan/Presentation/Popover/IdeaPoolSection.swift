@@ -167,6 +167,7 @@ struct IdeaPoolTaskRow: View {
     @State private var showDeleteConfirm = false
     @State private var editingTitle = false
     @State private var editingNote = false
+    @State private var showingCategoryMenu = false
     @State private var draftTitle: String = ""
     @State private var draftNote: String = ""
     @FocusState private var focusedField: Field?
@@ -216,29 +217,15 @@ struct IdeaPoolTaskRow: View {
 
                 // 标签 + 时长 + 日期
                 HStack(spacing: 8) {
-                    Menu {
-                        let tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
-                        ForEach(tags, id: \.self) { tag in
-                            Button {
-                                if tag != task.category {
-                                    onUpdate(nil, tag, nil)
-                                }
-                            } label: {
-                                if tag == task.category {
-                                    Label(tag, systemImage: "checkmark")
-                                } else {
-                                    Text(tag)
-                                }
-                            }
-                        }
+                    Button {
+                        showingCategoryMenu.toggle()
                     } label: {
-                        Label(task.category, systemImage: "tag")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                        TagChip(text: task.category)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                        categoryMenu
+                    }
 
                     Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
                         .font(.system(size: 10))
@@ -399,5 +386,43 @@ struct IdeaPoolTaskRow: View {
         if trimmed != (task.note ?? "") {
             onUpdate(nil, nil, trimmed)
         }
+    }
+
+    private var availableTags: [String] {
+        UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
+    }
+
+    private var categoryMenu: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(availableTags, id: \.self) { tag in
+                Button {
+                    showingCategoryMenu = false
+                    if tag != task.category {
+                        onUpdate(nil, tag, nil)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if tag == task.category {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                        } else {
+                            Color.clear
+                                .frame(width: 10, height: 10)
+                        }
+
+                        TagChip(text: tag)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .frame(width: 180)
     }
 }

@@ -265,7 +265,7 @@ private struct RecommendationRow: View {
                 HStack(spacing: 8) {
                     Label(task.category, systemImage: "tag")
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(task.category.tagColor)
 
                     Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
                         .font(.system(size: 10))
@@ -395,6 +395,8 @@ struct MustDoTaskRow: View {
                     task.taskPriority == .high ? .red :
                     task.taskPriority == .medium ? .orange : .blue
                 )
+
+            TagChip(text: task.category)
 
             Label("预计\(task.estimatedMinutes)分钟", systemImage: "clock")
                 .font(.system(size: 10))
