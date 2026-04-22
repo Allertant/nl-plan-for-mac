@@ -10,50 +10,56 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 标题
-            HStack {
-                Button {
-                    appState.currentPage = .main
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12))
+        ZStack {
+            // 列表
+            VStack(spacing: 0) {
+                HStack {
+                    Button {
+                        appState.currentPage = .main
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("历史记录")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
-                Text("历史记录")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+                Divider()
 
-            Divider()
-
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(viewModel.summaries, id: \.id) { summary in
-                        HistoryCard(summary: summary) {
-                            viewModel.selectSummary(summary)
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(viewModel.summaries, id: \.id) { summary in
+                            HistoryCard(summary: summary) {
+                                viewModel.selectSummary(summary)
+                            }
                         }
                     }
+                    .padding(12)
                 }
-                .padding(12)
+
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
             }
 
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-                    .padding(8)
+            // 详情覆盖层
+            if let summary = viewModel.selectedSummary {
+                HistoryDetailView(summary: summary) {
+                    viewModel.selectedSummary = nil
+                }
             }
         }
         .frame(width: 360, height: 520)
         .onAppear {
             Task { await viewModel.loadCurrentMonth() }
-        }
-        .sheet(item: $viewModel.selectedSummary) { summary in
-            HistoryDetailView(summary: summary)
         }
     }
 }
@@ -109,7 +115,7 @@ struct HistoryCard: View {
 /// 历史详情弹窗
 struct HistoryDetailView: View {
     let summary: DailySummaryEntity
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -117,7 +123,12 @@ struct HistoryDetailView: View {
                 Text(summary.date.dateString)
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
-                Button("关闭") { dismiss() }
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
 
             Text(summary.grade)
