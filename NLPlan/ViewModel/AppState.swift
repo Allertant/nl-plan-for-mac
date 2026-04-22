@@ -84,6 +84,7 @@ final class AppState {
 
     enum Page: Equatable {
         case main
+        case ideaPool
         case summary
         case history
         case settings
@@ -92,7 +93,7 @@ final class AppState {
 
         static func == (lhs: Page, rhs: Page) -> Bool {
             switch (lhs, rhs) {
-            case (.main, .main), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail):
+            case (.main, .main), (.ideaPool, .ideaPool), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail):
                 return true
             case (.queueDetail(let a), .queueDetail(let b)):
                 return a == b
@@ -193,10 +194,9 @@ final class AppState {
         ideaPoolViewModel = IdeaPoolViewModel(taskManager: taskMgr)
         mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
 
-        // 连接回调：提交成功后刷新想法池并展开
+        // 连接回调：提交成功后刷新想法池
         inputViewModel?.onSubmitSuccess = { [weak self] taskIds in
             guard let ideaPoolVM = self?.ideaPoolViewModel else { return }
-            ideaPoolVM.isExpanded = true
             await ideaPoolVM.refresh(newTaskIds: Set(taskIds))
         }
 

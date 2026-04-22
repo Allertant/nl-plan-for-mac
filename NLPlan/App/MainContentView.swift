@@ -13,6 +13,9 @@ struct MainContentView: View {
             case .main:
                 PopoverContainerView()
 
+            case .ideaPool:
+                IdeaPoolContainerView()
+
             case .summary:
                 SummaryContainerView()
 
@@ -123,6 +126,25 @@ struct CleanupDetailContainerView: View {
         Group {
             if let ideaPoolVM = appState.ideaPoolViewModel {
                 CleanupDetailView(viewModel: ideaPoolVM) {
+                    appState.currentPage = .main
+                }
+            } else {
+                ProgressView("加载中...")
+                    .frame(width: 360, height: 520)
+            }
+        }
+    }
+}
+
+// MARK: - IdeaPool Container
+
+struct IdeaPoolContainerView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        Group {
+            if let ideaPoolVM = appState.ideaPoolViewModel {
+                IdeaPoolPageView(viewModel: ideaPoolVM) {
                     appState.currentPage = .main
                 }
             } else {

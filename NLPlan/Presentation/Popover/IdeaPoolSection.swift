@@ -65,48 +65,13 @@ struct IdeaPoolSection: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 折叠头部
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundStyle(.yellow)
-                    Text("想法池")
-                        .font(.system(size: 13, weight: .semibold))
-                    if !viewModel.tasks.isEmpty {
-                        Text("\(viewModel.tasks.count)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.accentColor)
-                            .clipShape(Capsule())
-                    }
-                    Spacer()
-                    Image(systemName: viewModel.isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            VStack(spacing: 0) {
-                Divider()
-
-                if viewModel.tasks.isEmpty {
-                    Text("暂无想法")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 16)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
+            if viewModel.tasks.isEmpty {
+                Text("暂无想法")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 16)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
                         if hasSearchTokens {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
@@ -242,13 +207,7 @@ struct IdeaPoolSection: View {
                     }
                 }
             }
-            .frame(maxHeight: viewModel.isExpanded ? nil : 0, alignment: .top)
-            .clipped()
-            .opacity(viewModel.isExpanded ? 1 : 0)
-        }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.yellow.opacity(0.08))
-        .cornerRadius(8)
     }
 
     private func removeActiveTagQuery(from text: String) -> String {

@@ -10,13 +10,6 @@ struct PopoverView: View {
 
     let timerEngine: TimerEngine
 
-    @State private var hasScrollOverflow: Bool = false
-
-    private var showBackToTopButton: Bool {
-        ideaPoolViewModel.isExpanded &&
-        (hasScrollOverflow || ideaPoolViewModel.tasks.count >= 5)
-    }
-
     private var remainingWorkHours: Double {
         let workEndHour = UserDefaults.standard.double(forKey: AppConstants.workEndTimeKey)
         let endHour = workEndHour > 0 ? workEndHour : AppConstants.defaultWorkEndHour
@@ -27,18 +20,13 @@ struct PopoverView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 if !appState.isAPIKeyConfigured {
                     APIKeyNotConfiguredBanner()
                 }
 
                 ScrollView {
                     VStack(spacing: 12) {
-                        Color.clear
-                            .frame(height: 0)
-                            .id("scroll-top-anchor")
-
                         // 输入区
                         InputSection(viewModel: inputViewModel)
 
@@ -46,9 +34,6 @@ struct PopoverView: View {
                         ParseQueueSection(viewModel: inputViewModel) { queueItemID in
                             appState.currentPage = .queueDetail(queueItemID)
                         }
-
-                        // 想法池
-                        IdeaPoolSection(viewModel: ideaPoolViewModel)
 
                         // 必做项
                         MustDoSection(
@@ -61,15 +46,32 @@ struct PopoverView: View {
                     .background(ScrollViewScrollerHider())
                 }
                 .scrollIndicators(.hidden)
-                .background(
-                    ScrollViewStateObserver(hasOverflow: $hasScrollOverflow)
-                )
 
                 Divider()
 
                 // 底部操作栏
                 HStack(spacing: 16) {
                     Spacer()
+
+                    Button {
+                        appState.currentPage = .ideaPool
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lightbulb.fill")
+                            if !ideaPoolViewModel.tasks.isEmpty {
+                                Text("\(ideaPoolViewModel.tasks.count)")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Color.accentColor)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.yellow)
 
                     Button {
                         appState.currentPage = .summary
@@ -103,32 +105,8 @@ struct PopoverView: View {
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
-                // 回到顶部按钮
-                if showBackToTopButton {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            proxy.scrollTo("scroll-top-anchor", anchor: .top)
-                        }
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.borderless)
-                    .contentShape(Circle())
-                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.95))
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().stroke(Color.secondary.opacity(0.35), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 78)
-                    .zIndex(10)
-                }
-
-                // AI 推荐浮动按钮（想法池展开时隐藏，避免与回到顶部按钮重叠）
-                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel && !ideaPoolViewModel.isExpanded {
+                // AI 推荐浮动按钮
+                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel {
                     AIRecommendFloatingButton(
                         viewModel: mustDoViewModel,
                         ideaPoolTasks: ideaPoolViewModel.tasks,
@@ -136,7 +114,6 @@ struct PopoverView: View {
                     )
                     .padding(.trailing, 14)
                     .padding(.bottom, 48)
-                    .zIndex(9)
                 }
             }
             .onAppear {
@@ -145,7 +122,6 @@ struct PopoverView: View {
                     await mustDoViewModel.refresh()
                 }
             }
-        }
     }
 }
 
