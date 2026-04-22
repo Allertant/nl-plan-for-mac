@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 想法池区域
@@ -568,6 +569,7 @@ struct IdeaPoolTaskRow: View {
         draftTitle = task.title
         editingTitle = true
         focusedField = .title
+        moveInsertionPointToEnd()
     }
 
     private func commitTitleEdit() {
@@ -585,6 +587,7 @@ struct IdeaPoolTaskRow: View {
         draftNote = task.note ?? ""
         editingNote = true
         focusedField = .note
+        moveInsertionPointToEnd()
     }
 
     private func commitNoteEdit() {
@@ -631,5 +634,19 @@ struct IdeaPoolTaskRow: View {
         }
         .padding(6)
         .frame(width: 180)
+    }
+
+    private func moveInsertionPointToEnd(retryCount: Int = 3) {
+        DispatchQueue.main.async {
+            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else {
+                if retryCount > 0 {
+                    moveInsertionPointToEnd(retryCount: retryCount - 1)
+                }
+                return
+            }
+
+            let endLocation = textView.string.count
+            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
+        }
     }
 }
