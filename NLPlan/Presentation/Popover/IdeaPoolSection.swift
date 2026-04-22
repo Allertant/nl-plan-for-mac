@@ -283,9 +283,9 @@ struct IdeaPoolSection: View {
                 Button {
                     Task { await viewModel.fetchCleanupSuggestions() }
                 } label: {
-                    Image(systemName: "paintbrush")
+                    Image(systemName: "flask")
                         .font(.system(size: 11))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.teal)
                 }
                 .buttonStyle(.plain)
                 .help("AI 清理")
@@ -299,9 +299,9 @@ struct IdeaPoolSection: View {
                 Button {
                     appState.currentPage = .cleanupDetail
                 } label: {
-                    Image(systemName: "paintbrush")
+                    Image(systemName: "flask")
                         .font(.system(size: 11))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.teal)
                 }
                 .buttonStyle(.plain)
                 .help("查看清理建议")
