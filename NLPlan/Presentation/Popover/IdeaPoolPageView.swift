@@ -53,7 +53,7 @@ struct IdeaPoolPageView: View {
                     }
                     .padding(12)
                 }
-                .scrollIndicators(.hidden)
+                .scrollIndicators(.never)
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
