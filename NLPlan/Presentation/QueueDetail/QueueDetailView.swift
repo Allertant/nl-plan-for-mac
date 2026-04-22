@@ -14,14 +14,7 @@ struct QueueDetailView: View {
         VStack(spacing: 0) {
             // 顶部栏：返回按钮
             HStack {
-                Button {
-                    appState.currentPage = .main
-                } label: {
-                    Label("返回", systemImage: "chevron.left")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                BackButton { appState.currentPage = .main }
 
                 Spacer()
             }

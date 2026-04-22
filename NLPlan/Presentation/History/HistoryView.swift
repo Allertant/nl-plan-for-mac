@@ -14,13 +14,7 @@ struct HistoryView: View {
             // 列表
             VStack(spacing: 0) {
                 HStack {
-                    Button {
-                        appState.currentPage = .main
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12))
-                    }
-                    .buttonStyle(.plain)
+                    BackButton { appState.currentPage = .main }
 
                     Text("历史记录")
                         .font(.system(size: 14, weight: .semibold))

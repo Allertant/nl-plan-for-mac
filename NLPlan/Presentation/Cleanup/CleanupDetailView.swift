@@ -13,12 +13,7 @@ struct CleanupDetailView: View {
         VStack(spacing: 0) {
             // 顶部导航栏
             HStack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-                .help("返回")
+                BackButton(action: onBack)
 
                 Text("AI 清理建议")
                     .font(.system(size: 13, weight: .semibold))

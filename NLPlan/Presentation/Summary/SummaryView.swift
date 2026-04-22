@@ -146,12 +146,9 @@ struct SummaryView: View {
                     .foregroundStyle(.red)
             }
 
-            // 关闭按钮
-            Button("关闭") {
-                onDismiss()
-            }
-            .font(.system(size: 12))
-            .padding(.bottom, 8)
+            // 返回按钮
+            BackButton(action: onDismiss)
+                .padding(.bottom, 8)
         }
         .frame(width: 360, height: 520)
         .onAppear {

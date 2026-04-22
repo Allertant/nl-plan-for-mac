@@ -12,13 +12,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Button {
-                    onClose?()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
+                BackButton { onClose?() }
 
                 Text("设置")
                     .font(.system(size: 14, weight: .semibold))

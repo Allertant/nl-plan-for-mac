@@ -10,12 +10,7 @@ struct IdeaPoolPageView: View {
             VStack(spacing: 0) {
                 // 顶部导航栏
                 HStack {
-                    Button(action: onBack) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .help("返回")
+                    BackButton(action: onBack)
 
                     Image(systemName: "lightbulb.fill")
                         .foregroundStyle(.yellow)
