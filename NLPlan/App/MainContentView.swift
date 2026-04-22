@@ -24,6 +24,9 @@ struct MainContentView: View {
 
             case .queueDetail:
                 QueueDetailContainerView()
+
+            case .cleanupDetail:
+                CleanupDetailContainerView()
             }
         }
         .task {
@@ -106,6 +109,25 @@ struct SettingsContainerView: View {
         .task {
             if viewModel == nil {
                 viewModel = SettingsViewModel(appState: appState)
+            }
+        }
+    }
+}
+
+// MARK: - Cleanup Detail Container
+
+struct CleanupDetailContainerView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        Group {
+            if let ideaPoolVM = appState.ideaPoolViewModel {
+                CleanupDetailView(viewModel: ideaPoolVM) {
+                    appState.currentPage = .main
+                }
+            } else {
+                ProgressView("加载中...")
+                    .frame(width: 360, height: 520)
             }
         }
     }

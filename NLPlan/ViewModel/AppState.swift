@@ -88,10 +88,11 @@ final class AppState {
         case history
         case settings
         case queueDetail(UUID)
+        case cleanupDetail
 
         static func == (lhs: Page, rhs: Page) -> Bool {
             switch (lhs, rhs) {
-            case (.main, .main), (.summary, .summary), (.history, .history), (.settings, .settings):
+            case (.main, .main), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail):
                 return true
             case (.queueDetail(let a), .queueDetail(let b)):
                 return a == b

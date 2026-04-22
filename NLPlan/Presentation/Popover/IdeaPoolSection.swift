@@ -11,6 +11,8 @@ struct IdeaPoolSection: View {
         return viewModel.tasks.filter { $0.title.localizedCaseInsensitiveContains(keyword) }
     }
 
+    @Environment(AppState.self) private var appState
+
     var body: some View {
         VStack(spacing: 0) {
             // 折叠头部
@@ -66,6 +68,8 @@ struct IdeaPoolSection: View {
                         Text("\(filteredTasks.count)条")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+
+                        cleanupButton
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
@@ -99,9 +103,55 @@ struct IdeaPoolSection: View {
         .background(Color.yellow.opacity(0.08))
         .cornerRadius(8)
     }
+
+    // MARK: - 清理按钮
+
+    private var cleanupButton: some View {
+        Group {
+            switch viewModel.cleanupState {
+            case .idle:
+                Button {
+                    Task { await viewModel.fetchCleanupSuggestions() }
+                } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                .help("AI 清理")
+
+            case .loading:
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 16, height: 16)
+
+            case .loaded:
+                Button {
+                    appState.currentPage = .cleanupDetail
+                } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                .help("查看清理建议")
+
+            case .error:
+                Button {
+                    Task { await viewModel.fetchCleanupSuggestions() }
+                } label: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("重试 AI 清理")
+            }
+        }
+    }
 }
 
-/// 想法池任务卡片
+
 struct IdeaPoolTaskRow: View {
     let task: TaskEntity
     var isNew: Bool = false
@@ -172,6 +222,7 @@ struct IdeaPoolTaskRow: View {
                         .foregroundStyle(.green)
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .help("加入必做项")
 
                 if showDeleteConfirm {

@@ -41,14 +41,14 @@ protocol AIServiceProtocol: Sendable {
     ) async throws -> RecommendationResult
 
     /// 驳斥评分：AI 根据用户反馈重新评分
-    /// - Parameters:
-    ///   - originalGrade: 原始评分结果
-    ///   - originalInput: 原始评分输入数据
-    ///   - userFeedback: 用户驳斥理由
-    /// - Returns: 重新评分结果（含评分依据）
     func appealGrade(
         originalGrade: DailyGrade,
         originalInput: DailySummaryInput,
         userFeedback: String
     ) async throws -> DailyGrade
+
+    /// AI 清理想法池：推荐应删除的过时/不合适任务
+    /// - Parameter tasks: 想法池中所有任务
+    /// - Returns: 建议删除的任务列表及理由
+    func cleanupIdeaPool(tasks: [TaskRecommendationInput]) async throws -> CleanupResult
 }

@@ -168,6 +168,22 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
     }
 
+    func cleanupIdeaPool(tasks: [TaskRecommendationInput]) async throws -> CleanupResult {
+        let prompt = PromptTemplates.cleanupIdeaPool(tasks: tasks)
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: CleanupResponse.self
+        )
+
+        let items = response.items.compactMap { dto -> CleanupSuggestion? in
+            guard let uuid = UUID(uuidString: dto.taskId) else { return nil }
+            return CleanupSuggestion(taskId: uuid, reason: dto.reason)
+        }
+
+        return CleanupResult(items: items, overallReason: response.overallReason)
+    }
+
     // MARK: - Private
 
     /// 发送请求并解析 JSON，失败时携带原始响应和错误信息重试一次

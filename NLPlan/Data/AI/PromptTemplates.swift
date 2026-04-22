@@ -87,6 +87,39 @@ enum PromptTemplates {
         """
     }
 
+    // MARK: - 想法池清理
+
+    static func cleanupIdeaPool(tasks: [TaskRecommendationInput]) -> String {
+        let taskList = tasks.enumerated().map { i, t in
+            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试过" : "")"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个任务管理助手。请审查用户的想法池，找出应该清理的任务。
+
+        清理标准（满足任一即可建议删除）：
+        1. 内容过于模糊，无法执行（如单个词、缺少具体行动）
+        2. 与其他任务高度重复
+        3. 已尝试过但长期未转化为必做项（说明用户不真正想做）
+        4. 内容不合理或不具可执行性
+
+        不要删除：用户明确、具体、有意义的想法，即使暂时不会做。
+
+        ## 想法池任务列表
+        \(taskList)
+
+        输出严格的 JSON：
+        {
+          "items": [
+            { "task_id": "任务的 UUID", "reason": "建议删除的理由" }
+          ],
+          "overall_reason": "整体清理建议"
+        }
+
+        如果没有需要清理的任务，返回空列表并说明理由。
+        """
+    }
+
     // MARK: - 日终评分
 
     static func dailyGrade(input: DailySummaryInput) -> String {

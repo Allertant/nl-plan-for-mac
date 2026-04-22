@@ -116,3 +116,25 @@ struct RecommendationDTO: Decodable {
         case reason
     }
 }
+
+// MARK: - Cleanup Response (from AI JSON)
+
+struct CleanupResponse: Decodable {
+    let items: [CleanupItemDTO]
+    let overallReason: String
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case overallReason = "overall_reason"
+    }
+}
+
+struct CleanupItemDTO: Decodable {
+    let taskId: String
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case reason
+    }
+}

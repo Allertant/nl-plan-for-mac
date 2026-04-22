@@ -46,6 +46,23 @@ struct RecommendationResult: Sendable, Equatable {
     let overallReason: String
 }
 
+/// AI 清理建议（单条）
+struct CleanupSuggestion: Sendable, Identifiable, Equatable {
+    let id = UUID()
+    let taskId: UUID
+    let reason: String
+
+    static func == (lhs: CleanupSuggestion, rhs: CleanupSuggestion) -> Bool {
+        lhs.taskId == rhs.taskId
+    }
+}
+
+/// AI 清理响应（整体）
+struct CleanupResult: Sendable, Equatable {
+    let items: [CleanupSuggestion]
+    let overallReason: String
+}
+
 /// 日终评分输入
 struct DailySummaryInput: Sendable {
     let totalTasks: Int
