@@ -32,6 +32,12 @@ enum AppConstants {
     /// 工作结束时间持久化 key
     static let workEndTimeKey = "nlplan_work_end_time"
 
+    /// 自定义标签持久化 key
+    static let tagsKey = "nlplan_custom_tags"
+
+    /// 默认标签列表
+    static let defaultTags = ["工作", "生活", "学习", "健康", "技术", "其他"]
+
     /// 默认工作结束时间（小时）
     static let defaultWorkEndHour: Double = 18.0
 

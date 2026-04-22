@@ -35,9 +35,11 @@ final class DeepSeekAIService: AIServiceProtocol {
         input: String,
         existingTaskTitles: [String]
     ) async throws -> [ParsedTask] {
+        let tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
         let prompt = PromptTemplates.parseThought(
             input: input,
-            existingTaskTitles: existingTaskTitles
+            existingTaskTitles: existingTaskTitles,
+            availableTags: tags
         )
         let parsedResponse = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
@@ -61,10 +63,12 @@ final class DeepSeekAIService: AIServiceProtocol {
         currentTasks: [ParsedTask],
         userInstruction: String
     ) async throws -> [ParsedTask] {
+        let tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
         let prompt = PromptTemplates.refineParsedTasks(
             originalInput: originalInput,
             currentTasks: currentTasks,
-            userInstruction: userInstruction
+            userInstruction: userInstruction,
+            availableTags: tags
         )
         let parsedResponse = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",

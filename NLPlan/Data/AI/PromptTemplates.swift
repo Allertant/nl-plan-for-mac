@@ -5,7 +5,8 @@ enum PromptTemplates {
 
     // MARK: - 想法解析
 
-    static func parseThought(input: String, existingTaskTitles: [String]) -> String {
+    static func parseThought(input: String, existingTaskTitles: [String], availableTags: [String] = AppConstants.defaultTags) -> String {
+        let tagList = availableTags.joined(separator: "/")
         var prompt = """
         你是一个任务管理助手。将用户的想法整理为结构化任务列表。
 
@@ -15,7 +16,7 @@ enum PromptTemplates {
         1. 用户列出的每个独立事项 = 一个任务，原样保留用户的措辞
         2. 禁止将一个活动拆解为多个步骤（如"整理房间"不要拆成扫地、叠被子、洗衣服）
         3. 禁止合并不同事项（如"补电影A"和"补电影B"是两个独立任务）
-        4. 为每个任务分类（工作/生活/学习/健康/技术/其他）并预估时长（分钟）
+        4. 为每个任务从以下分类中选择最合适的一个：\(tagList)。必须从中选择，不得自创分类。并预估时长（分钟）
         5. 推荐最应该今天完成的任务（recommended = true）
 
         示例输入：「今天要把项目报告初稿写完，顺便整理工位，下午产品评审会」
@@ -50,7 +51,8 @@ enum PromptTemplates {
     static func refineParsedTasks(
         originalInput: String,
         currentTasks: [ParsedTask],
-        userInstruction: String
+        userInstruction: String,
+        availableTags: [String] = AppConstants.defaultTags
     ) -> String {
         let taskList = currentTasks.enumerated().map { i, t in
             "\(i + 1). 「\(t.title)」(\(t.category)，\(t.estimatedMinutes)分钟)\(t.recommended ? " [推荐]" : "")\(t.reason.isEmpty ? "" : " —— \(t.reason)")"
@@ -71,6 +73,8 @@ enum PromptTemplates {
         请根据用户的修改要求，调整任务列表（可以增删改）。
 
         核心原则：按用户的意图粒度拆分，不按执行步骤拆分。每个用户提到的独立事项 = 一个任务。
+
+        分类必须从以下列表中选择：\(availableTags.joined(separator: "/"))，不得自创分类。
 
         输出严格的 JSON：
         {

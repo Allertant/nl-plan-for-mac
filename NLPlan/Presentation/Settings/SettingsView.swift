@@ -29,7 +29,8 @@ struct SettingsView: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 12) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
                 Text("AI 服务配置")
                     .font(.system(size: 12, weight: .semibold))
 
@@ -117,6 +118,51 @@ struct SettingsView: View {
                 .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
                 .cornerRadius(8)
 
+                Text("标签管理")
+                    .font(.system(size: 12, weight: .semibold))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        TextField("添加标签", text: $viewModel.newTagText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12))
+                            .onSubmit { viewModel.addTag() }
+
+                        Button("添加") {
+                            viewModel.addTag()
+                        }
+                        .font(.system(size: 11))
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    FlowLayout(spacing: 6) {
+                        ForEach(Array(viewModel.tags.enumerated()), id: \.offset) { index, tag in
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .font(.system(size: 11))
+
+                                Button {
+                                    viewModel.removeTag(at: index)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.accentColor.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                .cornerRadius(8)
+
                 Text("外观")
                     .font(.system(size: 12, weight: .semibold))
 
@@ -153,6 +199,9 @@ struct SettingsView: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
+            .background(ScrollViewScrollerHider())
+            }
+            .scrollIndicators(.never)
         }
         .frame(width: 360, height: 520)
         .onAppear {

@@ -35,6 +35,33 @@ final class SettingsViewModel {
     var syncToNotes: Bool = true
     var workEndHour: Double = AppConstants.defaultWorkEndHour
 
+    // MARK: - 标签管理
+
+    var tags: [String] = AppConstants.defaultTags
+    var newTagText: String = ""
+
+    func loadTags() {
+        tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
+    }
+
+    func addTag() {
+        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !tags.contains(trimmed) else { return }
+        tags.append(trimmed)
+        newTagText = ""
+        saveTags()
+    }
+
+    func removeTag(at index: Int) {
+        guard tags.count > 1 else { return }
+        tags.remove(at: index)
+        saveTags()
+    }
+
+    private func saveTags() {
+        UserDefaults.standard.set(tags, forKey: AppConstants.tagsKey)
+    }
+
     /// 根据当前时间计算剩余工作小时数
     var remainingWorkHours: Double {
         let now = Date()
@@ -92,6 +119,7 @@ final class SettingsViewModel {
         loadSelectedModel()
         loadLaunchAtLoginState()
         loadWorkEndTime()
+        loadTags()
     }
 
     // MARK: - API Key
