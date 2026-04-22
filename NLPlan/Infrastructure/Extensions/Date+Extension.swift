@@ -56,4 +56,64 @@ extension Int {
         }
         return String(format: "%dm", minutes)
     }
+
+    /// 将分钟数格式化为紧凑的 h/m 格式
+    var hourMinuteString: String {
+        let hours = self / 60
+        let minutes = self % 60
+
+        if hours > 0, minutes > 0 {
+            return "\(hours)h\(minutes)m"
+        }
+        if hours > 0 {
+            return "\(hours)h"
+        }
+        return "\(Swift.max(self, 0))m"
+    }
+}
+
+extension String {
+    /// 解析 h/m 时长表达式为分钟数，支持 `90`、`90m`、`2h`、`2h30m`
+    var parsedHourMinuteDuration: Int? {
+        let normalized = lowercased()
+            .replacingOccurrences(of: " ", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalized.isEmpty else { return nil }
+
+        if normalized.allSatisfy(\.isNumber) {
+            return Int(normalized)
+        }
+
+        var totalMinutes = 0
+        var currentNumber = ""
+        var consumedCharacter = false
+
+        for character in normalized {
+            if character.isNumber {
+                currentNumber.append(character)
+                continue
+            }
+
+            guard let value = Int(currentNumber) else { return nil }
+
+            switch character {
+            case "h":
+                totalMinutes += value * 60
+            case "m":
+                totalMinutes += value
+            default:
+                return nil
+            }
+
+            currentNumber = ""
+            consumedCharacter = true
+        }
+
+        guard currentNumber.isEmpty, consumedCharacter, totalMinutes > 0 else {
+            return nil
+        }
+
+        return totalMinutes
+    }
 }

@@ -184,7 +184,7 @@ private struct CleanupDetailRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
 
-                    Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
+                    Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }

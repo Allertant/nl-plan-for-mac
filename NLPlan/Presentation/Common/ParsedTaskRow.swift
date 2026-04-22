@@ -94,7 +94,7 @@ struct ParsedTaskRow: View {
 
             HStack(spacing: 8) {
                 Label(task.category, systemImage: "folder")
-                Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
+                Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
                 if task.recommended {
                     Label("AI 推荐", systemImage: "star.fill")
                         .foregroundStyle(.yellow)

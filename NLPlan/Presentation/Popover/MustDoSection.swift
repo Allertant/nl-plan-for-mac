@@ -267,7 +267,7 @@ private struct RecommendationRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(task.category.tagColor)
 
-                    Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
+                    Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
 
@@ -398,7 +398,7 @@ struct MustDoTaskRow: View {
 
             TagChip(text: task.category)
 
-            Label("预计\(task.estimatedMinutes)分钟", systemImage: "clock")
+            Label("预计\(task.estimatedMinutes.hourMinuteString)", systemImage: "clock")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
 
@@ -497,7 +497,7 @@ struct CompletedTaskRow: View {
             Spacer()
 
             let minutes = task.totalElapsedSeconds / 60
-            Text("\(minutes)分钟")
+            Text(minutes.hourMinuteString)
                 .font(.system(size: 10))
                 .foregroundStyle(.gray)
         }

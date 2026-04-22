@@ -202,8 +202,16 @@ struct IdeaPoolSection: View {
                                     Task { await viewModel.promoteToMustDo(taskId: task.id, priority: priority) }
                                 } onDelete: {
                                     Task { await viewModel.deleteTask(taskId: task.id) }
-                                } onUpdate: { title, category, note in
-                                    Task { await viewModel.updateTask(taskId: task.id, title: title, category: category, note: note) }
+                                } onUpdate: { title, category, estimatedMinutes, note in
+                                    Task {
+                                        await viewModel.updateTask(
+                                            taskId: task.id,
+                                            title: title,
+                                            category: category,
+                                            estimatedMinutes: estimatedMinutes,
+                                            note: note
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -368,19 +376,21 @@ struct IdeaPoolTaskRow: View {
     var isNew: Bool = false
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
-    let onUpdate: (_ title: String?, _ category: String?, _ note: String?) -> Void
+    let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?) -> Void
 
     @State private var flashCount = 0
     @State private var showDeleteConfirm = false
     @State private var editingTitle = false
+    @State private var editingMinutes = false
     @State private var editingNote = false
     @State private var showingCategoryMenu = false
     @State private var draftTitle: String = ""
+    @State private var draftMinutes: String = ""
     @State private var draftNote: String = ""
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
-        case title, note
+        case title, minutes, note
     }
 
     var body: some View {
@@ -435,9 +445,27 @@ struct IdeaPoolTaskRow: View {
                         categoryMenu
                     }
 
-                    Label("\(task.estimatedMinutes)分钟", systemImage: "clock")
+                    if editingMinutes {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                            TextField("1h30m", text: $draftMinutes)
+                                .textFieldStyle(.plain)
+                                .frame(width: 52)
+                                .focused($focusedField, equals: .minutes)
+                                .onSubmit { commitMinutesEdit() }
+                        }
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                    } else {
+                        Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .onTapGesture { startEditingMinutes() }
+                    }
 
                     Text(task.createdDate.dateString)
                         .font(.system(size: 10))
@@ -531,6 +559,7 @@ struct IdeaPoolTaskRow: View {
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil {
                 if editingTitle { commitTitleEdit() }
+                if editingMinutes { commitMinutesEdit() }
                 if editingNote { commitNoteEdit() }
             }
         }
@@ -566,6 +595,9 @@ struct IdeaPoolTaskRow: View {
         if editingNote {
             commitNoteEdit()
         }
+        if editingMinutes {
+            commitMinutesEdit()
+        }
         draftTitle = task.title
         editingTitle = true
         focusedField = .title
@@ -576,13 +608,36 @@ struct IdeaPoolTaskRow: View {
         editingTitle = false
         let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != task.title else { return }
-        onUpdate(trimmed, nil, nil)
+        onUpdate(trimmed, nil, nil, nil)
+    }
+
+    private func startEditingMinutes() {
+        if editingTitle {
+            commitTitleEdit()
+        }
+        if editingNote {
+            commitNoteEdit()
+        }
+        draftMinutes = task.estimatedMinutes.hourMinuteString
+        editingMinutes = true
+        focusedField = .minutes
+        moveInsertionPointToEnd()
+    }
+
+    private func commitMinutesEdit() {
+        editingMinutes = false
+        let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let minutes = trimmed.parsedHourMinuteDuration, minutes != task.estimatedMinutes else { return }
+        onUpdate(nil, nil, minutes, nil)
     }
 
     private func startEditingNote() {
         // 如果正在编辑标题，先提交标题
         if editingTitle {
             commitTitleEdit()
+        }
+        if editingMinutes {
+            commitMinutesEdit()
         }
         draftNote = task.note ?? ""
         editingNote = true
@@ -594,7 +649,7 @@ struct IdeaPoolTaskRow: View {
         editingNote = false
         let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed != (task.note ?? "") {
-            onUpdate(nil, nil, trimmed)
+            onUpdate(nil, nil, nil, trimmed)
         }
     }
 
@@ -608,7 +663,7 @@ struct IdeaPoolTaskRow: View {
                 Button {
                     showingCategoryMenu = false
                     if tag != task.category {
-                        onUpdate(nil, tag, nil)
+                        onUpdate(nil, tag, nil, nil)
                     }
                 } label: {
                     HStack(spacing: 6) {

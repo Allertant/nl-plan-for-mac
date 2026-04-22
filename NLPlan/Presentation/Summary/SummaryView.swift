@@ -198,8 +198,8 @@ struct StatsGrid: View {
             GridItem(.flexible())
         ], spacing: 12) {
             StatCard(title: "完成", value: "\(summary.completedCount)/\(summary.totalCount)")
-            StatCard(title: "计划时长", value: "\(summary.totalPlannedMinutes)分钟")
-            StatCard(title: "实际时长", value: "\(summary.totalActualMinutes)分钟")
+            StatCard(title: "计划时长", value: summary.totalPlannedMinutes.hourMinuteString)
+            StatCard(title: "实际时长", value: summary.totalActualMinutes.hourMinuteString)
         }
     }
 }
