@@ -417,14 +417,12 @@ private struct SearchTagToken: View {
             }
         }
         .padding(.trailing, 2)
-        .background(
-            Capsule()
-                .fill(Color.accentColor.opacity(isHighlighted ? 0.15 : 0))
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.accentColor, lineWidth: isHighlighted ? 1.5 : 0)
-        )
+        .overlay {
+            if isHighlighted {
+                RoundedRectangle(cornerRadius: 999)
+                    .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+            }
+        }
     }
 }
 
