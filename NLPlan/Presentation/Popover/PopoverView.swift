@@ -77,7 +77,7 @@ struct PopoverView: View {
                             ProgressView()
                                 .controlSize(.small)
                         } else if let summary = appState.summaryViewModel?.summary {
-                            Image(systemName: "flag.checkered.fill")
+                            Image(systemName: "flag.checkered")
                                 .foregroundStyle(gradeColor(summary.gradeEnum))
                         } else {
                             Image(systemName: "flag.checkered")
