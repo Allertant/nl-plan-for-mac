@@ -7,6 +7,7 @@ struct IdeaPoolSection: View {
     @State private var searchText: String = ""
     @State private var selectedSearchTags: [String] = []
     @State private var highlightedCandidateTag: String?
+    @State private var isCandidateTagNavigationEnabled = false
     @State private var highlightedSelectedTagIndex: Int?
     @State private var didAutoFocusSearchField = false
     @State private var selectedProjectTask: TaskEntity?
@@ -112,25 +113,41 @@ struct IdeaPoolSection: View {
                                 }
                                 .onChange(of: searchText) { _, _ in
                                     highlightedSelectedTagIndex = nil
+                                    if activeTagQuery != nil {
+                                        isCandidateTagNavigationEnabled = true
+                                    } else {
+                                        isCandidateTagNavigationEnabled = false
+                                        highlightedCandidateTag = nil
+                                    }
                                     syncHighlightedCandidateTag()
                                 }
                                 .onKeyPress(.upArrow) {
+                                    if isCandidateTagNavigationEnabled, !candidateTags.isEmpty {
+                                        deactivateCandidateTagNavigation()
+                                        return .handled
+                                    }
                                     guard highlightedSelectedTagIndex == nil, !selectedSearchTags.isEmpty else { return .ignored }
                                     highlightedSelectedTagIndex = 0
                                     isSearchFieldFocused = false
                                     return .handled
                                 }
                                 .onKeyPress(.downArrow) {
-                                    guard highlightedSelectedTagIndex != nil else { return .ignored }
-                                    clearSelectedTagHighlight(focusSearch: true)
-                                    return .handled
+                                    if highlightedSelectedTagIndex != nil {
+                                        clearSelectedTagHighlight(focusSearch: true)
+                                        return .handled
+                                    }
+                                    if !isCandidateTagNavigationEnabled, !candidateTags.isEmpty {
+                                        activateCandidateTagNavigationIfNeeded()
+                                        return .handled
+                                    }
+                                    return .ignored
                                 }
                                 .onKeyPress(.leftArrow) {
                                     if let idx = highlightedSelectedTagIndex {
                                         highlightedSelectedTagIndex = max(0, idx - 1)
                                         return .handled
                                     }
-                                    guard candidateTags.count > 1 else { return .ignored }
+                                    guard isCandidateTagNavigationEnabled, candidateTags.count > 1 else { return .ignored }
                                     moveHighlightedCandidateTag(step: -1)
                                     return .handled
                                 }
@@ -139,9 +156,20 @@ struct IdeaPoolSection: View {
                                         highlightedSelectedTagIndex = min(selectedSearchTags.count - 1, idx + 1)
                                         return .handled
                                     }
-                                    guard candidateTags.count > 1 else { return .ignored }
+                                    guard isCandidateTagNavigationEnabled, candidateTags.count > 1 else { return .ignored }
                                     moveHighlightedCandidateTag(step: 1)
                                     return .handled
+                                }
+                                .onKeyPress(.escape) {
+                                    if isCandidateTagNavigationEnabled, !candidateTags.isEmpty {
+                                        deactivateCandidateTagNavigation()
+                                        return .handled
+                                    }
+                                    if highlightedSelectedTagIndex != nil {
+                                        clearSelectedTagHighlight(focusSearch: true)
+                                        return .handled
+                                    }
+                                    return .ignored
                                 }
                                 .onKeyPress(.delete) {
                                     guard removeHighlightedSearchTag() else { return .ignored }
@@ -194,7 +222,7 @@ struct IdeaPoolSection: View {
                                         }
                                         .buttonStyle(.plain)
                                         .overlay {
-                                            if highlightedCandidateTag == tag {
+                                            if isCandidateTagNavigationEnabled, highlightedCandidateTag == tag {
                                                 RoundedRectangle(cornerRadius: 999)
                                                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
                                             }
@@ -297,6 +325,10 @@ struct IdeaPoolSection: View {
     }
 
     private func syncHighlightedCandidateTag() {
+        guard isCandidateTagNavigationEnabled else {
+            highlightedCandidateTag = nil
+            return
+        }
         if let highlightedCandidateTag, candidateTags.contains(highlightedCandidateTag) {
             return
         }
@@ -360,6 +392,18 @@ struct IdeaPoolSection: View {
         }
     }
 
+    private func deactivateCandidateTagNavigation() {
+        isCandidateTagNavigationEnabled = false
+        highlightedCandidateTag = nil
+        isSearchFieldFocused = true
+    }
+
+    private func activateCandidateTagNavigationIfNeeded() {
+        guard !candidateTags.isEmpty else { return }
+        isCandidateTagNavigationEnabled = true
+        syncHighlightedCandidateTag()
+    }
+
     private func focusSearchFieldOnFirstAppear() {
         guard !didAutoFocusSearchField else { return }
         didAutoFocusSearchField = true
@@ -379,6 +423,10 @@ struct IdeaPoolSection: View {
         case .right:
             guard let idx = highlightedSelectedTagIndex else { return false }
             highlightedSelectedTagIndex = min(selectedSearchTags.count - 1, idx + 1)
+            return true
+
+        case .up:
+            clearSelectedTagHighlight(focusSearch: true)
             return true
 
         case .down:
@@ -908,6 +956,7 @@ private struct DraftSearchTagToken: View {
 private enum SearchTagKeyCommand {
     case left
     case right
+    case up
     case down
     case delete
     case blockTextInput
@@ -982,7 +1031,7 @@ private extension NSEvent {
         case 125:
             return .down
         case 126:
-            return .blockTextInput
+            return .up
         default:
             return charactersIgnoringModifiers?.isEmpty == false ? .blockTextInput : nil
         }
