@@ -54,27 +54,39 @@ struct IdeaPoolPageView: View {
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
                 if viewModel.tasks.count >= 5 {
-                    Button {
+                    ScrollToTopButton {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             proxy.scrollTo("scroll-top-anchor", anchor: .top)
                         }
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 36, height: 36)
                     }
-                    .buttonStyle(.borderless)
-                    .contentShape(Circle())
-                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.95))
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().stroke(Color.secondary.opacity(0.35), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
                     .padding(.trailing, 14)
                     .padding(.bottom, 20)
                 }
             }
         }
+    }
+}
+
+private struct ScrollToTopButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.up")
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 36, height: 36)
+        }
+        .buttonStyle(.borderless)
+        .contentShape(Circle())
+        .background(
+            Circle()
+                .fill(isHovered ? Color.white : Color(nsColor: .windowBackgroundColor).opacity(0.95))
+        )
+        .overlay(
+            Circle().stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
+        .onHover { isHovered = $0 }
     }
 }
