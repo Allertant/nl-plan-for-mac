@@ -550,7 +550,13 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var projectSummaryCard: some View {
-        DetailSectionCard(title: "项目信息", systemImage: "lightbulb.fill") {
+        DetailSectionCard(
+            title: "项目信息",
+            systemImage: "lightbulb.fill",
+            tint: .yellow,
+            background: Color.yellow.opacity(0.08),
+            border: Color.yellow.opacity(0.22)
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(project.title)
                     .font(.system(size: 15, weight: .semibold))
@@ -578,7 +584,13 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var progressCard: some View {
-        DetailSectionCard(title: "进度", systemImage: "chart.line.uptrend.xyaxis") {
+        DetailSectionCard(
+            title: "进度",
+            systemImage: "chart.line.uptrend.xyaxis",
+            tint: .indigo,
+            background: Color.indigo.opacity(0.08),
+            border: Color.indigo.opacity(0.22)
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     ProgressView(value: (project.projectProgress ?? 0) / 100)
@@ -611,7 +623,13 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var linkedTasksCard: some View {
-        DetailSectionCard(title: "推进任务清单", systemImage: "link") {
+        DetailSectionCard(
+            title: "推进任务清单",
+            systemImage: "link",
+            tint: .blue,
+            background: Color.blue.opacity(0.08),
+            border: Color.blue.opacity(0.22)
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 if isLoading {
                     HStack(spacing: 8) {
@@ -637,7 +655,13 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var noteCard: some View {
-        DetailSectionCard(title: "项目备注记录", systemImage: "note.text") {
+        DetailSectionCard(
+            title: "项目备注记录",
+            systemImage: "note.text",
+            tint: .mint,
+            background: Color.mint.opacity(0.08),
+            border: Color.mint.opacity(0.24)
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 6) {
                     TextField("新增备注...", text: $newNoteText)
@@ -686,19 +710,26 @@ private struct ProjectDetailOverlay: View {
 private struct DetailSectionCard<Content: View>: View {
     let title: String
     let systemImage: String
+    let tint: Color
+    let background: Color
+    let border: Color
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(tint)
 
             content
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(background)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(border, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
