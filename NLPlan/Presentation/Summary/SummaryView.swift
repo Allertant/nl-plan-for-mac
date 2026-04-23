@@ -137,18 +137,21 @@ struct SummaryView: View {
             } else {
                 // 未评分
                 VStack(spacing: 16) {
-                    Image(systemName: "moon.zzz")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.secondary)
-
                     Text("今天还没有结束")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
 
-                    Button("结束今天") {
+                    Button {
                         Task { await viewModel.endDay() }
+                    } label: {
+                        Image(systemName: "power")
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 64, height: 64)
+                            .background(Circle().fill(Color.red.opacity(0.85)))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
+                    .help("结束今天")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
