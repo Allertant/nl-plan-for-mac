@@ -373,6 +373,9 @@ struct IdeaPoolSection: View {
             }
         }
         syncHighlightedCandidateTag()
+        if selectedSearchTags.isEmpty {
+            clearSelectedTagHighlight(focusSearch: true)
+        }
     }
 
     @discardableResult
@@ -381,7 +384,11 @@ struct IdeaPoolSection: View {
               selectedSearchTags.indices.contains(idx) else { return false }
 
         removeSearchTag(selectedSearchTags[idx])
-        highlightedSelectedTagIndex = selectedSearchTags.isEmpty ? nil : min(idx, selectedSearchTags.count - 1)
+        if selectedSearchTags.isEmpty {
+            clearSelectedTagHighlight(focusSearch: true)
+        } else {
+            highlightedSelectedTagIndex = min(idx, selectedSearchTags.count - 1)
+        }
         return true
     }
 
