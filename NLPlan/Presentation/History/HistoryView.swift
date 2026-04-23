@@ -3,6 +3,7 @@ import SwiftUI
 /// 历史记录页
 struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
+    @State private var returnToTodayRotation: Double = 0
     @Environment(AppState.self) private var appState
 
     init(dayManager: DayManager) {
@@ -89,6 +90,8 @@ struct HistoryView: View {
             Text(viewModel.displayedMonthStart.yearMonthTitle)
                 .font(.system(size: 12, weight: .semibold))
 
+            returnToTodayButton
+
             Spacer()
 
             navIconButton(systemName: "chevron.right") {
@@ -118,6 +121,36 @@ struct HistoryView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
+    }
+
+    private var returnToTodayButton: some View {
+        Button {
+            withAnimation(.linear(duration: 0.5)) {
+                returnToTodayRotation += 360
+            }
+            viewModel.showCurrentMonth()
+        } label: {
+            ReturnToTodayRingIcon()
+                .frame(width: 14, height: 14)
+                .rotationEffect(.degrees(returnToTodayRotation))
+                .frame(width: 30, height: 30)
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .opacity(viewModel.isDisplayingCurrentMonth ? 0.42 : 1)
+        .disabled(viewModel.isLoadingMonth)
+        .help("回到当前月份")
+    }
+}
+
+private struct ReturnToTodayRingIcon: View {
+    var body: some View {
+        Circle()
+            .trim(from: 0.06, to: 0.94)
+            .stroke(style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
     }
 }
 

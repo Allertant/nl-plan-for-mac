@@ -12,6 +12,9 @@ final class HistoryViewModel {
     var errorMessage: String?
     var displayedMonthStart: Date
     var isLoadingMonth: Bool = false
+    var isDisplayingCurrentMonth: Bool {
+        Calendar.current.isDate(displayedMonthStart, equalTo: .now, toGranularity: .month)
+    }
 
     let dayManager: DayManager
     private var monthLoadTask: Task<Void, Never>?
@@ -44,6 +47,19 @@ final class HistoryViewModel {
 
     func showNextYear() {
         shiftYear(by: 1)
+    }
+
+    func showCurrentMonth() {
+        let calendar = Calendar.current
+        let currentMonthStart = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: .now)
+        ) ?? .now
+
+        selectedSummary = nil
+        guard !calendar.isDate(displayedMonthStart, equalTo: currentMonthStart, toGranularity: .month) else {
+            return
+        }
+        startMonthLoad(for: currentMonthStart)
     }
 
     // MARK: - Private
