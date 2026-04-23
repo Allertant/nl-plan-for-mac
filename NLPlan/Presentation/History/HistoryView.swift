@@ -4,7 +4,6 @@ import SwiftUI
 struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
     @Environment(AppState.self) private var appState
-    @State private var hoveredSummary: DailySummaryEntity?
 
     init(dayManager: DayManager) {
         _viewModel = State(initialValue: HistoryViewModel(dayManager: dayManager))
@@ -30,23 +29,9 @@ struct HistoryView: View {
                     HistoryGradeLegend()
 
                     HistoryMonthCalendarView(
-                        summaries: viewModel.summaries,
-                        hoveredSummary: $hoveredSummary
+                        summaries: viewModel.summaries
                     ) { summary in
                         viewModel.selectSummary(summary)
-                    }
-
-                    if let hoveredSummary {
-                        HistoryHoverDetailView(summary: hoveredSummary)
-                    } else {
-                        Text("将鼠标移动到日期圆点上可查看当天详情")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(Color(nsColor: .textBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
                     Spacer(minLength: 0)
@@ -84,7 +69,6 @@ struct HistoryView: View {
 
 private struct HistoryMonthCalendarView: View {
     let summaries: [DailySummaryEntity]
-    @Binding var hoveredSummary: DailySummaryEntity?
     let onSelectSummary: (DailySummaryEntity) -> Void
 
     private var calendar: Calendar { .current }
@@ -163,10 +147,6 @@ private struct HistoryMonthCalendarView: View {
                             .frame(width: 34, height: 34)
                     case .day(let day, _, let summary):
                         HistoryDayCircle(day: day, summary: summary)
-                            .onHover { hovering in
-                                guard let summary else { return }
-                                hoveredSummary = hovering ? summary : nil
-                            }
                             .onTapGesture {
                                 guard let summary else { return }
                                 onSelectSummary(summary)
@@ -212,44 +192,6 @@ private struct HistoryDayCircle: View {
                 Circle()
                     .stroke(Color.primary.opacity(summary == nil ? 0.08 : 0.2), lineWidth: 1)
             )
-    }
-}
-
-private struct HistoryHoverDetailView: View {
-    let summary: DailySummaryEntity
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(summary.date.dateString)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(summary.grade)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(summary.gradeEnum.historyColor)
-            }
-
-            Text(summary.summary)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
-            Text("完成 \(summary.completedCount)/\(summary.totalCount)")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .textBackgroundColor))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(summary.gradeEnum.historyColor.opacity(0.35), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
