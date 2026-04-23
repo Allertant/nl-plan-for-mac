@@ -363,14 +363,14 @@ struct HistoryDetailView: View {
 }
 
 private struct HistoryGradeLegend: View {
-    private let levels: [(label: String, color: Color)] = [
-        ("S", .purple),
-        ("A", .blue),
-        ("B", .cyan),
-        ("C", .green),
-        ("D", .yellow),
-        ("E", .orange),
-        ("F", .red),
+    private let levels: [Grade] = [
+        .S,
+        .A,
+        .B,
+        .C,
+        .D,
+        .E,
+        .F,
     ]
 
     var body: some View {
@@ -386,13 +386,13 @@ private struct HistoryGradeLegend: View {
             }
 
             HStack(spacing: 4) {
-                ForEach(levels, id: \.label) { level in
+                ForEach(levels, id: \.rawValue) { level in
                     ZStack {
                         RoundedRectangle(cornerRadius: 5)
-                            .fill(level.color.opacity(0.2))
-                        Text(level.label)
+                            .fill(level.historyColor.opacity(0.9))
+                        Text(level.rawValue)
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(level.color)
+                            .foregroundStyle(level.legendTextColor)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 22)
@@ -416,6 +416,10 @@ private extension Grade {
         case .E: return .orange
         case .F: return .red
         }
+    }
+
+    var legendTextColor: Color {
+        self == .D ? .black.opacity(0.72) : .white
     }
 }
 
