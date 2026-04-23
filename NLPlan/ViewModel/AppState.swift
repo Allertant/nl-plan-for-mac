@@ -74,6 +74,7 @@ final class AppState {
     var inputViewModel: InputViewModel?
     var ideaPoolViewModel: IdeaPoolViewModel?
     var mustDoViewModel: MustDoViewModel?
+    var summaryViewModel: SummaryViewModel?
 
     // MARK: - API Key
 

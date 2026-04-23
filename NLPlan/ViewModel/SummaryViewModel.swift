@@ -20,6 +20,7 @@ final class SummaryViewModel {
 
     /// 加载今日总结
     func loadTodaySummary() async {
+        guard !isProcessing else { return }
         do {
             summary = try await dayManager.fetchTodaySummary()
         } catch {

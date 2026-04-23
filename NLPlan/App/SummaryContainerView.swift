@@ -4,11 +4,9 @@ import SwiftUI
 struct SummaryContainerView: View {
     @Environment(AppState.self) private var appState
 
-    @State private var summaryVM: SummaryViewModel?
-
     var body: some View {
         Group {
-            if let summaryVM {
+            if let summaryVM = appState.summaryViewModel {
                 SummaryView(viewModel: summaryVM) {
                     appState.currentPage = .main
                 }
@@ -18,20 +16,22 @@ struct SummaryContainerView: View {
             }
         }
         .task {
-            let context = appState.modelContainer.mainContext
-            let taskRepo = TaskRepository(modelContext: context)
-            let sessionLogRepo = SessionLogRepository(modelContext: context)
-            let summaryRepo = SummaryRepository(modelContext: context)
-            let aiService = appState.makeAIService()
+            if appState.summaryViewModel == nil {
+                let context = appState.modelContainer.mainContext
+                let taskRepo = TaskRepository(modelContext: context)
+                let sessionLogRepo = SessionLogRepository(modelContext: context)
+                let summaryRepo = SummaryRepository(modelContext: context)
+                let aiService = appState.makeAIService()
 
-            let dayMgr = DayManager(
-                taskRepo: taskRepo,
-                summaryRepo: summaryRepo,
-                sessionLogRepo: sessionLogRepo,
-                timerEngine: appState.timerEngine,
-                aiService: aiService
-            )
-            self.summaryVM = SummaryViewModel(dayManager: dayMgr)
+                let dayMgr = DayManager(
+                    taskRepo: taskRepo,
+                    summaryRepo: summaryRepo,
+                    sessionLogRepo: sessionLogRepo,
+                    timerEngine: appState.timerEngine,
+                    aiService: aiService
+                )
+                appState.summaryViewModel = SummaryViewModel(dayManager: dayMgr)
+            }
         }
     }
 }
