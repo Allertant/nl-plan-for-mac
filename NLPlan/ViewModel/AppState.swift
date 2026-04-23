@@ -183,6 +183,13 @@ final class AppState {
         guard inputViewModel == nil else { return }
 
         let context = modelContainer.mainContext
+        do {
+            try TaskSplitMigrationService(modelContext: context).run()
+        } catch {
+            // Keep the legacy TaskEntity path available if the non-destructive migration fails.
+            print("Task split migration failed: \(error)")
+        }
+
         let taskRepo = TaskRepository(modelContext: context)
         let thoughtRepo = ThoughtRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
