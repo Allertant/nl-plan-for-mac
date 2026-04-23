@@ -73,7 +73,16 @@ struct PopoverView: View {
                     ToolbarIconButton {
                         appState.currentPage = .summary
                     } label: {
-                        Image(systemName: "chart.bar")
+                        if let vm = appState.summaryViewModel, vm.isProcessing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else if let summary = appState.summaryViewModel?.summary {
+                            Image(systemName: "flag.checkered.fill")
+                                .foregroundStyle(gradeColor(summary.gradeEnum))
+                        } else {
+                            Image(systemName: "flag.checkered")
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     ToolbarIconButton {
@@ -218,5 +227,15 @@ private struct ToolbarIconButton<Label: View>: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+private func gradeColor(_ grade: Grade) -> Color {
+    switch grade {
+    case .S: return .purple
+    case .A: return .green
+    case .B: return .blue
+    case .C: return .orange
+    case .D: return .red
     }
 }
