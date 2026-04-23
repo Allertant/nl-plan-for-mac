@@ -46,6 +46,7 @@ struct IdeaPoolPageView: View {
 
                         IdeaPoolSection(viewModel: viewModel)
                             .padding(12)
+                            .padding(.bottom, 40)
                     }
                 }
                 .scrollIndicators(.never)
@@ -59,8 +60,8 @@ struct IdeaPoolPageView: View {
                         }
                     } label: {
                         Image(systemName: "chevron.up")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 30, height: 30)
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 36, height: 36)
                     }
                     .buttonStyle(.borderless)
                     .contentShape(Circle())
@@ -71,7 +72,7 @@ struct IdeaPoolPageView: View {
                     )
                     .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
                     .padding(.trailing, 14)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 20)
                 }
             }
         }
