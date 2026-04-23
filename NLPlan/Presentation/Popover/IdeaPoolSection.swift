@@ -112,11 +112,12 @@ struct IdeaPoolSection: View {
                                 .onKeyPress(.upArrow) {
                                     guard highlightedSelectedTagIndex == nil, !selectedSearchTags.isEmpty else { return .ignored }
                                     highlightedSelectedTagIndex = 0
+                                    isSearchFieldFocused = false
                                     return .handled
                                 }
                                 .onKeyPress(.downArrow) {
                                     guard highlightedSelectedTagIndex != nil else { return .ignored }
-                                    highlightedSelectedTagIndex = nil
+                                    clearSelectedTagHighlight(focusSearch: true)
                                     return .handled
                                 }
                                 .onKeyPress(.leftArrow) {
@@ -142,12 +143,15 @@ struct IdeaPoolSection: View {
                                     return .handled
                                 }
                                 .background {
-                                    SearchTagDeleteKeyMonitor(
-                                        isEnabled: isSearchFieldFocused && highlightedSelectedTagIndex != nil
-                                    ) {
-                                        removeHighlightedSearchTag()
+                                    SearchTagKeyMonitor(
+                                        isEnabled: highlightedSelectedTagIndex != nil
+                                    ) { command in
+                                        handleSelectedTagKeyCommand(command)
                                     }
                                     .frame(width: 0, height: 0)
+                                }
+                                .onTapGesture {
+                                    clearSelectedTagHighlight(focusSearch: true)
                                 }
 
                             Text("\(filteredTasks.count)条")
@@ -315,6 +319,38 @@ struct IdeaPoolSection: View {
         return true
     }
 
+    private func clearSelectedTagHighlight(focusSearch: Bool) {
+        highlightedSelectedTagIndex = nil
+        if focusSearch {
+            isSearchFieldFocused = true
+        }
+    }
+
+    @discardableResult
+    private func handleSelectedTagKeyCommand(_ command: SearchTagKeyCommand) -> Bool {
+        switch command {
+        case .left:
+            guard let idx = highlightedSelectedTagIndex else { return false }
+            highlightedSelectedTagIndex = max(0, idx - 1)
+            return true
+
+        case .right:
+            guard let idx = highlightedSelectedTagIndex else { return false }
+            highlightedSelectedTagIndex = min(selectedSearchTags.count - 1, idx + 1)
+            return true
+
+        case .down:
+            clearSelectedTagHighlight(focusSearch: true)
+            return true
+
+        case .delete:
+            return removeHighlightedSearchTag()
+
+        case .blockTextInput:
+            return true
+        }
+    }
+
     // MARK: - 清理按钮
 
     private var cleanupButton: some View {
@@ -415,12 +451,20 @@ private struct DraftSearchTagToken: View {
     }
 }
 
-private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
+private enum SearchTagKeyCommand {
+    case left
+    case right
+    case down
+    case delete
+    case blockTextInput
+}
+
+private struct SearchTagKeyMonitor: NSViewRepresentable {
     var isEnabled: Bool
-    let onDelete: () -> Bool
+    let onCommand: (SearchTagKeyCommand) -> Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isEnabled: isEnabled, onDelete: onDelete)
+        Coordinator(isEnabled: isEnabled, onCommand: onCommand)
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -431,7 +475,7 @@ private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.isEnabled = isEnabled
-        context.coordinator.onDelete = onDelete
+        context.coordinator.onCommand = onCommand
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -440,12 +484,12 @@ private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
 
     final class Coordinator {
         var isEnabled: Bool
-        var onDelete: () -> Bool
+        var onCommand: (SearchTagKeyCommand) -> Bool
         private var monitor: Any?
 
-        init(isEnabled: Bool, onDelete: @escaping () -> Bool) {
+        init(isEnabled: Bool, onCommand: @escaping (SearchTagKeyCommand) -> Bool) {
             self.isEnabled = isEnabled
-            self.onDelete = onDelete
+            self.onCommand = onCommand
         }
 
         deinit {
@@ -455,8 +499,8 @@ private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
         func installMonitor() {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, self.isEnabled, event.isSearchTagDeleteKey else { return event }
-                return self.onDelete() ? nil : event
+                guard let self, self.isEnabled, let command = event.searchTagKeyCommand else { return event }
+                return self.onCommand(command) ? nil : event
             }
         }
 
@@ -470,8 +514,24 @@ private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
 }
 
 private extension NSEvent {
-    var isSearchTagDeleteKey: Bool {
-        keyCode == 51 || keyCode == 117
+    var searchTagKeyCommand: SearchTagKeyCommand? {
+        let passthroughModifiers: NSEvent.ModifierFlags = [.command, .control, .option]
+        guard modifierFlags.intersection(passthroughModifiers).isEmpty else { return nil }
+
+        switch keyCode {
+        case 51, 117:
+            return .delete
+        case 123:
+            return .left
+        case 124:
+            return .right
+        case 125:
+            return .down
+        case 126:
+            return .blockTextInput
+        default:
+            return charactersIgnoringModifiers?.isEmpty == false ? .blockTextInput : nil
+        }
     }
 }
 
