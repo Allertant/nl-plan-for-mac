@@ -29,6 +29,12 @@ struct SummaryView: View {
                     Text("AI 正在评分...")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
+                    Button("取消") {
+                        viewModel.cancelEndDay()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let summary = viewModel.summary {
@@ -131,6 +137,16 @@ struct SummaryView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(.tertiary)
                         }
+
+                        // 撤销评分
+                        Button {
+                            Task { await viewModel.undoEndDay() }
+                        } label: {
+                            Text("撤销评分")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(16)
                 }
@@ -142,7 +158,7 @@ struct SummaryView: View {
                         .foregroundStyle(.secondary)
 
                     Button {
-                        Task { await viewModel.endDay() }
+                        viewModel.endDay()
                     } label: {
                         Image(systemName: "power")
                             .font(.system(size: 28, weight: .medium))

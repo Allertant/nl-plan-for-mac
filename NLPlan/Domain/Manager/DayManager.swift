@@ -26,11 +26,15 @@ actor DayManager {
 
     // MARK: - End Day
 
-    /// 结束今天：停止所有任务 → 生成统计 → 调用 AI 评分
+    /// 结束今天：先评分（不修改任何状态）→ 成功后再停止任务并保存
     func endDay() async throws -> DailySummaryEntity {
         let today = Calendar.current.startOfDay(for: .now)
 
-        // 1. 停止所有运行中任务
+        // 1. 先评分（可安全取消，不修改任何数据）
+        let mustDoTasks = try taskRepo.fetchTasks(date: today, pool: .mustDo)
+        let grade = try await gradeWithFallback(tasks: mustDoTasks)
+
+        // 2. 评分成功后，停止所有运行中任务
         let stoppedTasks = await timerEngine.stopAll()
         for stopInfo in stoppedTasks {
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
@@ -41,9 +45,7 @@ actor DayManager {
             }
         }
 
-        // 2. 评分并保存
-        let mustDoTasks = try taskRepo.fetchTasks(date: today, pool: .mustDo)
-        let grade = try await gradeWithFallback(tasks: mustDoTasks)
+        // 3. 保存评分
         return try summaryRepo.create(
             date: today,
             grade: grade.grade,
@@ -149,6 +151,15 @@ actor DayManager {
         return summary
     }
 
+    // MARK: - Undo
+
+    /// 撤销今日评分
+    func undoTodaySummary() throws {
+        let today = Calendar.current.startOfDay(for: .now)
+        guard let summary = try summaryRepo.fetch(date: today) else { return }
+        try summaryRepo.delete(summary)
+    }
+
     // MARK: - Query
 
     /// 获取今日统计
@@ -198,6 +209,8 @@ actor DayManager {
 
         do {
             return try await aiService.generateDailyGrade(summaryInput: input)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             return DailyGrade(
                 grade: stats.fallbackGrade,

@@ -64,6 +64,11 @@ final class SummaryRepository {
         try modelContext.save()
     }
 
+    func delete(_ summary: DailySummaryEntity) throws {
+        modelContext.delete(summary)
+        try modelContext.save()
+    }
+
     func fetchAll() throws -> [DailySummaryEntity] {
         let descriptor = FetchDescriptor<DailySummaryEntity>(
             sortBy: [SortDescriptor(\.date, order: .reverse)]

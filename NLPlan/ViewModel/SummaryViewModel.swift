@@ -13,6 +13,7 @@ final class SummaryViewModel {
     var isAppealing: Bool = false
 
     private let dayManager: DayManager
+    private var endDayTask: Task<Void, Never>?
 
     init(dayManager: DayManager) {
         self.dayManager = dayManager
@@ -29,15 +30,39 @@ final class SummaryViewModel {
     }
 
     /// 结束今天
-    func endDay() async {
+    func endDay() {
         isProcessing = true
         errorMessage = nil
+        endDayTask = Task {
+            do {
+                summary = try await dayManager.endDay()
+            } catch {
+                if !Task.isCancelled {
+                    errorMessage = error.localizedDescription
+                }
+            }
+            endDayTask = nil
+            isProcessing = false
+        }
+    }
+
+    /// 取消评分（加载中）
+    func cancelEndDay() {
+        endDayTask?.cancel()
+        endDayTask = nil
+        isProcessing = false
+        errorMessage = nil
+    }
+
+    /// 撤销评分（已完成）
+    func undoEndDay() async {
         do {
-            summary = try await dayManager.endDay()
+            try await dayManager.undoTodaySummary()
+            summary = nil
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
-        isProcessing = false
     }
 
     /// 驳斥评分

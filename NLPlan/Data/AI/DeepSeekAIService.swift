@@ -270,6 +270,8 @@ final class DeepSeekAIService: AIServiceProtocol {
     }
 
     private func sendRequest(systemPrompt: String, userPrompt: String) async throws -> String {
+        try Task.checkCancellation()
+
         let timeoutInterval = Self.timeoutInterval(for: model)
         let request = DeepSeekAPIRequest(
             model: model,
@@ -290,8 +292,16 @@ final class DeepSeekAIService: AIServiceProtocol {
         // 重试最多 2 次
         var lastError: Error?
         for attempt in 0..<3 {
+            try Task.checkCancellation()
             do {
-                let (data, response) = try await urlSession.data(for: urlRequest)
+                let result: (Data, URLResponse) = try await withTaskCancellationHandler {
+                    try await urlSession.data(for: urlRequest)
+                } onCancel: {
+                    // Swift Task 取消时不会自动取消 URLSession 请求，
+                    // 但 withTaskCancellationHandler 会让 CancellationError 抛出
+                }
+
+                let (data, response) = result
 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw NLPlanError.aiServiceUnavailable
@@ -317,6 +327,8 @@ final class DeepSeekAIService: AIServiceProtocol {
                 throw NLPlanError.aiRequestTimeout
             } catch let error as NLPlanError {
                 throw error
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 lastError = error
                 print("⚠️ DeepSeek \(model) 第 \(attempt + 1) 次请求失败：\(error.localizedDescription)")
