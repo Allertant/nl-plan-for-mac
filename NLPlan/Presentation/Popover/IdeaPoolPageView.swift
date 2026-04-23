@@ -45,8 +45,8 @@ struct IdeaPoolPageView: View {
                             .id("scroll-top-anchor")
 
                         IdeaPoolSection(viewModel: viewModel)
+                            .padding(12)
                     }
-                    .padding(12)
                 }
                 .scrollIndicators(.never)
             }
