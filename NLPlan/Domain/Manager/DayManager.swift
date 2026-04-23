@@ -339,7 +339,26 @@ final class DayManager {
                 note: note
             )
 
-            if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
+            if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try taskRepo.fetchById(sourceIdeaId) {
+                if task.status == TaskStatus.done.rawValue {
+                    sourceIdea.status = TaskStatus.done.rawValue
+                } else {
+                    sourceIdea.status = IdeaStatus.attempted.rawValue
+                    sourceIdea.attempted = true
+                    if let note, !note.isEmpty {
+                        let timestamp = Date.now.dateString
+                        let existingNote = sourceIdea.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let appendedNote = "\(timestamp)\n\(note)"
+                        sourceIdea.note = [existingNote, appendedNote]
+                            .compactMap { value in
+                                guard let value, !value.isEmpty else { return nil }
+                                return value
+                            }
+                            .joined(separator: "\n\n")
+                    }
+                }
+                taskRepo.deleteWithoutSaving(task)
+            } else if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
                 task.pool = TaskPool.ideaPool.rawValue
                 task.status = TaskStatus.pending.rawValue
                 task.date = Date.now

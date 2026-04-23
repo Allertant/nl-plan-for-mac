@@ -124,35 +124,56 @@ final class TaskManager {
 
     /// 从想法池中挑选任务加入必做项
     func promoteToMustDo(taskId: UUID, priority: TaskPriority? = nil, sortOrder: Int? = nil) async throws {
-        guard let task = try taskRepo.fetchById(taskId) else {
+        guard let idea = try taskRepo.fetchById(taskId) else {
             throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
         }
-        guard task.pool == TaskPool.ideaPool.rawValue else {
-            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
+        guard idea.pool == TaskPool.ideaPool.rawValue else {
+            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: idea.taskPool)
         }
-        if let priority { task.taskPriority = priority }
-        if let sortOrder { task.sortOrder = sortOrder }
-        try taskRepo.moveToMustDo(task)
-        if let idea = try ideaRepo.fetchById(task.id) {
-            idea.ideaStatus = .inProgress
-            try ideaRepo.update(idea)
+
+        if !idea.isProjectTask {
+            let activeLinkedTasks = try taskRepo.fetchTasks(sourceIdeaId: idea.id)
+                .filter { $0.status != TaskStatus.done.rawValue }
+            guard activeLinkedTasks.isEmpty else { return }
+        }
+
+        let mustDo = try taskRepo.create(
+            title: idea.title,
+            category: idea.category,
+            estimatedMinutes: idea.estimatedMinutes,
+            priority: priority ?? idea.taskPriority,
+            aiRecommended: idea.aiRecommended,
+            recommendationReason: idea.recommendationReason,
+            pool: .mustDo,
+            date: .now,
+            sourceIdeaId: idea.id
+        )
+        mustDo.sortOrder = sortOrder ?? idea.sortOrder
+        try taskRepo.update(mustDo)
+
+        idea.status = IdeaStatus.inProgress.rawValue
+        try taskRepo.update(idea)
+
+        if let splitIdea = try ideaRepo.fetchById(idea.id) {
+            splitIdea.ideaStatus = .inProgress
+            try ideaRepo.update(splitIdea)
         }
         _ = try dailyTaskRepo.create(
-            id: task.id,
-            title: task.title,
-            category: task.category,
-            estimatedMinutes: task.estimatedMinutes,
-            priority: task.taskPriority,
-            aiRecommended: task.aiRecommended,
-            recommendationReason: task.recommendationReason,
-            sortOrder: task.sortOrder,
-            date: task.date,
-            createdDate: task.createdDate,
-            attempted: task.attempted,
-            note: task.note,
-            sourceIdeaId: task.id,
-            sourceType: task.isProjectTask ? .project : .idea,
-            migratedFromTaskId: task.id
+            id: mustDo.id,
+            title: mustDo.title,
+            category: mustDo.category,
+            estimatedMinutes: mustDo.estimatedMinutes,
+            priority: mustDo.taskPriority,
+            aiRecommended: mustDo.aiRecommended,
+            recommendationReason: mustDo.recommendationReason,
+            sortOrder: mustDo.sortOrder,
+            date: mustDo.date,
+            createdDate: mustDo.createdDate,
+            attempted: mustDo.attempted,
+            note: mustDo.note,
+            sourceIdeaId: idea.id,
+            sourceType: idea.isProjectTask ? .project : .idea,
+            migratedFromTaskId: mustDo.id
         )
     }
 
@@ -218,12 +239,27 @@ final class TaskManager {
             }
         }
 
-        try taskRepo.moveToIdeaPool(task, markAttempted: markAttempted)
         try dailyTaskRepo.deleteByMigratedTaskId(task.id)
-        if let idea = try ideaRepo.fetchById(task.id) {
-            idea.ideaStatus = markAttempted ? .attempted : .pending
-            idea.attempted = markAttempted || idea.attempted
-            try ideaRepo.update(idea)
+
+        if let sourceIdeaId = task.sourceIdeaId,
+           let sourceIdea = try taskRepo.fetchById(sourceIdeaId),
+           sourceIdea.pool == TaskPool.ideaPool.rawValue {
+            taskRepo.deleteWithoutSaving(task)
+            sourceIdea.status = markAttempted ? IdeaStatus.attempted.rawValue : TaskStatus.pending.rawValue
+            sourceIdea.attempted = markAttempted || sourceIdea.attempted
+            try taskRepo.save()
+            if let splitIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                splitIdea.ideaStatus = markAttempted ? .attempted : .pending
+                splitIdea.attempted = markAttempted || splitIdea.attempted
+                try ideaRepo.update(splitIdea)
+            }
+        } else {
+            try taskRepo.moveToIdeaPool(task, markAttempted: markAttempted)
+            if let idea = try ideaRepo.fetchById(task.id) {
+                idea.ideaStatus = markAttempted ? .attempted : .pending
+                idea.attempted = markAttempted || idea.attempted
+                try ideaRepo.update(idea)
+            }
         }
     }
 

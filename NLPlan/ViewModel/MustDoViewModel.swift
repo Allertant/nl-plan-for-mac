@@ -262,7 +262,13 @@ final class MustDoViewModel {
         acceptedRecommendationIds = []
         selectedPriorities = [:]
 
-        let ideaInputs = ideaPoolTasks.map { task in
+        let recommendationCandidates = ideaPoolTasks.filter { task in
+            task.status != IdeaStatus.inProgress.rawValue &&
+            task.status != TaskStatus.done.rawValue &&
+            task.status != IdeaStatus.archived.rawValue
+        }
+
+        let ideaInputs = recommendationCandidates.map { task in
             TaskRecommendationInput(
                 id: task.id,
                 title: task.title,
@@ -296,7 +302,7 @@ final class MustDoViewModel {
             )
 
             // 过滤掉不存在的 taskId
-            let ideaIds = Set(ideaPoolTasks.map { $0.id })
+            let ideaIds = Set(recommendationCandidates.map { $0.id })
             let validRecs = result.recommendations.filter { recommendation in
                 if let taskId = recommendation.taskId {
                     return ideaIds.contains(taskId)

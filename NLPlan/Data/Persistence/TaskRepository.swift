@@ -76,8 +76,14 @@ final class TaskRepository {
 
     func fetchAllIdeaPoolTasks() throws -> [TaskEntity] {
         let poolRaw = TaskPool.ideaPool.rawValue
+        let doneRaw = TaskStatus.done.rawValue
+        let archivedRaw = IdeaStatus.archived.rawValue
         let descriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { $0.pool == poolRaw },
+            predicate: #Predicate { task in
+                task.pool == poolRaw &&
+                task.status != doneRaw &&
+                task.status != archivedRaw
+            },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)

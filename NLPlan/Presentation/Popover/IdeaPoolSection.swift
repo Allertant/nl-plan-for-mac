@@ -1156,6 +1156,7 @@ struct IdeaPoolTaskRow: View {
     @State private var draftMinutes: String = ""
     @State private var draftNote: String = ""
     @FocusState private var focusedField: Field?
+    private var isInProgress: Bool { task.status == IdeaStatus.inProgress.rawValue }
 
     private enum Field: Hashable {
         case title, minutes, note
@@ -1219,6 +1220,16 @@ struct IdeaPoolTaskRow: View {
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(Color.orange.opacity(0.15))
+                            .cornerRadius(3)
+                    }
+
+                    if isInProgress {
+                        Text("进行中")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.green.opacity(0.14))
                             .cornerRadius(3)
                     }
                 }
@@ -1339,6 +1350,8 @@ struct IdeaPoolTaskRow: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .help("加入必做项")
+                .disabled(isInProgress)
+                .opacity(isInProgress ? 0.35 : 1)
 
                 if showDeleteConfirm {
                     Button {
@@ -1417,7 +1430,13 @@ struct IdeaPoolTaskRow: View {
     }
 
     private var rowBackground: Color {
-        flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor)
+        if flashCount % 2 == 1 {
+            return Color.accentColor.opacity(0.15)
+        }
+        if isInProgress {
+            return Color.green.opacity(0.08)
+        }
+        return Color(nsColor: .textBackgroundColor)
     }
 
     // MARK: - Inline Editing
