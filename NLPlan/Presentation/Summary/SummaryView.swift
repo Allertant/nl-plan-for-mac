@@ -159,10 +159,50 @@ struct SummaryView: View {
                 }
             } else {
                 // 未评分
-                VStack(spacing: 16) {
-                    Text("今天还没有结束")
+                ScrollView {
+                    VStack(spacing: 16) {
+                    Text("该日期尚未结算")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
+
+                    if !viewModel.incompleteTasks.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("未完成必做项需要补充备注")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("备注会进入本次结算评分依据，用于说明阻塞、低估、调整或后续安排。")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+
+                            ForEach(viewModel.incompleteTasks, id: \.id) { task in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(task.title)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                    TextField(
+                                        "补充未完成原因和后续安排...",
+                                        text: Binding(
+                                            get: { viewModel.incompleteNotes[task.id] ?? "" },
+                                            set: { viewModel.incompleteNotes[task.id] = $0 }
+                                        ),
+                                        axis: .vertical
+                                    )
+                                    .textFieldStyle(.plain)
+                                    .lineLimit(2...4)
+                                    .font(.system(size: 12))
+                                    .padding(8)
+                                    .background(Color(nsColor: .textBackgroundColor))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+                                .padding(10)
+                                .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.orange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
 
                     Button {
                         viewModel.endDay()
@@ -174,9 +214,13 @@ struct SummaryView: View {
                             .background(Circle().fill(Color.red.opacity(0.85)))
                     }
                     .buttonStyle(.plain)
-                    .help("结束今天")
+                    .disabled(!viewModel.canSettle)
+                    .opacity(viewModel.canSettle ? 1 : 0.45)
+                    .help("确认结算")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                }
             }
 
             if let error = viewModel.errorMessage {

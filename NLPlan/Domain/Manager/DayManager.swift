@@ -34,13 +34,13 @@ final class DayManager {
     }
 
     /// 结算指定日期。今天结算成功后会停止当前运行任务；历史日期只结算对应日期数据。
-    func settleDay(date: Date) async throws -> DailySummaryEntity {
+    func settleDay(date: Date, incompleteNotes: [UUID: String] = [:]) async throws -> DailySummaryEntity {
         let settlementDate = Calendar.current.startOfDay(for: date)
         let isToday = Calendar.current.isDateInToday(settlementDate)
 
         // 1. 先评分（可安全取消，不修改任何数据）
         let mustDoTasks = try taskRepo.fetchTasks(date: settlementDate, pool: .mustDo)
-        let grade = try await gradeWithFallback(tasks: mustDoTasks)
+        let grade = try await gradeWithFallback(tasks: mustDoTasks, incompleteNotes: incompleteNotes)
 
         // 2. 今日评分成功后，停止所有运行中任务
         if isToday {
@@ -201,6 +201,11 @@ final class DayManager {
         try summaryRepo.fetch(date: Calendar.current.startOfDay(for: date))
     }
 
+    /// 获取指定日期必做项
+    func fetchMustDoTasks(date: Date) async throws -> [TaskEntity] {
+        try taskRepo.fetchTasks(date: Calendar.current.startOfDay(for: date), pool: .mustDo)
+    }
+
     /// 获取历史评分
     func fetchHistory(from: Date, to: Date) async throws -> [DailySummaryEntity] {
         try summaryRepo.fetchRange(from: from, to: to)
@@ -209,7 +214,11 @@ final class DayManager {
     // MARK: - Private
 
     /// 从任务列表构建 AI 评分输入
-    private func buildSummaryInput(tasks: [TaskEntity], stats: DayStats) throws -> DailySummaryInput {
+    private func buildSummaryInput(
+        tasks: [TaskEntity],
+        stats: DayStats,
+        incompleteNotes: [UUID: String] = [:]
+    ) throws -> DailySummaryInput {
         DailySummaryInput(
             settlementDate: Date.now.dateString,
             totalTasks: stats.totalTasks,
@@ -226,16 +235,20 @@ final class DayManager {
                     completed: task.status == TaskStatus.done.rawValue,
                     priority: task.priority,
                     sourceType: try summarySourceType(for: task),
-                    note: task.note
+                    note: summaryNote(for: task, incompleteNotes: incompleteNotes)
                 )
             }
         )
     }
 
     /// AI 评分（带降级方案）
-    private func gradeWithFallback(tasks: [TaskEntity], fallbackSummary: String = "AI 评分不可用，使用基础评分。") async throws -> DailyGrade {
+    private func gradeWithFallback(
+        tasks: [TaskEntity],
+        fallbackSummary: String = "AI 评分不可用，使用基础评分。",
+        incompleteNotes: [UUID: String] = [:]
+    ) async throws -> DailyGrade {
         let stats = computeStats(tasks: tasks)
-        let input = try buildSummaryInput(tasks: tasks, stats: stats)
+        let input = try buildSummaryInput(tasks: tasks, stats: stats, incompleteNotes: incompleteNotes)
 
         do {
             return try await aiService.generateDailyGrade(summaryInput: input)
@@ -291,5 +304,16 @@ final class DayManager {
             return "普通想法来源必做项"
         }
         return source.isProjectTask ? "项目链接必做项" : "普通想法来源必做项"
+    }
+
+    private func summaryNote(for task: TaskEntity, incompleteNotes: [UUID: String]) -> String? {
+        var parts: [String] = []
+        if let note = task.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            parts.append(note)
+        }
+        if let note = incompleteNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            parts.append(note)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n结算备注：")
     }
 }

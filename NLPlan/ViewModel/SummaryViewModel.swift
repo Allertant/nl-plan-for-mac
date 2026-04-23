@@ -11,6 +11,8 @@ final class SummaryViewModel {
     var appealText: String = ""
     var showAppealInput: Bool = false
     var isAppealing: Bool = false
+    var tasks: [TaskEntity] = []
+    var incompleteNotes: [UUID: String] = [:]
     let settlementDate: Date
 
     private let dayManager: DayManager
@@ -31,6 +33,10 @@ final class SummaryViewModel {
         guard !isProcessing else { return }
         do {
             summary = try await dayManager.fetchSummary(date: settlementDate)
+            tasks = try await dayManager.fetchMustDoTasks(date: settlementDate)
+            incompleteNotes = Dictionary(
+                uniqueKeysWithValues: incompleteTasks.map { ($0.id, incompleteNotes[$0.id] ?? "") }
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -42,7 +48,7 @@ final class SummaryViewModel {
         errorMessage = nil
         endDayTask = Task {
             do {
-                let result = try await dayManager.settleDay(date: settlementDate)
+                let result = try await dayManager.settleDay(date: settlementDate, incompleteNotes: sanitizedIncompleteNotes)
                 guard !Task.isCancelled else { return }
                 summary = result
             } catch {
@@ -104,5 +110,24 @@ final class SummaryViewModel {
     var remainingAppeals: Int {
         guard let summary else { return AppConstants.maxAppealCount }
         return AppConstants.maxAppealCount - summary.appealCount
+    }
+
+    var incompleteTasks: [TaskEntity] {
+        tasks.filter { $0.status != TaskStatus.done.rawValue }
+    }
+
+    var canSettle: Bool {
+        incompleteTasks.allSatisfy { task in
+            !(incompleteNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }
+    }
+
+    var sanitizedIncompleteNotes: [UUID: String] {
+        incompleteNotes.reduce(into: [UUID: String]()) { result, pair in
+            let note = pair.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !note.isEmpty {
+                result[pair.key] = note
+            }
+        }
     }
 }
