@@ -12,6 +12,7 @@ struct IdeaPoolSection: View {
     @State private var didAutoFocusSearchField = false
     @State private var selectedProjectTask: TaskEntity?
     @State private var linkedMustDoTasks: [TaskEntity] = []
+    @State private var projectSettlementRecords: [TaskSettlementRecordEntity] = []
     @State private var isLoadingProjectDetail = false
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -286,6 +287,7 @@ struct IdeaPoolSection: View {
                 ProjectDetailOverlay(
                     project: selectedProjectTask,
                     linkedTasks: linkedMustDoTasks,
+                    settlementRecords: projectSettlementRecords,
                     isLoading: isLoadingProjectDetail,
                     onAddNote: { content in
                         Task {
@@ -452,13 +454,16 @@ struct IdeaPoolSection: View {
         guard task.isProjectTask else { return }
         selectedProjectTask = task
         linkedMustDoTasks = []
+        projectSettlementRecords = []
         isLoadingProjectDetail = true
         isSearchFieldFocused = false
 
         Task {
-            let tasks = await viewModel.fetchLinkedMustDoTasks(sourceIdeaId: task.id)
+            async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: task.id)
+            async let records = viewModel.fetchSettlementRecords(sourceIdeaId: task.id)
             guard selectedProjectTask?.id == task.id else { return }
-            linkedMustDoTasks = tasks
+            linkedMustDoTasks = await tasks
+            projectSettlementRecords = await records
             isLoadingProjectDetail = false
         }
     }
@@ -466,6 +471,7 @@ struct IdeaPoolSection: View {
     private func closeProjectDetail() {
         selectedProjectTask = nil
         linkedMustDoTasks = []
+        projectSettlementRecords = []
         isLoadingProjectDetail = false
     }
 
@@ -547,6 +553,7 @@ private struct SearchTagToken: View {
 private struct ProjectDetailOverlay: View {
     let project: TaskEntity
     let linkedTasks: [TaskEntity]
+    let settlementRecords: [TaskSettlementRecordEntity]
     let isLoading: Bool
     let onAddNote: (String) -> Void
     let onUpdateNote: (UUID, String) -> Void
@@ -568,6 +575,7 @@ private struct ProjectDetailOverlay: View {
                     projectSummaryCard
                     progressCard
                     linkedTasksCard
+                    settlementRecordsCard
                     noteCard
                 }
                 .padding(12)
@@ -754,11 +762,93 @@ private struct ProjectDetailOverlay: View {
         }
     }
 
+    private var settlementRecordsCard: some View {
+        DetailSectionCard(
+            title: "推进归档",
+            systemImage: "archivebox",
+            tint: .orange,
+            background: Color.orange.opacity(0.08),
+            border: Color.orange.opacity(0.22)
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("加载中")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                } else if settlementRecords.isEmpty {
+                    Text("暂无归档记录")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ForEach(settlementRecords, id: \.id) { record in
+                        ProjectSettlementRecordRow(record: record)
+                    }
+                }
+            }
+        }
+    }
+
     private func submitNewNote() {
         let trimmed = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         onAddNote(trimmed)
         newNoteText = ""
+    }
+}
+
+private struct ProjectSettlementRecordRow: View {
+    let record: TaskSettlementRecordEntity
+
+    private var statusColor: Color {
+        record.completed ? .green : .orange
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: record.completed ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(statusColor)
+
+                Text(record.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+
+                Text(record.completed ? "已完成" : "未完成")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(statusColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(statusColor.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+
+            HStack(spacing: 8) {
+                Label(record.settlementDate.dateString, systemImage: "calendar")
+                Label(record.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                if record.actualMinutes > 0 {
+                    Label(record.actualMinutes.hourMinuteString, systemImage: "timer")
+                }
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(.secondary)
+
+            if let note = record.note, !note.isEmpty {
+                Text(note)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 }
 

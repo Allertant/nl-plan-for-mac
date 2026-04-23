@@ -264,6 +264,11 @@ final class TaskManager {
         try taskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
     }
 
+    /// 获取绑定到指定项目想法的归档记录
+    func fetchSettlementRecords(sourceIdeaId: UUID) async throws -> [TaskSettlementRecordEntity] {
+        try taskRepo.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
+    }
+
     /// 获取活跃的正在运行的任务
     func fetchRunningTasks() async throws -> [TaskEntity] {
         try taskRepo.fetchActiveRunningTasks()

@@ -125,6 +125,15 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func fetchSettlementRecords(sourceIdeaId: UUID) async -> [TaskSettlementRecordEntity] {
+        do {
+            return try await taskManager.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func addProjectNote(taskId: UUID, content: String) async {
         do {
             try await taskManager.addProjectNote(taskId: taskId, content: content)
