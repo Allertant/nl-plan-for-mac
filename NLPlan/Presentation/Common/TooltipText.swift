@@ -4,8 +4,11 @@ import SwiftUI
 struct TooltipText: View {
     let text: String
     let tooltip: String
+    var showDelaySeconds: Double = 0.35
 
     @State private var isHovered = false
+    @State private var showTooltip = false
+    @State private var hoverTask: Task<Void, Never>?
 
     var body: some View {
         Text(text)
@@ -14,8 +17,24 @@ struct TooltipText: View {
             .lineLimit(2)
             .onHover { hovering in
                 isHovered = hovering
+                hoverTask?.cancel()
+                hoverTask = nil
+
+                if hovering {
+                    hoverTask = Task {
+                        try? await Task.sleep(for: .seconds(showDelaySeconds))
+                        guard !Task.isCancelled, isHovered else { return }
+                        showTooltip = true
+                    }
+                } else {
+                    showTooltip = false
+                }
             }
-            .popover(isPresented: $isHovered, arrowEdge: .bottom) {
+            .onDisappear {
+                hoverTask?.cancel()
+                hoverTask = nil
+            }
+            .popover(isPresented: $showTooltip, arrowEdge: .bottom) {
                 Text(tooltip)
                     .font(.system(size: 12))
                     .padding(10)
