@@ -21,6 +21,13 @@ struct SummaryView: View {
 
             Divider()
 
+            Text("正在结算：\(viewModel.settlementDate.dateString)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+
             if viewModel.isProcessing {
                 // 评分中
                 VStack(spacing: 16) {

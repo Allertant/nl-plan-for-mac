@@ -25,6 +25,13 @@ struct PopoverView: View {
                     APIKeyNotConfiguredBanner()
                 }
 
+                if let pendingDate = appState.pendingSettlementDate {
+                    PendingSettlementBanner(date: pendingDate) {
+                        appState.pendingSettlementDate = nil
+                        appState.openSummary(for: pendingDate)
+                    }
+                }
+
                 ScrollView {
                     VStack(spacing: 12) {
                         // 输入区
@@ -71,7 +78,7 @@ struct PopoverView: View {
                     }
 
                     ToolbarIconButton {
-                        appState.currentPage = .summary
+                        appState.openSummary(for: .now)
                     } label: {
                         if let vm = appState.summaryViewModel, vm.isProcessing {
                             ProgressView()
@@ -119,6 +126,38 @@ struct PopoverView: View {
                     await mustDoViewModel.refresh()
                 }
             }
+    }
+}
+
+private struct PendingSettlementBanner: View {
+    let date: Date
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .foregroundStyle(.orange)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("有未结算的必做项")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("结算日期：\(date.dateString)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("去结算")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.1))
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -30,25 +30,34 @@ final class DayManager {
     /// 结束今天：先评分（不修改任何状态）→ 成功后再停止任务并保存
     func endDay() async throws -> DailySummaryEntity {
         let today = Calendar.current.startOfDay(for: .now)
+        return try await settleDay(date: today)
+    }
+
+    /// 结算指定日期。今天结算成功后会停止当前运行任务；历史日期只结算对应日期数据。
+    func settleDay(date: Date) async throws -> DailySummaryEntity {
+        let settlementDate = Calendar.current.startOfDay(for: date)
+        let isToday = Calendar.current.isDateInToday(settlementDate)
 
         // 1. 先评分（可安全取消，不修改任何数据）
-        let mustDoTasks = try taskRepo.fetchTasks(date: today, pool: .mustDo)
+        let mustDoTasks = try taskRepo.fetchTasks(date: settlementDate, pool: .mustDo)
         let grade = try await gradeWithFallback(tasks: mustDoTasks)
 
-        // 2. 评分成功后，停止所有运行中任务
-        let stoppedTasks = await timerEngine.stopAll()
-        for stopInfo in stoppedTasks {
-            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
-                try sessionLogRepo.endSession(openLog)
-            }
-            if let task = try taskRepo.fetchById(stopInfo.taskId) {
-                try taskRepo.updateStatus(task, status: .pending)
+        // 2. 今日评分成功后，停止所有运行中任务
+        if isToday {
+            let stoppedTasks = await timerEngine.stopAll()
+            for stopInfo in stoppedTasks {
+                if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
+                    try sessionLogRepo.endSession(openLog)
+                }
+                if let task = try taskRepo.fetchById(stopInfo.taskId) {
+                    try taskRepo.updateStatus(task, status: .pending)
+                }
             }
         }
 
         // 3. 保存评分
         return try summaryRepo.create(
-            date: today,
+            date: settlementDate,
             grade: grade.grade,
             summary: grade.summary,
             suggestion: grade.suggestion,
@@ -58,6 +67,17 @@ final class DayManager {
             totalCount: grade.stats.totalTasks,
             gradingBasis: grade.gradingBasis
         )
+    }
+
+    /// 检查是否存在需要用户手动补结算的日期。只返回提醒日期，不自动评分或迁移。
+    func pendingSettlementDate(referenceDate: Date = .now) throws -> Date? {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: referenceDate)!
+        let yesterdayStart = Calendar.current.startOfDay(for: yesterday)
+        if try summaryRepo.fetch(date: yesterdayStart) != nil {
+            return nil
+        }
+        let yesterdayTasks = try taskRepo.fetchTasks(date: yesterdayStart, pool: .mustDo)
+        return yesterdayTasks.isEmpty ? nil : yesterdayStart
     }
 
     // MARK: - Check Yesterday
@@ -174,6 +194,11 @@ final class DayManager {
     func fetchTodaySummary() async throws -> DailySummaryEntity? {
         let today = Calendar.current.startOfDay(for: .now)
         return try summaryRepo.fetch(date: today)
+    }
+
+    /// 获取指定日期评分
+    func fetchSummary(date: Date) async throws -> DailySummaryEntity? {
+        try summaryRepo.fetch(date: Calendar.current.startOfDay(for: date))
     }
 
     /// 获取历史评分

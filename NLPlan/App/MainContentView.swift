@@ -55,8 +55,7 @@ struct MainContentView: View {
         )
 
         do {
-            _ = try await dayMgr.migrateUnfinishedMustDo()
-            _ = try await dayMgr.checkAndGradeYesterday()
+            appState.pendingSettlementDate = try dayMgr.pendingSettlementDate()
         } catch {
             print("启动检查失败：\(error)")
         }

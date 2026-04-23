@@ -60,6 +60,12 @@ final class AppState {
     /// 当前显示的页面
     var currentPage: Page = .main
 
+    /// 当前总结页要结算的日期
+    var settlementDate: Date = Calendar.current.startOfDay(for: .now)
+
+    /// 需要用户补结算的日期。系统只提醒，不自动结算。
+    var pendingSettlementDate: Date?
+
     /// 应用外观模式
     var appearanceMode: AppearanceMode = .system
 
@@ -141,6 +147,13 @@ final class AppState {
         appearanceMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: AppConstants.appearanceModeKey)
         applyAppearanceMode(mode)
+    }
+
+    @MainActor
+    func openSummary(for date: Date = .now) {
+        settlementDate = Calendar.current.startOfDay(for: date)
+        summaryViewModel = nil
+        currentPage = .summary
     }
 
     private func loadAppearanceMode() {

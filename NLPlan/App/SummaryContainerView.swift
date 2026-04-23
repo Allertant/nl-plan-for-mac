@@ -30,7 +30,10 @@ struct SummaryContainerView: View {
                     timerEngine: appState.timerEngine,
                     aiService: aiService
                 )
-                appState.summaryViewModel = SummaryViewModel(dayManager: dayMgr)
+                appState.summaryViewModel = SummaryViewModel(
+                    dayManager: dayMgr,
+                    settlementDate: appState.settlementDate
+                )
             }
         }
     }

@@ -11,19 +11,26 @@ final class SummaryViewModel {
     var appealText: String = ""
     var showAppealInput: Bool = false
     var isAppealing: Bool = false
+    let settlementDate: Date
 
     private let dayManager: DayManager
     private var endDayTask: Task<Void, Never>?
 
-    init(dayManager: DayManager) {
+    init(dayManager: DayManager, settlementDate: Date = .now) {
         self.dayManager = dayManager
+        self.settlementDate = Calendar.current.startOfDay(for: settlementDate)
     }
 
     /// 加载今日总结
     func loadTodaySummary() async {
+        await loadSettlementSummary()
+    }
+
+    /// 加载结算日总结
+    func loadSettlementSummary() async {
         guard !isProcessing else { return }
         do {
-            summary = try await dayManager.fetchTodaySummary()
+            summary = try await dayManager.fetchSummary(date: settlementDate)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -35,7 +42,7 @@ final class SummaryViewModel {
         errorMessage = nil
         endDayTask = Task {
             do {
-                let result = try await dayManager.endDay()
+                let result = try await dayManager.settleDay(date: settlementDate)
                 guard !Task.isCancelled else { return }
                 summary = result
             } catch {
@@ -59,7 +66,9 @@ final class SummaryViewModel {
     /// 撤销评分（已完成）
     func undoEndDay() async {
         do {
-            try await dayManager.undoTodaySummary()
+            if Calendar.current.isDateInToday(settlementDate) {
+                try await dayManager.undoTodaySummary()
+            }
             summary = nil
             errorMessage = nil
         } catch {
@@ -75,8 +84,7 @@ final class SummaryViewModel {
         errorMessage = nil
 
         do {
-            let today = Calendar.current.startOfDay(for: .now)
-            summary = try await dayManager.appealGrade(date: today, userFeedback: appealText)
+            summary = try await dayManager.appealGrade(date: settlementDate, userFeedback: appealText)
             appealText = ""
             showAppealInput = false
         } catch {
