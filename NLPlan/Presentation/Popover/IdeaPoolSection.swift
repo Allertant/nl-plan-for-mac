@@ -518,12 +518,7 @@ private struct ProjectDetailOverlay: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Button(action: onClose) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.plain)
+            BackButton(action: onClose)
             .help("返回想法池")
 
             Image(systemName: "folder.fill")
