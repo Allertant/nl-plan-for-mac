@@ -76,6 +76,18 @@ final class TaskRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchTasks(sourceIdeaId: UUID) throws -> [TaskEntity] {
+        let sourceId = sourceIdeaId
+        let poolRaw = TaskPool.mustDo.rawValue
+        let descriptor = FetchDescriptor<TaskEntity>(
+            predicate: #Predicate { task in
+                task.pool == poolRaw && task.sourceIdeaId == sourceId
+            },
+            sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func fetchActiveRunningTasks() throws -> [TaskEntity] {
         let statusRaw = TaskStatus.running.rawValue
         let descriptor = FetchDescriptor<TaskEntity>(

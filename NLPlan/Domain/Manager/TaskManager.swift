@@ -237,6 +237,11 @@ actor TaskManager {
         try taskRepo.fetchTasks(date: date, pool: .mustDo)
     }
 
+    /// 获取绑定到指定项目想法的全部必做项
+    func fetchMustDo(sourceIdeaId: UUID) async throws -> [TaskEntity] {
+        try taskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
+    }
+
     /// 获取活跃的正在运行的任务
     func fetchRunningTasks() async throws -> [TaskEntity] {
         try taskRepo.fetchActiveRunningTasks()

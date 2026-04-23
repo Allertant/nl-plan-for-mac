@@ -116,6 +116,15 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func fetchLinkedMustDoTasks(sourceIdeaId: UUID) async -> [TaskEntity] {
+        do {
+            return try await taskManager.fetchMustDo(sourceIdeaId: sourceIdeaId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func updateProjectState(taskId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
         do {
             guard let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) else { return }

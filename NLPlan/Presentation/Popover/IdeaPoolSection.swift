@@ -9,6 +9,9 @@ struct IdeaPoolSection: View {
     @State private var highlightedCandidateTag: String?
     @State private var highlightedSelectedTagIndex: Int?
     @State private var didAutoFocusSearchField = false
+    @State private var selectedProjectTask: TaskEntity?
+    @State private var linkedMustDoTasks: [TaskEntity] = []
+    @State private var isLoadingProjectDetail = false
     @FocusState private var isSearchFieldFocused: Bool
 
     private var filteredTasks: [TaskEntity] {
@@ -66,7 +69,8 @@ struct IdeaPoolSection: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            VStack(spacing: 0) {
             if viewModel.tasks.isEmpty {
                 Text("暂无想法")
                     .font(.system(size: 12))
@@ -238,6 +242,8 @@ struct IdeaPoolSection: View {
                                     Task { await viewModel.refreshProjectAnalyses(taskId: task.id) }
                                 } onUpdateProjectState: { isProject in
                                     Task { await viewModel.updateProjectState(taskId: task.id, isProject: isProject) }
+                                } onOpenProject: {
+                                    openProjectDetail(task)
                                 }
                             }
                         }
@@ -246,7 +252,21 @@ struct IdeaPoolSection: View {
                     }
                 }
             }
-        .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let selectedProjectTask {
+                ProjectDetailOverlay(
+                    project: selectedProjectTask,
+                    linkedTasks: linkedMustDoTasks,
+                    isLoading: isLoadingProjectDetail
+                ) {
+                    closeProjectDetail()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .zIndex(1)
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: selectedProjectTask?.id)
     }
 
     private func removeActiveTagQuery(from text: String) -> String {
@@ -363,6 +383,27 @@ struct IdeaPoolSection: View {
         }
     }
 
+    private func openProjectDetail(_ task: TaskEntity) {
+        guard task.isProjectTask else { return }
+        selectedProjectTask = task
+        linkedMustDoTasks = []
+        isLoadingProjectDetail = true
+        isSearchFieldFocused = false
+
+        Task {
+            let tasks = await viewModel.fetchLinkedMustDoTasks(sourceIdeaId: task.id)
+            guard selectedProjectTask?.id == task.id else { return }
+            linkedMustDoTasks = tasks
+            isLoadingProjectDetail = false
+        }
+    }
+
+    private func closeProjectDetail() {
+        selectedProjectTask = nil
+        linkedMustDoTasks = []
+        isLoadingProjectDetail = false
+    }
+
     // MARK: - 清理按钮
 
     private var cleanupButton: some View {
@@ -435,6 +476,258 @@ private struct SearchTagToken: View {
                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
             }
         }
+    }
+}
+
+private struct ProjectDetailOverlay: View {
+    let project: TaskEntity
+    let linkedTasks: [TaskEntity]
+    let isLoading: Bool
+    let onClose: () -> Void
+
+    private var noteText: String {
+        project.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    projectSummaryCard
+                    progressCard
+                    linkedTasksCard
+                    noteCard
+                }
+                .padding(12)
+            }
+            .scrollIndicators(.never)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
+        .padding(8)
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Button(action: onClose) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+            .help("返回想法池")
+
+            Image(systemName: "folder.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.indigo)
+
+            Text("项目详情")
+                .font(.system(size: 13, weight: .semibold))
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var projectSummaryCard: some View {
+        DetailSectionCard(title: "项目信息", systemImage: "lightbulb.fill") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(project.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(3)
+
+                HStack(spacing: 8) {
+                    TagChip(text: project.category)
+
+                    Label(project.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+
+                    Text(project.createdDate.shortDateTimeString)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if project.attempted {
+                    Text("已尝试")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+    }
+
+    private var progressCard: some View {
+        DetailSectionCard(title: "进度", systemImage: "chart.line.uptrend.xyaxis") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    ProgressView(value: (project.projectProgress ?? 0) / 100)
+                        .progressViewStyle(.linear)
+                        .tint(.indigo)
+
+                    Text("\(Int(project.projectProgress ?? 0))%")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.indigo)
+                }
+
+                if let summary = project.projectProgressSummary, !summary.isEmpty {
+                    Text(summary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("暂无进度分析")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if let updatedAt = project.projectProgressUpdatedAt {
+                    Text("更新于 \(updatedAt.shortDateTimeString)")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    private var linkedTasksCard: some View {
+        DetailSectionCard(title: "绑定必做项", systemImage: "link") {
+            VStack(alignment: .leading, spacing: 8) {
+                if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("加载中")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else if linkedTasks.isEmpty {
+                    Text("暂无绑定必做项")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(linkedTasks, id: \.id) { task in
+                        ProjectLinkedTaskRow(task: task)
+                    }
+                }
+            }
+        }
+    }
+
+    private var noteCard: some View {
+        DetailSectionCard(title: "备注", systemImage: "note.text") {
+            Text(noteText.isEmpty ? "暂无备注" : noteText)
+                .font(.system(size: 11))
+                .foregroundStyle(noteText.isEmpty ? .tertiary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct DetailSectionCard<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct ProjectLinkedTaskRow: View {
+    let task: TaskEntity
+
+    private var statusColor: Color {
+        switch task.taskStatus {
+        case .done: return .green
+        case .running: return .blue
+        case .paused: return .orange
+        case .pending: return .secondary
+        }
+    }
+
+    private var priorityColor: Color {
+        switch task.taskPriority {
+        case .high: return .red
+        case .medium: return .orange
+        case .low: return .blue
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: task.taskStatus.iconName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(statusColor)
+
+                Text(task.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+
+                statusBadge
+            }
+
+            HStack(spacing: 8) {
+                Label(task.taskPriority.displayName, systemImage: task.taskPriority.iconName)
+                    .foregroundStyle(priorityColor)
+
+                Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
+
+                if task.totalElapsedSeconds > 0 {
+                    Label((task.totalElapsedSeconds / 60).hourMinuteString, systemImage: "timer")
+                }
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(.secondary)
+
+            Text("创建于 \(task.createdDate.shortDateTimeString)")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(8)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+
+    private var statusBadge: some View {
+        Text(task.taskStatus.displayName)
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(statusColor.opacity(0.1))
+            .clipShape(Capsule())
     }
 }
 
@@ -554,6 +847,7 @@ struct IdeaPoolTaskRow: View {
     let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?) -> Void
     let onRefreshProject: () -> Void
     let onUpdateProjectState: (Bool) -> Void
+    let onOpenProject: () -> Void
 
     @State private var flashCount = 0
     @State private var showDeleteConfirm = false
@@ -727,7 +1021,7 @@ struct IdeaPoolTaskRow: View {
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             VStack(spacing: 4) {
                 Menu {
@@ -780,12 +1074,17 @@ struct IdeaPoolTaskRow: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor))
-        .cornerRadius(6)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            focusedField = nil
+        .background {
+            rowBackground
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    focusedField = nil
+                    if task.isProjectTask {
+                        onOpenProject()
+                    }
+                }
         }
+        .cornerRadius(6)
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil {
                 if editingTitle { commitTitleEdit() }
@@ -816,6 +1115,10 @@ struct IdeaPoolTaskRow: View {
                 }
             }
         }
+    }
+
+    private var rowBackground: Color {
+        flashCount % 2 == 1 ? Color.accentColor.opacity(0.15) : Color(nsColor: .textBackgroundColor)
     }
 
     // MARK: - Inline Editing
