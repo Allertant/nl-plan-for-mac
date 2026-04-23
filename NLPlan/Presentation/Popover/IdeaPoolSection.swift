@@ -8,6 +8,7 @@ struct IdeaPoolSection: View {
     @State private var selectedSearchTags: [String] = []
     @State private var highlightedCandidateTag: String?
     @State private var highlightedSelectedTagIndex: Int?
+    @State private var didAutoFocusSearchField = false
     @FocusState private var isSearchFieldFocused: Bool
 
     private var filteredTasks: [TaskEntity] {
@@ -152,6 +153,9 @@ struct IdeaPoolSection: View {
                                 }
                                 .onTapGesture {
                                     clearSelectedTagHighlight(focusSearch: true)
+                                }
+                                .onAppear {
+                                    focusSearchFieldOnFirstAppear()
                                 }
 
                             Text("\(filteredTasks.count)条")
@@ -322,6 +326,14 @@ struct IdeaPoolSection: View {
     private func clearSelectedTagHighlight(focusSearch: Bool) {
         highlightedSelectedTagIndex = nil
         if focusSearch {
+            isSearchFieldFocused = true
+        }
+    }
+
+    private func focusSearchFieldOnFirstAppear() {
+        guard !didAutoFocusSearchField else { return }
+        didAutoFocusSearchField = true
+        DispatchQueue.main.async {
             isSearchFieldFocused = true
         }
     }
