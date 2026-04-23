@@ -9,9 +9,6 @@ final class ThoughtEntity {
     var createdAt: Date
     var processed: Bool
 
-    @Relationship(deleteRule: .cascade)
-    var tasks: [TaskEntity] = []
-
     init(
         id: UUID = UUID(),
         rawText: String,

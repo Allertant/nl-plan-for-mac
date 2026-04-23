@@ -17,7 +17,6 @@ struct HistoryContainerView: View {
         }
         .task {
             let context = appState.modelContainer.mainContext
-            let taskRepo = TaskRepository(modelContext: context)
             let ideaRepo = IdeaRepository(modelContext: context)
             let dailyTaskRepo = DailyTaskRepository(modelContext: context)
             let sessionLogRepo = SessionLogRepository(modelContext: context)
@@ -25,7 +24,6 @@ struct HistoryContainerView: View {
             let aiService = appState.makeAIService()
 
             let dayMgr = DayManager(
-                taskRepo: taskRepo,
                 ideaRepo: ideaRepo,
                 dailyTaskRepo: dailyTaskRepo,
                 summaryRepo: summaryRepo,

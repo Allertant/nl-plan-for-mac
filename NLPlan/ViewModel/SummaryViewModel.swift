@@ -11,7 +11,7 @@ final class SummaryViewModel {
     var appealText: String = ""
     var showAppealInput: Bool = false
     var isAppealing: Bool = false
-    var tasks: [TaskEntity] = []
+    var tasks: [DailyTaskEntity] = []
     var incompleteNotes: [UUID: String] = [:]
     let settlementDate: Date
 
@@ -112,8 +112,8 @@ final class SummaryViewModel {
         return AppConstants.maxAppealCount - summary.appealCount
     }
 
-    var incompleteTasks: [TaskEntity] {
-        tasks.filter { $0.status != TaskStatus.done.rawValue }
+    var incompleteTasks: [DailyTaskEntity] {
+        tasks.filter { $0.taskStatus != .done }
     }
 
     var canSettle: Bool {

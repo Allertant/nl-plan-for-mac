@@ -10,7 +10,7 @@ enum ParseStatus: String, Equatable {
 }
 
 /// AI 解析队列项（SwiftData 持久化）
-/// 确认后转为 TaskEntity + ThoughtEntity，然后删除本实体
+/// 确认后转为 IdeaEntity + ThoughtEntity，然后删除本实体
 @Model
 final class ParseQueueItemEntity {
 

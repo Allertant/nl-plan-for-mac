@@ -5,8 +5,8 @@ struct CleanupDetailView: View {
     @Bindable var viewModel: IdeaPoolViewModel
     let onBack: () -> Void
 
-    private var taskLookup: [UUID: TaskEntity] {
-        Dictionary(uniqueKeysWithValues: viewModel.tasks.map { ($0.id, $0) })
+    private var taskLookup: [UUID: IdeaEntity] {
+        Dictionary(uniqueKeysWithValues: viewModel.ideas.map { ($0.id, $0) })
     }
 
     var body: some View {
@@ -159,7 +159,7 @@ struct CleanupDetailView: View {
 // MARK: - 清理详情行
 
 private struct CleanupDetailRow: View {
-    let task: TaskEntity
+    let task: IdeaEntity
     let reason: String
     let isConfirmed: Bool
     let onConfirm: () -> Void

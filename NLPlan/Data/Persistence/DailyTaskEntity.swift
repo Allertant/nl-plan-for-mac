@@ -21,7 +21,6 @@ final class DailyTaskEntity {
     var settlementNote: String?
     var sourceIdeaId: UUID?
     var sourceType: String
-    var migratedFromTaskId: UUID?
 
     @Transient
     var taskStatus: TaskStatus {
@@ -52,8 +51,7 @@ final class DailyTaskEntity {
         note: String? = nil,
         settlementNote: String? = nil,
         sourceIdeaId: UUID? = nil,
-        sourceType: String = DailyTaskSourceType.none.rawValue,
-        migratedFromTaskId: UUID? = nil
+        sourceType: String = DailyTaskSourceType.none.rawValue
     ) {
         self.id = id
         self.title = title
@@ -72,7 +70,6 @@ final class DailyTaskEntity {
         self.settlementNote = settlementNote
         self.sourceIdeaId = sourceIdeaId
         self.sourceType = sourceType
-        self.migratedFromTaskId = migratedFromTaskId
     }
 }
 

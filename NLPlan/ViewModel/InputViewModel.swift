@@ -20,7 +20,7 @@ final class InputViewModel {
     private let taskManager: TaskManager
     private let parseQueueRepo: ParseQueueRepository
 
-    /// 提交成功后的回调，传入新增任务 ID（用于通知想法池刷新并高亮）
+    /// 提交成功后的回调，传入新增想法 ID（用于通知想法池刷新并高亮）
     var onSubmitSuccess: (([UUID]) async -> Void)?
 
     init(taskManager: TaskManager, parseQueueRepo: ParseQueueRepository) {
@@ -94,8 +94,8 @@ final class InputViewModel {
         item.parseStatus = .processing
 
         do {
-            let existingTasks = try await taskManager.fetchIdeaPool()
-            let existingTitles = existingTasks.map { $0.title }
+            let existingIdeas = try await taskManager.fetchIdeaPool()
+            let existingTitles = existingIdeas.map { $0.title }
             let parsedTasks = try await taskManager.parseThoughts(
                 rawText: item.rawText,
                 existingTaskTitles: existingTitles
@@ -124,13 +124,13 @@ final class InputViewModel {
 
         do {
             let finalParsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks)
-            let createdTasks = try await taskManager.saveParsedTasks(
+            let createdIdeas = try await taskManager.saveParsedTasks(
                 parsedTasks: finalParsedTasks,
                 rawText: item.rawText
             )
             successMessage = "✅ 已添加到想法池"
-            let taskIds = createdTasks.map { $0.id }
-            await onSubmitSuccess?(taskIds)
+            let ideaIds = createdIdeas.map { $0.id }
+            await onSubmitSuccess?(ideaIds)
 
             // 删除队列实体
             try parseQueueRepo.delete(item)

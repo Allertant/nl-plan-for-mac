@@ -4,8 +4,11 @@ import Foundation
 @Observable
 final class MustDoViewModel {
 
-    var tasks: [TaskEntity] = []
+    var tasks: [DailyTaskEntity] = []
     var errorMessage: String?
+
+    /// 耗时缓存 [taskId: seconds]
+    var elapsedSecondsCache: [UUID: Int] = [:]
 
     /// 编辑模式（上下箭头排序）
     var isEditMode: Bool = false
@@ -21,10 +24,9 @@ final class MustDoViewModel {
 
     // MARK: - AI 推荐
 
-    /// 推荐策略
     enum RecommendationStrategy: String, CaseIterable, Identifiable {
-        case quickWin = "quick_win"       // 快速完成优先
-        case hardFirst = "hard_first"     // 高难度优先
+        case quickWin = "quick_win"
+        case hardFirst = "hard_first"
 
         var id: String { rawValue }
 
@@ -98,7 +100,11 @@ final class MustDoViewModel {
     func refresh() async {
         do {
             tasks = try await taskManager.fetchMustDo()
-            // 刷新后统一重编 sortOrder，避免碰撞
+            // 刷新耗时缓存
+            elapsedSecondsCache.removeAll()
+            for task in tasks {
+                elapsedSecondsCache[task.id] = try await taskManager.totalElapsedSeconds(taskId: task.id)
+            }
             reindexAllPendingSortOrders()
         } catch {
             errorMessage = error.localizedDescription
@@ -136,21 +142,21 @@ final class MustDoViewModel {
         }
     }
 
-    /// 是否可以上移（同优先级内有上一个）
+    /// 是否可以上移
     func canMoveUp(at index: Int) -> Bool {
         let pending = pendingTasks
         guard index > 0 && index < pending.count else { return false }
         return pending[index].priority == pending[index - 1].priority
     }
 
-    /// 是否可以下移（同优先级内有下一个）
+    /// 是否可以下移
     func canMoveDown(at index: Int) -> Bool {
         let pending = pendingTasks
         guard index >= 0 && index < pending.count - 1 else { return false }
         return pending[index].priority == pending[index + 1].priority
     }
 
-    /// 上移（同优先级内前移一位，重编 sortOrder）
+    /// 上移
     func moveUp(at index: Int) {
         let pending = pendingTasks
         guard index > 0,
@@ -168,7 +174,7 @@ final class MustDoViewModel {
         Task { await refresh() }
     }
 
-    /// 下移（同优先级内后移一位，重编 sortOrder）
+    /// 下移
     func moveDown(at index: Int) {
         let pending = pendingTasks
         guard index < pending.count - 1,
@@ -187,19 +193,19 @@ final class MustDoViewModel {
     }
 
     /// 已完成的任务
-    var completedTasks: [TaskEntity] {
-        tasks.filter { $0.status == TaskStatus.done.rawValue }
+    var completedTasks: [DailyTaskEntity] {
+        tasks.filter { $0.taskStatus == .done }
     }
 
     /// 未完成的任务（按优先级排序，同优先级内按 sortOrder）
-    var pendingTasks: [TaskEntity] {
+    var pendingTasks: [DailyTaskEntity] {
         let priorityOrder: [String: Int] = [
             TaskPriority.high.rawValue: 0,
             TaskPriority.medium.rawValue: 1,
             TaskPriority.low.rawValue: 2
         ]
         return tasks
-            .filter { $0.status != TaskStatus.done.rawValue }
+            .filter { $0.taskStatus != .done }
             .sorted {
                 let p0 = priorityOrder[$0.priority] ?? 1
                 let p1 = priorityOrder[$1.priority] ?? 1
@@ -209,20 +215,18 @@ final class MustDoViewModel {
     }
 
     /// 正在运行的任务
-    var runningTask: TaskEntity? {
-        tasks.first { $0.status == TaskStatus.running.rawValue }
+    var runningTask: DailyTaskEntity? {
+        tasks.first { $0.taskStatus == .running }
     }
 
     // MARK: - SortOrder 管理
 
-    /// 统一重编 sortOrder（0, 1, 2...）
-    private func reindexSortOrder(_ tasks: [TaskEntity]) {
+    private func reindexSortOrder(_ tasks: [DailyTaskEntity]) {
         for (i, task) in tasks.enumerated() {
             task.sortOrder = i
         }
     }
 
-    /// 刷新后对所有未完成任务的 sortOrder 做一次紧凑重编
     private func reindexAllPendingSortOrders() {
         let priorityOrder: [String: Int] = [
             TaskPriority.high.rawValue: 0,
@@ -230,7 +234,7 @@ final class MustDoViewModel {
             TaskPriority.low.rawValue: 2
         ]
         let sorted = tasks
-            .filter { $0.status != TaskStatus.done.rawValue }
+            .filter { $0.taskStatus != .done }
             .sorted {
                 let p0 = priorityOrder[$0.priority] ?? 1
                 let p1 = priorityOrder[$1.priority] ?? 1
@@ -252,9 +256,8 @@ final class MustDoViewModel {
 
     // MARK: - AI 推荐
 
-    /// 获取 AI 推荐
     func fetchRecommendations(
-        ideaPoolTasks: [TaskEntity],
+        ideaPoolIdeas: [IdeaEntity],
         remainingHours: Double
     ) async {
         recommendationState = .loading
@@ -262,21 +265,21 @@ final class MustDoViewModel {
         acceptedRecommendationIds = []
         selectedPriorities = [:]
 
-        let recommendationCandidates = ideaPoolTasks.filter { task in
-            task.status != IdeaStatus.inProgress.rawValue &&
-            task.status != TaskStatus.done.rawValue &&
-            task.status != IdeaStatus.archived.rawValue
+        let recommendationCandidates = ideaPoolIdeas.filter { idea in
+            idea.ideaStatus != .inProgress &&
+            idea.ideaStatus != .completed &&
+            idea.ideaStatus != .archived
         }
 
-        let ideaInputs = recommendationCandidates.map { task in
+        let ideaInputs = recommendationCandidates.map { idea in
             TaskRecommendationInput(
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                estimatedMinutes: task.estimatedMinutes,
-                attempted: task.attempted,
-                status: task.status,
-                isProject: task.isProjectTask
+                id: idea.id,
+                title: idea.title,
+                category: idea.category,
+                estimatedMinutes: idea.estimatedMinutes,
+                attempted: idea.attempted,
+                status: idea.status,
+                isProject: idea.isProject
             )
         }
 
@@ -301,7 +304,6 @@ final class MustDoViewModel {
                 strategy: recommendationStrategy
             )
 
-            // 过滤掉不存在的 taskId
             let ideaIds = Set(recommendationCandidates.map { $0.id })
             let validRecs = result.recommendations.filter { recommendation in
                 if let taskId = recommendation.taskId {
@@ -317,7 +319,6 @@ final class MustDoViewModel {
                 overallReason: result.overallReason
             )
 
-            // 设置默认优先级：按推荐顺序递减
             for (index, rec) in validRecs.enumerated() {
                 let priority: TaskPriority
                 switch index {
@@ -334,7 +335,6 @@ final class MustDoViewModel {
         }
     }
 
-    /// 接受单条推荐
     func acceptRecommendation(recommendationId: UUID) async {
         guard let recommendation = currentRecommendations?.recommendations.first(where: { $0.id == recommendationId }) else {
             return
@@ -352,7 +352,6 @@ final class MustDoViewModel {
         }
     }
 
-    /// 接受所有未操作的推荐
     func acceptAllRecommendations() async {
         guard let recs = currentRecommendations else { return }
         for (index, rec) in recs.recommendations.enumerated() {
@@ -371,7 +370,6 @@ final class MustDoViewModel {
         await onIdeaPoolChanged?()
     }
 
-    /// 关闭推荐面板
     func dismissRecommendations() {
         recommendationState = .idle
         acceptedRecommendationIds = []
@@ -387,7 +385,7 @@ final class MustDoViewModel {
 
     private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {
         if let taskId = recommendation.taskId {
-            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority, sortOrder: sortOrder)
+            try await taskManager.promoteToMustDo(ideaId: taskId, priority: priority, sortOrder: sortOrder)
         } else {
             _ = try await taskManager.createMustDoTask(
                 title: recommendation.title,
@@ -406,7 +404,7 @@ final class MustDoViewModel {
             guard let task = try await taskManager.fetchMustDo(date: .now).first(where: { $0.id == taskId }) else { return }
             let previousSourceIdeaId = task.sourceIdeaId
             task.sourceIdeaId = sourceIdeaId
-            try await taskManager.updateTask(task)
+            try await taskManager.updateDailyTask(task)
             await refresh()
             await onProjectLinkChanged?(previousSourceIdeaId)
             if sourceIdeaId != previousSourceIdeaId {

@@ -24,7 +24,6 @@ enum NLPlanError: LocalizedError {
 
     // 业务错误
     case appealLimitExceeded
-    case taskNotInExpectedPool(expected: TaskPool, actual: TaskPool)
     case apiKeyNotConfigured
 
     var errorDescription: String? {
@@ -51,8 +50,6 @@ enum NLPlanError: LocalizedError {
             return "网络不可用，请检查网络连接"
         case .appealLimitExceeded:
             return "今日申诉次数已达上限（3次）"
-        case .taskNotInExpectedPool(let expected, let actual):
-            return "任务不在预期池中（预期：\(expected.displayName)，实际：\(actual.displayName)）"
         case .apiKeyNotConfigured:
             return "请先配置 API Key"
         }

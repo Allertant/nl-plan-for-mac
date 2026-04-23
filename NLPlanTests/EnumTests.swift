@@ -75,24 +75,6 @@ struct NLPlanErrorTests {
     }
 }
 
-// MARK: - TaskPool Tests
-
-@Suite("TaskPool Tests")
-struct TaskPoolTests {
-
-    @Test("TaskPool rawValue 正确")
-    func testRawValues() {
-        #expect(TaskPool.ideaPool.rawValue == "idea_pool")
-        #expect(TaskPool.mustDo.rawValue == "must_do")
-    }
-
-    @Test("TaskPool displayName 正确")
-    func testDisplayNames() {
-        #expect(TaskPool.ideaPool.displayName == "想法池")
-        #expect(TaskPool.mustDo.displayName == "必做项")
-    }
-}
-
 // MARK: - TaskStatus Tests
 
 @Suite("TaskStatus Tests")

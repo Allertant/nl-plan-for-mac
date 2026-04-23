@@ -19,8 +19,8 @@ struct IdeaPoolPageView: View {
                     Text("想法池")
                         .font(.system(size: 13, weight: .semibold))
 
-                    if !viewModel.tasks.isEmpty {
-                        Text("\(viewModel.tasks.count)")
+                    if !viewModel.ideas.isEmpty {
+                        Text("\(viewModel.ideas.count)")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
@@ -53,7 +53,7 @@ struct IdeaPoolPageView: View {
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
-                if viewModel.tasks.count >= 5 {
+                if viewModel.ideas.count >= 5 {
                     ScrollToTopButton {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             proxy.scrollTo("scroll-top-anchor", anchor: .top)

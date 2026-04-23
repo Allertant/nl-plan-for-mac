@@ -3,7 +3,7 @@ import SwiftUI
 /// 必做项列表区域
 struct MustDoSection: View {
     @Bindable var viewModel: MustDoViewModel
-    let ideaPoolTasks: [TaskEntity]
+    let ideaPoolIdeas: [IdeaEntity]
     let timerEngine: TimerEngine
 
     var body: some View {
@@ -55,7 +55,8 @@ struct MustDoSection: View {
                     ForEach(Array(viewModel.pendingTasks.enumerated()), id: \.element.id) { index, task in
                         MustDoTaskRow(
                             task: task,
-                            ideaPoolTasks: ideaPoolTasks,
+                            ideaPoolIdeas: ideaPoolIdeas,
+                            elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0,
                             isEditMode: viewModel.isEditMode,
                             canMoveUp: viewModel.canMoveUp(at: index),
                             canMoveDown: viewModel.canMoveDown(at: index),
@@ -80,7 +81,7 @@ struct MustDoSection: View {
                     }
 
                     // 为底部浮动按钮留出空间
-                    if !ideaPoolTasks.isEmpty && !viewModel.showRecommendationPanel {
+                    if !ideaPoolIdeas.isEmpty && !viewModel.showRecommendationPanel {
                         Color.clear.frame(height: 36)
                     }
                 }
@@ -93,7 +94,7 @@ struct MustDoSection: View {
 
                     LazyVStack(spacing: 4) {
                         ForEach(viewModel.completedTasks, id: \.id) { task in
-                            CompletedTaskRow(task: task)
+                            CompletedTaskRow(task: task, elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0)
                         }
                     }
                     .padding(.horizontal, 8)
@@ -102,7 +103,7 @@ struct MustDoSection: View {
 
             // AI 推荐面板
             if viewModel.showRecommendationPanel {
-                AIRecommendPanel(viewModel: viewModel, ideaPoolTasks: ideaPoolTasks)
+                AIRecommendPanel(viewModel: viewModel, ideaPoolIdeas: ideaPoolIdeas)
             }
 
             if let error = viewModel.errorMessage {
@@ -122,7 +123,7 @@ struct MustDoSection: View {
 
 private struct AIRecommendPanel: View {
     @Bindable var viewModel: MustDoViewModel
-    let ideaPoolTasks: [TaskEntity]
+    let ideaPoolIdeas: [IdeaEntity]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -336,8 +337,9 @@ private struct RecommendationRow: View {
 
 /// 必做项任务卡片
 struct MustDoTaskRow: View {
-    let task: TaskEntity
-    let ideaPoolTasks: [TaskEntity]
+    let task: DailyTaskEntity
+    let ideaPoolIdeas: [IdeaEntity]
+    var elapsedSeconds: Int = 0
     var isEditMode: Bool = false
     var canMoveUp: Bool = false
     var canMoveDown: Bool = false
@@ -351,10 +353,10 @@ struct MustDoTaskRow: View {
 
     @State private var showCompleteConfirm = false
 
-    private var isRunning: Bool { task.status == TaskStatus.running.rawValue }
-    private var sourceIdea: TaskEntity? {
+    private var isRunning: Bool { task.taskStatus == .running }
+    private var sourceIdea: IdeaEntity? {
         guard let sourceIdeaId = task.sourceIdeaId else { return nil }
-        return ideaPoolTasks.first(where: { $0.id == sourceIdeaId })
+        return ideaPoolIdeas.first(where: { $0.id == sourceIdeaId })
     }
 
     var body: some View {
@@ -483,11 +485,11 @@ struct MustDoTaskRow: View {
                     onBindSource(nil)
                 }
 
-                if !ideaPoolTasks.filter(\.isProjectTask).isEmpty {
+                if !ideaPoolIdeas.filter(\.isProject).isEmpty {
                     Divider()
                 }
 
-                ForEach(ideaPoolTasks.filter(\.isProjectTask), id: \.id) { idea in
+                ForEach(ideaPoolIdeas.filter(\.isProject), id: \.id) { idea in
                     Button {
                         onBindSource(idea.id)
                     } label: {
@@ -521,7 +523,8 @@ struct MustDoTaskRow: View {
 
 /// 已完成任务卡片
 struct CompletedTaskRow: View {
-    let task: TaskEntity
+    let task: DailyTaskEntity
+    var elapsedSeconds: Int = 0
 
     var body: some View {
         HStack(spacing: 8) {
@@ -536,7 +539,7 @@ struct CompletedTaskRow: View {
 
             Spacer()
 
-            let minutes = task.totalElapsedSeconds / 60
+            let minutes = elapsedSeconds / 60
             Text(minutes.hourMinuteString)
                 .font(.system(size: 10))
                 .foregroundStyle(.gray)

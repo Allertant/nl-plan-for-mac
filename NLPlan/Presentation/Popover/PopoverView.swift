@@ -45,7 +45,7 @@ struct PopoverView: View {
                         // 必做项
                         MustDoSection(
                             viewModel: mustDoViewModel,
-                            ideaPoolTasks: ideaPoolViewModel.tasks,
+                            ideaPoolIdeas: ideaPoolViewModel.ideas,
                             timerEngine: timerEngine
                         )
                     }
@@ -65,8 +65,8 @@ struct PopoverView: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "lightbulb.fill")
-                            if !ideaPoolViewModel.tasks.isEmpty {
-                                Text("\(ideaPoolViewModel.tasks.count)")
+                            if !ideaPoolViewModel.ideas.isEmpty {
+                                Text("\(ideaPoolViewModel.ideas.count)")
                                     .font(.system(size: 9, weight: .medium))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 4)
@@ -110,10 +110,10 @@ struct PopoverView: View {
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
                 // AI 推荐浮动按钮
-                if !ideaPoolViewModel.tasks.isEmpty && !mustDoViewModel.showRecommendationPanel {
+                if !ideaPoolViewModel.ideas.isEmpty && !mustDoViewModel.showRecommendationPanel {
                     AIRecommendFloatingButton(
                         viewModel: mustDoViewModel,
-                        ideaPoolTasks: ideaPoolViewModel.tasks,
+                        ideaPoolIdeas: ideaPoolViewModel.ideas,
                         remainingWorkHours: remainingWorkHours
                     )
                     .padding(.trailing, 14)
@@ -181,7 +181,7 @@ struct APIKeyNotConfiguredBanner: View {
 
 private struct AIRecommendFloatingButton: View {
     @Bindable var viewModel: MustDoViewModel
-    let ideaPoolTasks: [TaskEntity]
+    let ideaPoolIdeas: [IdeaEntity]
     let remainingWorkHours: Double
 
     @State private var isExpanded = false
@@ -222,7 +222,7 @@ private struct AIRecommendFloatingButton: View {
             }
             Task {
                 await viewModel.fetchRecommendations(
-                    ideaPoolTasks: ideaPoolTasks,
+                    ideaPoolIdeas: ideaPoolIdeas,
                     remainingHours: remainingWorkHours
                 )
             }

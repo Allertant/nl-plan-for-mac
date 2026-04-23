@@ -10,10 +10,10 @@ final class IdeaPoolViewModel {
         case user
     }
 
-    var tasks: [TaskEntity] = []
+    var ideas: [IdeaEntity] = []
     var isExpanded: Bool = false
     var errorMessage: String?
-    var newlyAddedTaskIds: Set<UUID> = []
+    var newlyAddedIdeaIds: Set<UUID> = []
     var isRefreshingProjects: Bool = false
     var refreshingProjectIds: Set<UUID> = []
     private let minimumRefreshAnimationDuration: TimeInterval = 0.45
@@ -32,10 +32,10 @@ final class IdeaPoolViewModel {
 
     var cleanupState: CleanupState = .idle
 
-    /// 已确认删除的 taskId
+    /// 已确认删除的 ideaId
     var confirmedCleanupIds: Set<UUID> = []
 
-    /// 撤销栈（按顺序记录已标记删除的 taskId）
+    /// 撤销栈
     private var undoStack: [UUID] = []
 
     /// 是否可以撤销
@@ -64,15 +64,15 @@ final class IdeaPoolViewModel {
         self.taskManager = taskManager
     }
 
-    /// 刷新想法池（可传入新增任务 ID 用于高亮闪烁）
-    func refresh(newTaskIds: Set<UUID> = []) async {
+    /// 刷新想法池
+    func refresh(newIdeaIds: Set<UUID> = []) async {
         do {
-            tasks = try await taskManager.fetchIdeaPool()
-            if !newTaskIds.isEmpty {
-                newlyAddedTaskIds = newTaskIds
+            ideas = try await taskManager.fetchIdeaPool()
+            if !newIdeaIds.isEmpty {
+                newlyAddedIdeaIds = newIdeaIds
                 Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .seconds(2))
-                    self?.newlyAddedTaskIds.removeAll()
+                    self?.newlyAddedIdeaIds.removeAll()
                 }
             }
         } catch {
@@ -81,9 +81,9 @@ final class IdeaPoolViewModel {
     }
 
     /// 加入必做项
-    func promoteToMustDo(taskId: UUID, priority: TaskPriority = .medium) async {
+    func promoteToMustDo(ideaId: UUID, priority: TaskPriority = .medium) async {
         do {
-            try await taskManager.promoteToMustDo(taskId: taskId, priority: priority)
+            try await taskManager.promoteToMustDo(ideaId: ideaId, priority: priority)
             await refresh()
             await onPromotedToMustDo?()
         } catch {
@@ -91,32 +91,32 @@ final class IdeaPoolViewModel {
         }
     }
 
-    /// 删除任务
-    func deleteTask(taskId: UUID) async {
+    /// 删除想法
+    func deleteIdea(ideaId: UUID) async {
         do {
-            try await taskManager.deleteFromIdeaPool(taskId: taskId)
+            try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    /// 更新任务字段（标题/标签/时长/备注）
-    func updateTask(taskId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil) async {
+    /// 更新想法字段
+    func updateIdea(ideaId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil) async {
         do {
-            if let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) {
-                if let title { task.title = title }
-                if let category { task.category = category }
-                if let estimatedMinutes { task.estimatedMinutes = estimatedMinutes }
-                if let note { task.note = note }
-                try await taskManager.updateTask(task)
+            if let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) {
+                if let title { idea.title = title }
+                if let category { idea.category = category }
+                if let estimatedMinutes { idea.estimatedMinutes = estimatedMinutes }
+                if let note { idea.note = note }
+                try await taskManager.updateIdea(idea)
             }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func fetchLinkedMustDoTasks(sourceIdeaId: UUID) async -> [TaskEntity] {
+    func fetchLinkedMustDoTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
             return try await taskManager.fetchMustDo(sourceIdeaId: sourceIdeaId)
         } catch {
@@ -134,9 +134,18 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func addProjectNote(taskId: UUID, content: String) async {
+    func fetchProjectNotes(ideaId: UUID) async -> [ProjectNoteEntity] {
         do {
-            try await taskManager.addProjectNote(taskId: taskId, content: content)
+            return try await taskManager.fetchProjectNotes(ideaId: ideaId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func addProjectNote(ideaId: UUID, content: String) async {
+        do {
+            try await taskManager.addProjectNote(ideaId: ideaId, content: content)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -150,27 +159,27 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func updateProjectState(taskId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
+    func updateProjectState(ideaId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
         do {
-            guard let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) else { return }
-            task.isProject = isProject
-            task.projectDecisionSource = source.rawValue
+            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
+            idea.isProject = isProject
+            idea.projectDecisionSource = source.rawValue
             if !isProject {
-                task.projectProgress = 0
-                task.projectProgressSummary = nil
-                task.projectProgressUpdatedAt = nil
+                idea.projectProgress = 0
+                idea.projectProgressSummary = nil
+                idea.projectProgressUpdatedAt = nil
             }
-            try await taskManager.updateTask(task)
+            try await taskManager.updateIdea(idea)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func refreshProjectAnalyses(taskId: UUID? = nil) async {
-        if let taskId {
-            guard !isRefreshingProjects, !refreshingProjectIds.contains(taskId) else { return }
-            refreshingProjectIds.insert(taskId)
+    func refreshProjectAnalyses(ideaId: UUID? = nil) async {
+        if let ideaId {
+            guard !isRefreshingProjects, !refreshingProjectIds.contains(ideaId) else { return }
+            refreshingProjectIds.insert(ideaId)
         } else {
             guard !isRefreshingProjects, refreshingProjectIds.isEmpty else { return }
             isRefreshingProjects = true
@@ -183,16 +192,16 @@ final class IdeaPoolViewModel {
             let aiService = await makeAIService()
 
             let targetIdeas = allIdeas.filter { idea in
-                guard let taskId else { return true }
-                return idea.id == taskId
+                guard let ideaId else { return true }
+                return idea.id == ideaId
             }
 
             let progressTargets = targetIdeas.compactMap { idea -> ProjectProgressInput? in
-                guard idea.isProjectTask else { return nil }
+                guard idea.isProject else { return nil }
 
                 let linkedMustDos = allMustDos.filter { $0.sourceIdeaId == idea.id }
-                let completed = linkedMustDos.filter { $0.status == TaskStatus.done.rawValue }
-                let pending = linkedMustDos.filter { $0.status != TaskStatus.done.rawValue }
+                let completed = linkedMustDos.filter { $0.taskStatus == .done }
+                let pending = linkedMustDos.filter { $0.taskStatus != .done }
 
                 guard !completed.isEmpty else {
                     idea.projectProgress = 0
@@ -230,7 +239,7 @@ final class IdeaPoolViewModel {
                 }
                 let analysisMap = Dictionary(uniqueKeysWithValues: analyses.map { ($0.ideaId, $0) })
 
-                for idea in targetIdeas where idea.isProjectTask {
+                for idea in targetIdeas where idea.isProject {
                     guard let analysis = analysisMap[idea.id] else { continue }
                     idea.projectProgress = min(max(analysis.progress, 0), 100)
                     idea.projectProgressSummary = analysis.summary
@@ -239,34 +248,33 @@ final class IdeaPoolViewModel {
             }
 
             if let first = targetIdeas.first {
-                try await taskManager.updateTask(first)
+                try await taskManager.updateIdea(first)
             }
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
 
-        await finishProjectRefresh(taskId: taskId, startedAt: startedAt)
+        await finishProjectRefresh(ideaId: ideaId, startedAt: startedAt)
     }
 
     // MARK: - AI 清理
 
-    /// 请求 AI 分析可清理的任务
     func fetchCleanupSuggestions() async {
         cleanupState = .loading
         errorMessage = nil
         confirmedCleanupIds = []
         undoStack = []
 
-        let inputs = tasks.map { task in
+        let inputs = ideas.map { idea in
             TaskRecommendationInput(
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                estimatedMinutes: task.estimatedMinutes,
-                attempted: task.attempted,
-                status: task.status,
-                isProject: task.isProjectTask
+                id: idea.id,
+                title: idea.title,
+                category: idea.category,
+                estimatedMinutes: idea.estimatedMinutes,
+                attempted: idea.attempted,
+                status: idea.status,
+                isProject: idea.isProject
             )
         }
 
@@ -274,9 +282,8 @@ final class IdeaPoolViewModel {
             let aiService = await makeAIService()
             let result = try await aiService.cleanupIdeaPool(tasks: inputs)
 
-            // 过滤掉不存在的 taskId
-            let taskIds = Set(tasks.map { $0.id })
-            let validItems = result.items.filter { taskIds.contains($0.taskId) }
+            let ideaIds = Set(ideas.map { $0.id })
+            let validItems = result.items.filter { ideaIds.contains($0.taskId) }
             let filteredResult = CleanupResult(items: validItems, overallReason: result.overallReason)
 
             cleanupState = .loaded(filteredResult)
@@ -285,13 +292,11 @@ final class IdeaPoolViewModel {
         }
     }
 
-    /// 标记单条为待删除（不执行数据库操作）
     func markCleanupItem(taskId: UUID) {
         confirmedCleanupIds.insert(taskId)
         undoStack.append(taskId)
     }
 
-    /// 标记所有为待删除
     func markAllCleanupItems() {
         guard let result = currentCleanupResult else { return }
         for item in result.items where !confirmedCleanupIds.contains(item.taskId) {
@@ -300,17 +305,15 @@ final class IdeaPoolViewModel {
         }
     }
 
-    /// 撤销上一次标记
     func undoLastCleanup() {
         guard let lastId = undoStack.popLast() else { return }
         confirmedCleanupIds.remove(lastId)
     }
 
-    /// 执行批量删除（从数据库真正删除所有已标记项）
     func executeCleanup() async {
-        for taskId in confirmedCleanupIds {
+        for ideaId in confirmedCleanupIds {
             do {
-                try await taskManager.deleteFromIdeaPool(taskId: taskId)
+                try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -319,14 +322,12 @@ final class IdeaPoolViewModel {
         resetCleanupState()
     }
 
-    /// 跳过单条（从建议列表中移除，不删除）
     func skipCleanupItem(taskId: UUID) {
         guard case .loaded(let result) = cleanupState else { return }
         let updated = result.items.filter { $0.taskId != taskId }
         cleanupState = .loaded(CleanupResult(items: updated, overallReason: result.overallReason))
     }
 
-    /// 重置清理状态（全部跳过时调用）
     func resetCleanupState() {
         cleanupState = .idle
         confirmedCleanupIds = []
@@ -362,14 +363,14 @@ final class IdeaPoolViewModel {
         }
     }
 
-    private func finishProjectRefresh(taskId: UUID?, startedAt: Date) async {
+    private func finishProjectRefresh(ideaId: UUID?, startedAt: Date) async {
         let elapsed = Date().timeIntervalSince(startedAt)
         if elapsed < minimumRefreshAnimationDuration {
             try? await Task.sleep(for: .seconds(minimumRefreshAnimationDuration - elapsed))
         }
 
-        if let taskId {
-            refreshingProjectIds.remove(taskId)
+        if let ideaId {
+            refreshingProjectIds.remove(ideaId)
         } else {
             isRefreshingProjects = false
         }

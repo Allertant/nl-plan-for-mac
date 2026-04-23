@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 新必做项表仓库。迁移完成前与旧 TaskRepository 并存。
+/// 必做项表仓库
 final class DailyTaskRepository {
 
     private let modelContext: ModelContext
@@ -25,8 +25,7 @@ final class DailyTaskRepository {
         attempted: Bool = false,
         note: String? = nil,
         sourceIdeaId: UUID? = nil,
-        sourceType: DailyTaskSourceType = .none,
-        migratedFromTaskId: UUID? = nil
+        sourceType: DailyTaskSourceType = .none
     ) throws -> DailyTaskEntity {
         let task = DailyTaskEntity(
             id: id,
@@ -44,8 +43,7 @@ final class DailyTaskRepository {
             attempted: attempted,
             note: note,
             sourceIdeaId: sourceIdeaId,
-            sourceType: sourceType.rawValue,
-            migratedFromTaskId: migratedFromTaskId
+            sourceType: sourceType.rawValue
         )
         modelContext.insert(task)
         try modelContext.save()
@@ -55,13 +53,6 @@ final class DailyTaskRepository {
     func fetchById(_ id: UUID) throws -> DailyTaskEntity? {
         let descriptor = FetchDescriptor<DailyTaskEntity>(
             predicate: #Predicate { $0.id == id }
-        )
-        return try modelContext.fetch(descriptor).first
-    }
-
-    func fetchByMigratedTaskId(_ taskId: UUID) throws -> DailyTaskEntity? {
-        let descriptor = FetchDescriptor<DailyTaskEntity>(
-            predicate: #Predicate { $0.migratedFromTaskId == taskId }
         )
         return try modelContext.fetch(descriptor).first
     }
@@ -116,8 +107,8 @@ final class DailyTaskRepository {
         try modelContext.save()
     }
 
-    func deleteByMigratedTaskId(_ taskId: UUID) throws {
-        guard let task = try fetchByMigratedTaskId(taskId) else { return }
+    func deleteById(_ id: UUID) throws {
+        guard let task = try fetchById(id) else { return }
         modelContext.delete(task)
         try modelContext.save()
     }
@@ -129,5 +120,22 @@ final class DailyTaskRepository {
 
     func save() throws {
         try modelContext.save()
+    }
+
+    /// 将指定日期未完成的必做项移回想法池（在 DailyTaskEntity 上标记回退）
+    func migrateUnfinishedMustDo(date: Date) throws -> [DailyTaskEntity] {
+        let tasks = try fetchTasks(date: date)
+        let unfinished = tasks.filter { $0.status != TaskStatus.done.rawValue }
+        for task in unfinished {
+            let wasStarted = task.status == TaskStatus.running.rawValue
+                || task.status == TaskStatus.paused.rawValue
+            task.status = TaskStatus.pending.rawValue
+            task.date = Date.now
+            if wasStarted {
+                task.attempted = true
+            }
+        }
+        try modelContext.save()
+        return unfinished
     }
 }

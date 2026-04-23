@@ -8,20 +8,19 @@ final class ProjectNoteEntity {
     var content: String
     var createdAt: Date
     var updatedAt: Date
-
-    var projectTask: TaskEntity?
+    var ideaId: UUID?
 
     init(
         id: UUID = UUID(),
         content: String,
         createdAt: Date = .now,
         updatedAt: Date = .now,
-        projectTask: TaskEntity? = nil
+        ideaId: UUID?
     ) {
         self.id = id
         self.content = content
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.projectTask = projectTask
+        self.ideaId = ideaId
     }
 }

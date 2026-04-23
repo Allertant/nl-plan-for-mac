@@ -1,4 +1,3 @@
-import Foundation
 import SwiftUI
 import SwiftData
 import AppKit
@@ -183,14 +182,7 @@ final class AppState {
         guard inputViewModel == nil else { return }
 
         let context = modelContainer.mainContext
-        do {
-            try TaskSplitMigrationService(modelContext: context).run()
-        } catch {
-            // Keep the legacy TaskEntity path available if the non-destructive migration fails.
-            print("Task split migration failed: \(error)")
-        }
 
-        let taskRepo = TaskRepository(modelContext: context)
         let ideaRepo = IdeaRepository(modelContext: context)
         let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let thoughtRepo = ThoughtRepository(modelContext: context)
@@ -198,7 +190,6 @@ final class AppState {
         let aiService = makeAIService()
 
         let taskMgr = TaskManager(
-            taskRepo: taskRepo,
             ideaRepo: ideaRepo,
             dailyTaskRepo: dailyTaskRepo,
             thoughtRepo: thoughtRepo,
@@ -220,9 +211,9 @@ final class AppState {
         mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
 
         // 连接回调：提交成功后刷新想法池
-        inputViewModel?.onSubmitSuccess = { [weak self] taskIds in
+        inputViewModel?.onSubmitSuccess = { [weak self] ideaIds in
             guard let ideaPoolVM = self?.ideaPoolViewModel else { return }
-            await ideaPoolVM.refresh(newTaskIds: Set(taskIds))
+            await ideaPoolVM.refresh(newIdeaIds: Set(ideaIds))
         }
 
         // 连接回调：想法池提升到必做项后刷新必做项
@@ -242,7 +233,7 @@ final class AppState {
 
         mustDoViewModel?.onProjectLinkChanged = { [weak self] ideaId in
             guard let ideaId else { return }
-            await self?.ideaPoolViewModel?.refreshProjectAnalyses(taskId: ideaId)
+            await self?.ideaPoolViewModel?.refreshProjectAnalyses(ideaId: ideaId)
         }
     }
 }

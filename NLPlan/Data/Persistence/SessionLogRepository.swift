@@ -17,15 +17,9 @@ final class SessionLogRepository {
     ) throws -> SessionLogEntity {
         let log = SessionLogEntity(
             startedAt: startedAt,
-            date: date
+            date: date,
+            taskId: taskId
         )
-        // 关联 task
-        let taskDescriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { $0.id == taskId }
-        )
-        if let task = try modelContext.fetch(taskDescriptor).first {
-            log.task = task
-        }
         modelContext.insert(log)
         try modelContext.save()
         return log
@@ -38,18 +32,24 @@ final class SessionLogRepository {
     }
 
     func fetchLogs(taskId: UUID) throws -> [SessionLogEntity] {
+        let targetId = taskId
         let descriptor = FetchDescriptor<SessionLogEntity>(
-            predicate: #Predicate { $0.task?.id == taskId }
+            predicate: #Predicate { $0.taskId == targetId }
         )
         return try modelContext.fetch(descriptor)
     }
 
     func fetchOpenSession(taskId: UUID) throws -> SessionLogEntity? {
+        let targetId = taskId
         let descriptor = FetchDescriptor<SessionLogEntity>(
             predicate: #Predicate { log in
-                log.task?.id == taskId && log.endedAt == nil
+                log.taskId == targetId && log.endedAt == nil
             }
         )
         return try modelContext.fetch(descriptor).first
+    }
+
+    func totalElapsedSeconds(taskId: UUID) throws -> Int {
+        try fetchLogs(taskId: taskId).reduce(0) { $0 + $1.durationSeconds }
     }
 }

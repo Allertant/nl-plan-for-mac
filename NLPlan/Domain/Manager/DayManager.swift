@@ -5,7 +5,6 @@ import SwiftData
 @MainActor
 final class DayManager {
 
-    private let taskRepo: TaskRepository
     private let ideaRepo: IdeaRepository
     private let dailyTaskRepo: DailyTaskRepository
     private let summaryRepo: SummaryRepository
@@ -14,7 +13,6 @@ final class DayManager {
     private let aiService: AIServiceProtocol
 
     init(
-        taskRepo: TaskRepository,
         ideaRepo: IdeaRepository,
         dailyTaskRepo: DailyTaskRepository,
         summaryRepo: SummaryRepository,
@@ -22,7 +20,6 @@ final class DayManager {
         timerEngine: TimerEngine,
         aiService: AIServiceProtocol
     ) {
-        self.taskRepo = taskRepo
         self.ideaRepo = ideaRepo
         self.dailyTaskRepo = dailyTaskRepo
         self.summaryRepo = summaryRepo
@@ -45,7 +42,7 @@ final class DayManager {
         let isToday = Calendar.current.isDateInToday(settlementDate)
 
         // 1. 先评分（可安全取消，不修改任何数据）
-        let mustDoTasks = try fetchLegacyMustDoTasks(date: settlementDate)
+        let mustDoTasks = try dailyTaskRepo.fetchTasks(date: settlementDate)
         let grade = try await gradeWithFallback(tasks: mustDoTasks, incompleteNotes: incompleteNotes)
 
         // 2. 今日评分成功后，停止所有运行中任务
@@ -55,8 +52,9 @@ final class DayManager {
                 if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
                     try sessionLogRepo.endSession(openLog)
                 }
-                if let task = try taskRepo.fetchById(stopInfo.taskId) {
-                    try taskRepo.updateStatus(task, status: .pending)
+                if let task = try dailyTaskRepo.fetchById(stopInfo.taskId) {
+                    task.taskStatus = .pending
+                    try dailyTaskRepo.update(task)
                 }
             }
         }
@@ -88,7 +86,7 @@ final class DayManager {
         if try summaryRepo.fetch(date: yesterdayStart) != nil {
             return nil
         }
-        let yesterdayTasks = try fetchLegacyMustDoTasks(date: yesterdayStart)
+        let yesterdayTasks = try dailyTaskRepo.fetchTasks(date: yesterdayStart)
         return yesterdayTasks.isEmpty ? nil : yesterdayStart
     }
 
@@ -105,13 +103,13 @@ final class DayManager {
         }
 
         // 检查昨天是否有必做项
-        let yesterdayTasks = try fetchLegacyMustDoTasks(date: yesterdayStart)
+        let yesterdayTasks = try dailyTaskRepo.fetchTasks(date: yesterdayStart)
         if yesterdayTasks.isEmpty {
             return nil
         }
 
         // 先迁移未完成的任务，然后评分
-        _ = try taskRepo.migrateUnfinishedMustDo(date: yesterdayStart)
+        _ = try dailyTaskRepo.migrateUnfinishedMustDo(date: yesterdayStart)
 
         let grade = try await gradeWithFallback(tasks: yesterdayTasks, fallbackSummary: "自动补评（AI 不可用）")
         return try summaryRepo.create(
@@ -130,10 +128,10 @@ final class DayManager {
     // MARK: - Migrate
 
     /// 跨天迁移：将昨日未完成的必做项移回想法池
-    func migrateUnfinishedMustDo() async throws -> [TaskEntity] {
+    func migrateUnfinishedMustDo() async throws -> [DailyTaskEntity] {
         let today = Calendar.current.startOfDay(for: .now)
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
-        return try taskRepo.migrateUnfinishedMustDo(date: yesterday)
+        return try dailyTaskRepo.migrateUnfinishedMustDo(date: yesterday)
     }
 
     // MARK: - Appeal
@@ -150,7 +148,7 @@ final class DayManager {
             throw NLPlanError.appealLimitExceeded
         }
 
-        let tasks = try fetchLegacyMustDoTasks(date: date)
+        let tasks = try dailyTaskRepo.fetchTasks(date: date)
         let stats = computeStats(tasks: tasks)
         let originalInput = try buildSummaryInput(tasks: tasks, stats: stats)
         let originalGrade = DailyGrade(
@@ -198,7 +196,7 @@ final class DayManager {
     /// 获取今日统计
     func todayStats() async throws -> DayStats {
         let today = Calendar.current.startOfDay(for: .now)
-        let tasks = try fetchLegacyMustDoTasks(date: today)
+        let tasks = try dailyTaskRepo.fetchTasks(date: today)
         return computeStats(tasks: tasks)
     }
 
@@ -214,8 +212,8 @@ final class DayManager {
     }
 
     /// 获取指定日期必做项
-    func fetchMustDoTasks(date: Date) async throws -> [TaskEntity] {
-        try fetchLegacyMustDoTasks(date: date)
+    func fetchMustDoTasks(date: Date) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchTasks(date: date)
     }
 
     /// 获取历史评分
@@ -227,7 +225,7 @@ final class DayManager {
 
     /// 从任务列表构建 AI 评分输入
     private func buildSummaryInput(
-        tasks: [TaskEntity],
+        tasks: [DailyTaskEntity],
         stats: DayStats,
         incompleteNotes: [UUID: String] = [:]
     ) throws -> DailySummaryInput {
@@ -243,10 +241,10 @@ final class DayManager {
                 TaskDetail(
                     title: task.title,
                     estimatedMinutes: task.estimatedMinutes,
-                    actualMinutes: max(0, task.totalElapsedSeconds / 60),
-                    completed: task.status == TaskStatus.done.rawValue,
+                    actualMinutes: max(0, try sessionLogRepo.totalElapsedSeconds(taskId: task.id) / 60),
+                    completed: task.taskStatus == .done,
                     priority: task.priority,
-                    sourceType: try summarySourceType(for: task),
+                    sourceType: summarySourceType(for: task),
                     note: summaryNote(for: task, incompleteNotes: incompleteNotes)
                 )
             }
@@ -255,7 +253,7 @@ final class DayManager {
 
     /// AI 评分（带降级方案）
     private func gradeWithFallback(
-        tasks: [TaskEntity],
+        tasks: [DailyTaskEntity],
         fallbackSummary: String = "AI 评分不可用，使用基础评分。",
         incompleteNotes: [UUID: String] = [:]
     ) async throws -> DailyGrade {
@@ -284,11 +282,14 @@ final class DayManager {
         }
     }
 
-    private func computeStats(tasks: [TaskEntity]) -> DayStats {
+    private func computeStats(tasks: [DailyTaskEntity]) -> DayStats {
         let totalTasks = tasks.count
-        let completedTasks = tasks.filter { $0.status == TaskStatus.done.rawValue }.count
+        let completedTasks = tasks.filter { $0.taskStatus == .done }.count
         let totalPlannedMinutes = tasks.reduce(0) { $0 + $1.estimatedMinutes }
-        let totalActualSeconds = tasks.reduce(0) { $0 + $1.totalElapsedSeconds }
+        let totalActualSeconds = tasks.reduce(0) { total, task in
+            let secs = (try? sessionLogRepo.totalElapsedSeconds(taskId: task.id)) ?? 0
+            return total + secs
+        }
         let totalActualMinutes = totalActualSeconds / 60
 
         let deviationRate: Double
@@ -304,21 +305,21 @@ final class DayManager {
             totalPlannedMinutes: totalPlannedMinutes,
             totalActualMinutes: totalActualMinutes,
             deviationRate: deviationRate,
-            extraCompleted: 0  // TODO: 计算额外完成的想法池任务
+            extraCompleted: 0
         )
     }
 
-    private func summarySourceType(for task: TaskEntity) throws -> String {
+    private func summarySourceType(for task: DailyTaskEntity) -> String {
         guard let sourceIdeaId = task.sourceIdeaId else {
             return task.aiRecommended ? "无来源必做项" : "普通想法来源必做项"
         }
-        guard let source = try taskRepo.fetchById(sourceIdeaId) else {
+        guard let source = try? ideaRepo.fetchById(sourceIdeaId) else {
             return "普通想法来源必做项"
         }
-        return source.isProjectTask ? "项目链接必做项" : "普通想法来源必做项"
+        return source.isProject ? "项目链接必做项" : "普通想法来源必做项"
     }
 
-    private func summaryNote(for task: TaskEntity, incompleteNotes: [UUID: String]) -> String? {
+    private func summaryNote(for task: DailyTaskEntity, incompleteNotes: [UUID: String]) -> String? {
         var parts: [String] = []
         if let note = task.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
             parts.append(note)
@@ -330,27 +331,33 @@ final class DayManager {
     }
 
     private func archiveAndClearSettledTasks(
-        tasks: [TaskEntity],
+        tasks: [DailyTaskEntity],
         settlementDate: Date,
         incompleteNotes: [UUID: String]
     ) throws {
         var affectedProjectIdeaIds: Set<UUID> = []
 
         for task in tasks {
-            let sourceType = try summarySourceType(for: task)
+            let sourceType = summarySourceType(for: task)
             let note = summaryNote(for: task, incompleteNotes: incompleteNotes)
-            try taskRepo.createSettlementRecord(
-                task: task,
+            let actualMinutes = max(0, try sessionLogRepo.totalElapsedSeconds(taskId: task.id) / 60)
+
+            try ideaRepo.createSettlementRecord(
+                taskId: task.id,
+                sourceIdeaId: task.sourceIdeaId,
                 settlementDate: settlementDate,
-                actualMinutes: max(0, task.totalElapsedSeconds / 60),
+                title: task.title,
+                estimatedMinutes: task.estimatedMinutes,
+                actualMinutes: actualMinutes,
+                priority: task.priority,
+                completed: task.taskStatus == .done,
                 sourceType: sourceType,
                 note: note
             )
-            try archiveSplitDailyTask(task, note: note)
 
-            if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try taskRepo.fetchById(sourceIdeaId) {
-                if task.status == TaskStatus.done.rawValue {
-                    sourceIdea.status = TaskStatus.done.rawValue
+            if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                if task.taskStatus == .done {
+                    sourceIdea.ideaStatus = .completed
                     try updateSplitIdea(
                         sourceIdeaId: sourceIdeaId,
                         status: .completed,
@@ -361,7 +368,7 @@ final class DayManager {
                         settlementDate: settlementDate
                     )
                 } else {
-                    sourceIdea.status = IdeaStatus.attempted.rawValue
+                    sourceIdea.ideaStatus = .attempted
                     sourceIdea.attempted = true
                     if let note, !note.isEmpty {
                         let timestamp = Date.now.dateString
@@ -384,7 +391,6 @@ final class DayManager {
                         settlementDate: settlementDate
                     )
                 }
-                taskRepo.deleteWithoutSaving(task)
             } else if sourceType == "项目链接必做项", let sourceIdeaId = task.sourceIdeaId {
                 affectedProjectIdeaIds.insert(sourceIdeaId)
                 try appendProjectSettlementNoteIfNeeded(
@@ -393,26 +399,11 @@ final class DayManager {
                     note: note,
                     settlementDate: settlementDate
                 )
-                taskRepo.deleteWithoutSaving(task)
-            } else if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
-                task.pool = TaskPool.ideaPool.rawValue
-                task.status = TaskStatus.pending.rawValue
-                task.date = Date.now
-                task.attempted = true
-            } else {
-                taskRepo.deleteWithoutSaving(task)
             }
-        }
-        try taskRepo.save()
-        try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
-    }
 
-    private func archiveSplitDailyTask(_ task: TaskEntity, note: String?) throws {
-        guard let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) else { return }
-        dailyTask.settlementNote = note
-        dailyTask.status = task.status
-        try dailyTaskRepo.update(dailyTask)
-        try dailyTaskRepo.delete(dailyTask)
+            try dailyTaskRepo.delete(task)
+        }
+        try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
     }
 
     private func updateSplitIdea(
@@ -437,15 +428,7 @@ final class DayManager {
         )
     }
 
-    private func fetchLegacyMustDoTasks(date: Date) throws -> [TaskEntity] {
-        let targetDate = Calendar.current.startOfDay(for: date)
-        let dailyTasks = try dailyTaskRepo.fetchTasks(date: targetDate)
-        return try dailyTasks.compactMap { dailyTask in
-            try taskRepo.fetchById(dailyTask.id)
-        }
-    }
-
-    private func settlementLogContent(task: TaskEntity, note: String?) -> String {
+    private func settlementLogContent(task: DailyTaskEntity, note: String?) -> String {
         let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let trimmedNote, !trimmedNote.isEmpty else {
             return "未完成必做项：\(task.title)"
@@ -455,35 +438,28 @@ final class DayManager {
 
     private func appendProjectSettlementNoteIfNeeded(
         sourceIdeaId: UUID,
-        task: TaskEntity,
+        task: DailyTaskEntity,
         note: String?,
         settlementDate: Date
     ) throws {
-        guard task.status != TaskStatus.done.rawValue else { return }
+        guard task.taskStatus != .done else { return }
         guard let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedNote.isEmpty else {
             return
         }
-        guard let projectIdea = try taskRepo.fetchById(sourceIdeaId) else { return }
+        guard let _ = try ideaRepo.fetchById(sourceIdeaId) else { return }
 
         let content = """
         \(settlementDate.shortDateTimeString)
         必做项：\(task.title)
         备注：\(trimmedNote)
         """
-        _ = try taskRepo.createProjectNote(task: projectIdea, content: content)
+        _ = try ideaRepo.createProjectNote(ideaId: sourceIdeaId, content: content)
     }
 
     private func refreshProjectIdeaStatusesAfterSettlement(_ ideaIds: Set<UUID>) throws {
         for ideaId in ideaIds {
-            let activeTasks = try taskRepo.fetchTasks(sourceIdeaId: ideaId)
-                .filter { $0.status != TaskStatus.done.rawValue }
+            let activeTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: ideaId)
             guard activeTasks.isEmpty else { continue }
-
-            if let sourceIdea = try taskRepo.fetchById(ideaId),
-               sourceIdea.status == IdeaStatus.inProgress.rawValue {
-                sourceIdea.status = TaskStatus.pending.rawValue
-                try taskRepo.update(sourceIdea)
-            }
 
             if let idea = try ideaRepo.fetchById(ideaId),
                idea.ideaStatus == .inProgress {

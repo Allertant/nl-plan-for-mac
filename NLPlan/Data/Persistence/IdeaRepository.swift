@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 新想法表仓库。迁移完成前与旧 TaskRepository 并存。
+/// 想法表仓库
 final class IdeaRepository {
 
     private let modelContext: ModelContext
@@ -27,8 +27,7 @@ final class IdeaRepository {
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
         projectProgressUpdatedAt: Date? = nil,
-        createdDate: Date = .now,
-        migratedFromTaskId: UUID? = nil
+        createdDate: Date = .now
     ) throws -> IdeaEntity {
         let idea = IdeaEntity(
             id: id,
@@ -48,8 +47,7 @@ final class IdeaRepository {
             projectDecisionSource: projectDecisionSource,
             projectProgress: projectProgress,
             projectProgressSummary: projectProgressSummary,
-            projectProgressUpdatedAt: projectProgressUpdatedAt,
-            migratedFromTaskId: migratedFromTaskId
+            projectProgressUpdatedAt: projectProgressUpdatedAt
         )
         modelContext.insert(idea)
         try modelContext.save()
@@ -59,13 +57,6 @@ final class IdeaRepository {
     func fetchById(_ id: UUID) throws -> IdeaEntity? {
         let descriptor = FetchDescriptor<IdeaEntity>(
             predicate: #Predicate { $0.id == id }
-        )
-        return try modelContext.fetch(descriptor).first
-    }
-
-    func fetchByMigratedTaskId(_ taskId: UUID) throws -> IdeaEntity? {
-        let descriptor = FetchDescriptor<IdeaEntity>(
-            predicate: #Predicate { $0.migratedFromTaskId == taskId }
         )
         return try modelContext.fetch(descriptor).first
     }
@@ -128,6 +119,77 @@ final class IdeaRepository {
         let descriptor = FetchDescriptor<IdeaLogEntity>(
             predicate: #Predicate { $0.ideaId == targetId },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    // MARK: - Project Notes
+
+    func createProjectNote(ideaId: UUID, content: String) throws -> ProjectNoteEntity {
+        let note = ProjectNoteEntity(content: content, ideaId: ideaId)
+        modelContext.insert(note)
+        try modelContext.save()
+        return note
+    }
+
+    func fetchProjectNotes(ideaId: UUID) throws -> [ProjectNoteEntity] {
+        let targetId = ideaId
+        let descriptor = FetchDescriptor<ProjectNoteEntity>(
+            predicate: #Predicate { $0.ideaId == targetId },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchProjectNoteById(_ id: UUID) throws -> ProjectNoteEntity? {
+        let descriptor = FetchDescriptor<ProjectNoteEntity>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try modelContext.fetch(descriptor).first
+    }
+
+    func updateProjectNote(_ note: ProjectNoteEntity, content: String) throws {
+        note.content = content
+        note.updatedAt = .now
+        try modelContext.save()
+    }
+
+    // MARK: - Settlement Records
+
+    func createSettlementRecord(
+        taskId: UUID,
+        sourceIdeaId: UUID?,
+        settlementDate: Date,
+        title: String,
+        estimatedMinutes: Int,
+        actualMinutes: Int,
+        priority: String,
+        completed: Bool,
+        sourceType: String,
+        note: String? = nil
+    ) throws {
+        let record = TaskSettlementRecordEntity(
+            taskId: taskId,
+            sourceIdeaId: sourceIdeaId,
+            settlementDate: settlementDate,
+            title: title,
+            estimatedMinutes: estimatedMinutes,
+            actualMinutes: actualMinutes,
+            priority: priority,
+            completed: completed,
+            sourceType: sourceType,
+            note: note
+        )
+        modelContext.insert(record)
+    }
+
+    func fetchSettlementRecords(sourceIdeaId: UUID) throws -> [TaskSettlementRecordEntity] {
+        let sourceId = sourceIdeaId
+        let descriptor = FetchDescriptor<TaskSettlementRecordEntity>(
+            predicate: #Predicate { record in
+                record.sourceIdeaId == sourceId
+            },
+            sortBy: [SortDescriptor(\.settlementDate, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
     }

@@ -9,8 +9,7 @@ final class SessionLogEntity {
     var endedAt: Date?
     var durationSeconds: Int
     var date: Date  // 记录所属日期
-
-    var task: TaskEntity?
+    var taskId: UUID?
 
     /// 计算当前仍在进行中的 session 的实时已用秒数
     @Transient
@@ -28,13 +27,13 @@ final class SessionLogEntity {
         endedAt: Date? = nil,
         durationSeconds: Int = 0,
         date: Date = .now,
-        task: TaskEntity? = nil
+        taskId: UUID?
     ) {
         self.id = id
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.durationSeconds = durationSeconds
         self.date = date
-        self.task = task
+        self.taskId = taskId
     }
 }

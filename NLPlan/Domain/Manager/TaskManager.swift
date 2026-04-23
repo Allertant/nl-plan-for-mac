@@ -5,7 +5,6 @@ import SwiftData
 @MainActor
 final class TaskManager {
 
-    private let taskRepo: TaskRepository
     private let ideaRepo: IdeaRepository
     private let dailyTaskRepo: DailyTaskRepository
     private let thoughtRepo: ThoughtRepository
@@ -14,7 +13,6 @@ final class TaskManager {
     private let timerEngine: TimerEngine
 
     init(
-        taskRepo: TaskRepository,
         ideaRepo: IdeaRepository,
         dailyTaskRepo: DailyTaskRepository,
         thoughtRepo: ThoughtRepository,
@@ -22,7 +20,6 @@ final class TaskManager {
         aiService: AIServiceProtocol,
         timerEngine: TimerEngine
     ) {
-        self.taskRepo = taskRepo
         self.ideaRepo = ideaRepo
         self.dailyTaskRepo = dailyTaskRepo
         self.thoughtRepo = thoughtRepo
@@ -59,122 +56,69 @@ final class TaskManager {
         try await aiService.classifyProjects(tasks: tasks)
     }
 
-    /// 将已解析的任务保存到想法池（供确认流程使用）
-    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [TaskEntity] {
+    /// 将已解析的任务保存到想法池
+    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [IdeaEntity] {
         // 1. 保存原始想法
         let thought = try thoughtRepo.create(rawText: rawText)
 
-        // 2. 转为 TaskEntity 并保存
-        var createdTasks: [TaskEntity] = []
+        // 2. 转为 IdeaEntity 并保存
+        var createdIdeas: [IdeaEntity] = []
         for (index, parsed) in parsedTasks.enumerated() {
-            let task = try taskRepo.create(
+            let idea = try ideaRepo.create(
                 title: parsed.title,
                 category: parsed.category,
                 estimatedMinutes: parsed.estimatedMinutes,
                 aiRecommended: parsed.recommended,
                 recommendationReason: parsed.reason,
-                pool: .ideaPool,
-                date: .now
+                sortOrder: index,
+                isProject: parsed.isProject ?? false,
+                projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
+                projectProgress: parsed.isProject == true ? 0 : nil
             )
-            task.sortOrder = index
-            if let isProject = parsed.isProject {
-                task.isProject = isProject
-                task.projectDecisionSource = "ai"
-                task.projectProgress = 0
-                task.projectProgressSummary = nil
-                task.projectProgressUpdatedAt = nil
-            }
-            try taskRepo.update(task)
-            _ = try ideaRepo.create(
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                estimatedMinutes: task.estimatedMinutes,
-                priority: task.taskPriority,
-                aiRecommended: task.aiRecommended,
-                recommendationReason: task.recommendationReason,
-                sortOrder: task.sortOrder,
-                status: .pending,
-                attempted: task.attempted,
-                note: task.note,
-                isProject: task.isProjectTask,
-                projectDecisionSource: task.projectDecisionSource,
-                projectProgress: task.projectProgress,
-                projectProgressSummary: task.projectProgressSummary,
-                projectProgressUpdatedAt: task.projectProgressUpdatedAt,
-                createdDate: task.createdDate,
-                migratedFromTaskId: task.id
-            )
-            createdTasks.append(task)
+            createdIdeas.append(idea)
         }
 
         // 3. 标记想法已处理
         try thoughtRepo.markProcessed(thought)
 
-        return createdTasks
+        return createdIdeas
     }
 
     /// 提交自然语言 → AI 解析 → 进入想法池（一步到位）
-    func submitThought(rawText: String) async throws -> [TaskEntity] {
-        let existingTasks = try taskRepo.fetchAllIdeaPoolTasks()
-        let existingTitles = existingTasks.map { $0.title }
+    func submitThought(rawText: String) async throws -> [IdeaEntity] {
+        let existingIdeas = try ideaRepo.fetchVisibleIdeas()
+        let existingTitles = existingIdeas.map { $0.title }
         let parsedTasks = try await parseThoughts(rawText: rawText, existingTaskTitles: existingTitles)
         return try await saveParsedTasks(parsedTasks: parsedTasks, rawText: rawText)
     }
 
     /// 从想法池中挑选任务加入必做项
-    func promoteToMustDo(taskId: UUID, priority: TaskPriority? = nil, sortOrder: Int? = nil) async throws {
-        guard let idea = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+    func promoteToMustDo(ideaId: UUID, priority: TaskPriority? = nil, sortOrder: Int? = nil) async throws {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
-        guard idea.pool == TaskPool.ideaPool.rawValue else {
-            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: idea.taskPool)
-        }
+        guard idea.ideaStatus != .completed, idea.ideaStatus != .archived else { return }
 
-        if !idea.isProjectTask {
-            let activeLinkedTasks = try taskRepo.fetchTasks(sourceIdeaId: idea.id)
-                .filter { $0.status != TaskStatus.done.rawValue }
+        if !idea.isProject {
+            let activeLinkedTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: idea.id)
             guard activeLinkedTasks.isEmpty else { return }
         }
 
-        let mustDo = try taskRepo.create(
+        _ = try dailyTaskRepo.create(
             title: idea.title,
             category: idea.category,
             estimatedMinutes: idea.estimatedMinutes,
             priority: priority ?? idea.taskPriority,
             aiRecommended: idea.aiRecommended,
             recommendationReason: idea.recommendationReason,
-            pool: .mustDo,
+            sortOrder: sortOrder ?? idea.sortOrder,
             date: .now,
-            sourceIdeaId: idea.id
-        )
-        mustDo.sortOrder = sortOrder ?? idea.sortOrder
-        try taskRepo.update(mustDo)
-
-        idea.status = IdeaStatus.inProgress.rawValue
-        try taskRepo.update(idea)
-
-        if let splitIdea = try ideaRepo.fetchById(idea.id) {
-            splitIdea.ideaStatus = .inProgress
-            try ideaRepo.update(splitIdea)
-        }
-        _ = try dailyTaskRepo.create(
-            id: mustDo.id,
-            title: mustDo.title,
-            category: mustDo.category,
-            estimatedMinutes: mustDo.estimatedMinutes,
-            priority: mustDo.taskPriority,
-            aiRecommended: mustDo.aiRecommended,
-            recommendationReason: mustDo.recommendationReason,
-            sortOrder: mustDo.sortOrder,
-            date: mustDo.date,
-            createdDate: mustDo.createdDate,
-            attempted: mustDo.attempted,
-            note: mustDo.note,
             sourceIdeaId: idea.id,
-            sourceType: idea.isProjectTask ? .project : .idea,
-            migratedFromTaskId: mustDo.id
+            sourceType: idea.isProject ? .project : .idea
         )
+
+        idea.ideaStatus = .inProgress
+        try ideaRepo.update(idea)
     }
 
     /// 创建新的必做项（用于项目切片）
@@ -186,35 +130,20 @@ final class TaskManager {
         sortOrder: Int = 0,
         sourceIdeaId: UUID? = nil,
         recommendationReason: String? = nil
-    ) async throws -> TaskEntity {
-        let task = try taskRepo.create(
+    ) async throws -> DailyTaskEntity {
+        let task = try dailyTaskRepo.create(
             title: title,
             category: category,
             estimatedMinutes: estimatedMinutes,
             priority: priority,
             aiRecommended: true,
             recommendationReason: recommendationReason,
-            pool: .mustDo,
+            sortOrder: sortOrder,
             date: .now,
-            sourceIdeaId: sourceIdeaId
-        )
-        task.sortOrder = sortOrder
-        try taskRepo.update(task)
-        _ = try dailyTaskRepo.create(
-            id: task.id,
-            title: task.title,
-            category: task.category,
-            estimatedMinutes: task.estimatedMinutes,
-            priority: task.taskPriority,
-            aiRecommended: task.aiRecommended,
-            recommendationReason: task.recommendationReason,
-            sortOrder: task.sortOrder,
-            date: task.date,
-            createdDate: task.createdDate,
             sourceIdeaId: sourceIdeaId,
-            sourceType: try dailyTaskSourceType(sourceIdeaId: sourceIdeaId),
-            migratedFromTaskId: task.id
+            sourceType: try dailyTaskSourceType(sourceIdeaId: sourceIdeaId)
         )
+
         if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
             idea.ideaStatus = .inProgress
             try ideaRepo.update(idea)
@@ -224,102 +153,77 @@ final class TaskManager {
 
     /// 将必做项移回想法池
     func demoteToIdeaPool(taskId: UUID, markAttempted: Bool = false) async throws {
-        guard let task = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
-        }
-        guard task.pool == TaskPool.mustDo.rawValue else {
-            throw NLPlanError.taskNotInExpectedPool(expected: .mustDo, actual: task.taskPool)
+        guard let dailyTask = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
 
         // 停止计时（如果正在运行）
-        if task.status == TaskStatus.running.rawValue {
+        if dailyTask.taskStatus == .running {
             _ = await timerEngine.stopTask(taskId)
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
                 try sessionLogRepo.endSession(openLog)
             }
         }
 
-        try dailyTaskRepo.deleteByMigratedTaskId(task.id)
+        try dailyTaskRepo.deleteById(taskId)
 
-        if let sourceIdeaId = task.sourceIdeaId,
-           let sourceIdea = try taskRepo.fetchById(sourceIdeaId),
-           sourceIdea.pool == TaskPool.ideaPool.rawValue {
-            taskRepo.deleteWithoutSaving(task)
-            sourceIdea.status = markAttempted ? IdeaStatus.attempted.rawValue : TaskStatus.pending.rawValue
+        if let sourceIdeaId = dailyTask.sourceIdeaId,
+           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            sourceIdea.ideaStatus = markAttempted ? .attempted : .pending
             sourceIdea.attempted = markAttempted || sourceIdea.attempted
-            try taskRepo.save()
-            if let splitIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                splitIdea.ideaStatus = markAttempted ? .attempted : .pending
-                splitIdea.attempted = markAttempted || splitIdea.attempted
-                try ideaRepo.update(splitIdea)
-            }
-        } else {
-            try taskRepo.moveToIdeaPool(task, markAttempted: markAttempted)
-            if let idea = try ideaRepo.fetchById(task.id) {
-                idea.ideaStatus = markAttempted ? .attempted : .pending
-                idea.attempted = markAttempted || idea.attempted
-                try ideaRepo.update(idea)
-            }
+            try ideaRepo.update(sourceIdea)
         }
     }
 
     /// 删除想法池中的任务
-    func deleteFromIdeaPool(taskId: UUID) async throws {
-        guard let task = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+    func deleteFromIdeaPool(ideaId: UUID) async throws {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
-        guard task.pool == TaskPool.ideaPool.rawValue else {
-            throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
-        }
-        if let idea = try ideaRepo.fetchById(task.id) {
-            try ideaRepo.delete(idea)
-        }
-        try taskRepo.delete(task)
+        try ideaRepo.delete(idea)
     }
 
     /// 为项目想法添加备注记录
-    func addProjectNote(taskId: UUID, content: String) async throws {
+    func addProjectNote(ideaId: UUID, content: String) async throws {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard let task = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
-        guard task.isProjectTask else { return }
-        _ = try taskRepo.createProjectNote(task: task, content: trimmed)
+        guard idea.isProject else { return }
+        _ = try ideaRepo.createProjectNote(ideaId: idea.id, content: trimmed)
     }
 
     /// 编辑项目备注记录
     func updateProjectNote(noteId: UUID, content: String) async throws {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard let note = try taskRepo.fetchProjectNoteById(noteId) else {
+        guard let note = try ideaRepo.fetchProjectNoteById(noteId) else {
             throw NLPlanError.dataNotFound(entity: "ProjectNote", id: noteId)
         }
-        try taskRepo.updateProjectNote(note, content: trimmed)
+        try ideaRepo.updateProjectNote(note, content: trimmed)
     }
 
     // MARK: - 必做项操作
 
     /// 开始执行任务
     func startTask(taskId: UUID) async throws {
-        guard let task = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        guard let dailyTask = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
-        guard task.pool == TaskPool.mustDo.rawValue else {
-            throw NLPlanError.taskNotInExpectedPool(expected: .mustDo, actual: task.taskPool)
-        }
-        guard task.status != TaskStatus.done.rawValue else { return }
+        guard dailyTask.taskStatus != .done else { return }
 
         // 1. TimerEngine 处理切换逻辑
         let stoppedTasks = await timerEngine.startTask(taskId)
 
-        // 2. 持久化被停止任务的 session（查找并结束已有的 open session）
+        // 2. 持久化被停止任务的 session
         for stopInfo in stoppedTasks {
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
                 try sessionLogRepo.endSession(openLog)
             }
-            if let stoppedTask = try taskRepo.fetchById(stopInfo.taskId) {
-                try taskRepo.updateStatus(stoppedTask, status: .pending)
+            if let stoppedTask = try dailyTaskRepo.fetchById(stopInfo.taskId) {
+                stoppedTask.taskStatus = .pending
+                try dailyTaskRepo.update(stoppedTask)
             }
         }
 
@@ -327,131 +231,83 @@ final class TaskManager {
         _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
 
         // 4. 更新任务状态
-        try taskRepo.updateStatus(task, status: .running)
+        dailyTask.taskStatus = .running
+        try dailyTaskRepo.update(dailyTask)
     }
 
     /// 标记任务完成
     func markComplete(taskId: UUID) async throws {
-        guard let task = try taskRepo.fetchById(taskId) else {
-            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        guard let dailyTask = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
 
         // 停止计时
-        if task.status == TaskStatus.running.rawValue {
+        if dailyTask.taskStatus == .running {
             _ = await timerEngine.stopTask(taskId)
-            // 结束已有的 open session
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
                 try sessionLogRepo.endSession(openLog)
             }
         }
 
-        try taskRepo.markComplete(task)
-        if let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) {
-            dailyTask.taskStatus = .done
-            try dailyTaskRepo.update(dailyTask)
-        }
+        dailyTask.taskStatus = .done
+        try dailyTaskRepo.update(dailyTask)
     }
 
     // MARK: - 查询
 
     /// 获取所有想法池任务
-    func fetchIdeaPool() async throws -> [TaskEntity] {
-        let ideas = try ideaRepo.fetchVisibleIdeas()
-        let mapped = try ideas.compactMap { idea in
-            try taskRepo.fetchById(idea.id)
-        }
-        return mapped.sorted { $0.createdDate > $1.createdDate }
+    func fetchIdeaPool() async throws -> [IdeaEntity] {
+        try ideaRepo.fetchVisibleIdeas()
     }
 
     /// 获取想法池中的单个任务
-    func fetchIdeaPoolTask(taskId: UUID) async throws -> TaskEntity? {
-        guard try ideaRepo.fetchById(taskId) != nil else { return nil }
-        return try taskRepo.fetchById(taskId)
+    func fetchIdeaPoolTask(ideaId: UUID) async throws -> IdeaEntity? {
+        try ideaRepo.fetchById(ideaId)
     }
 
-    /// 更新任务（直接保存已有实体的修改）
-    func updateTask(_ task: TaskEntity) async throws {
-        try taskRepo.update(task)
-        try syncSplitTables(from: task)
+    /// 更新想法实体
+    func updateIdea(_ idea: IdeaEntity) async throws {
+        try ideaRepo.update(idea)
     }
 
     /// 获取指定日期的必做项
-    func fetchMustDo(date: Date = .now) async throws -> [TaskEntity] {
-        let dailyTasks = try dailyTaskRepo.fetchTasks(date: date)
-        return try dailyTasks.compactMap { dailyTask in
-            try taskRepo.fetchById(dailyTask.id)
-        }
+    func fetchMustDo(date: Date = .now) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchTasks(date: date)
     }
 
     /// 获取绑定到指定项目想法的全部必做项
-    func fetchMustDo(sourceIdeaId: UUID) async throws -> [TaskEntity] {
-        let dailyTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
-        return try dailyTasks.compactMap { dailyTask in
-            try taskRepo.fetchById(dailyTask.id)
-        }
+    func fetchMustDo(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
     }
 
     /// 获取绑定到指定项目想法的归档记录
     func fetchSettlementRecords(sourceIdeaId: UUID) async throws -> [TaskSettlementRecordEntity] {
-        try taskRepo.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
+        try ideaRepo.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
     }
 
     /// 获取活跃的正在运行的任务
-    func fetchRunningTasks() async throws -> [TaskEntity] {
-        let runningDailyTasks = try dailyTaskRepo.fetchActiveRunningTasks()
-        return try runningDailyTasks.compactMap { dailyTask in
-            try taskRepo.fetchById(dailyTask.id)
-        }
+    func fetchRunningTasks() async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchActiveRunningTasks()
     }
 
-    /// 保存任务的排序顺序（拖拽排序后调用）
-    func saveTaskOrders() async throws {
-        let tasks = try taskRepo.fetchTasks(date: .now, pool: .mustDo)
-        if let anyTask = tasks.first {
-            try taskRepo.update(anyTask)
-        }
+    /// 获取指定任务的总计时秒数
+    func totalElapsedSeconds(taskId: UUID) async throws -> Int {
+        try sessionLogRepo.totalElapsedSeconds(taskId: taskId)
+    }
+
+    /// 更新必做项实体
+    func updateDailyTask(_ task: DailyTaskEntity) async throws {
+        try dailyTaskRepo.update(task)
+    }
+
+    /// 获取项目备注列表
+    func fetchProjectNotes(ideaId: UUID) async throws -> [ProjectNoteEntity] {
+        try ideaRepo.fetchProjectNotes(ideaId: ideaId)
     }
 
     private func dailyTaskSourceType(sourceIdeaId: UUID?) throws -> DailyTaskSourceType {
         guard let sourceIdeaId else { return .none }
         guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return .idea }
         return idea.isProject ? .project : .idea
-    }
-
-    private func syncSplitTables(from task: TaskEntity) throws {
-        if task.pool == TaskPool.ideaPool.rawValue, let idea = try ideaRepo.fetchById(task.id) {
-            idea.title = task.title
-            idea.category = task.category
-            idea.estimatedMinutes = task.estimatedMinutes
-            idea.priority = task.priority
-            idea.aiRecommended = task.aiRecommended
-            idea.recommendationReason = task.recommendationReason
-            idea.sortOrder = task.sortOrder
-            idea.attempted = task.attempted
-            idea.note = task.note
-            idea.isProject = task.isProjectTask
-            idea.projectDecisionSource = task.projectDecisionSource
-            idea.projectProgress = task.projectProgress
-            idea.projectProgressSummary = task.projectProgressSummary
-            idea.projectProgressUpdatedAt = task.projectProgressUpdatedAt
-            try ideaRepo.update(idea)
-        }
-
-        if task.pool == TaskPool.mustDo.rawValue, let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) {
-            dailyTask.title = task.title
-            dailyTask.category = task.category
-            dailyTask.estimatedMinutes = task.estimatedMinutes
-            dailyTask.priority = task.priority
-            dailyTask.aiRecommended = task.aiRecommended
-            dailyTask.recommendationReason = task.recommendationReason
-            dailyTask.sortOrder = task.sortOrder
-            dailyTask.status = task.status
-            dailyTask.date = task.date
-            dailyTask.attempted = task.attempted
-            dailyTask.note = task.note
-            dailyTask.sourceIdeaId = task.sourceIdeaId
-            dailyTask.sourceType = try dailyTaskSourceType(sourceIdeaId: task.sourceIdeaId).rawValue
-            try dailyTaskRepo.update(dailyTask)
-        }
     }
 }
