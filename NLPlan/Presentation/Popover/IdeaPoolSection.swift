@@ -6,7 +6,8 @@ struct IdeaPoolSection: View {
     @Bindable var viewModel: IdeaPoolViewModel
     @State private var searchText: String = ""
     @State private var selectedSearchTags: [String] = []
-    @State private var highlightedTag: String?
+    @State private var highlightedCandidateTag: String?
+    @State private var highlightedSelectedTagIndex: Int?
     @FocusState private var isSearchFieldFocused: Bool
 
     private var filteredTasks: [TaskEntity] {
@@ -44,7 +45,7 @@ struct IdeaPoolSection: View {
         return suffix
     }
 
-    private var matchingTags: [String] {
+    private var candidateTags: [String] {
         guard let query = activeTagQuery else { return [] }
 
         let candidates = availableTags.filter { !selectedSearchTags.contains($0) }
@@ -75,8 +76,11 @@ struct IdeaPoolSection: View {
                         if hasSearchTokens {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
-                                    ForEach(selectedSearchTags, id: \.self) { tag in
-                                        SearchTagToken(text: tag) {
+                                    ForEach(Array(selectedSearchTags.enumerated()), id: \.element) { index, tag in
+                                        SearchTagToken(
+                                            text: tag,
+                                            isHighlighted: highlightedSelectedTagIndex == index
+                                        ) {
                                             removeSearchTag(tag)
                                         }
                                     }
@@ -102,21 +106,48 @@ struct IdeaPoolSection: View {
                                     commitActiveTagIfNeeded()
                                 }
                                 .onChange(of: searchText) { _, _ in
-                                    syncHighlightedTag()
+                                    highlightedSelectedTagIndex = nil
+                                    syncHighlightedCandidateTag()
+                                }
+                                .onKeyPress(.upArrow) {
+                                    guard highlightedSelectedTagIndex == nil, !selectedSearchTags.isEmpty else { return .ignored }
+                                    highlightedSelectedTagIndex = 0
+                                    return .handled
+                                }
+                                .onKeyPress(.downArrow) {
+                                    guard highlightedSelectedTagIndex != nil else { return .ignored }
+                                    highlightedSelectedTagIndex = nil
+                                    return .handled
                                 }
                                 .onKeyPress(.leftArrow) {
-                                    guard isSearchFieldFocused, matchingTags.count > 1 else {
-                                        return .ignored
+                                    if let idx = highlightedSelectedTagIndex {
+                                        highlightedSelectedTagIndex = max(0, idx - 1)
+                                        return .handled
                                     }
-                                    moveHighlightedTag(step: -1)
+                                    guard candidateTags.count > 1 else { return .ignored }
+                                    moveHighlightedCandidateTag(step: -1)
                                     return .handled
                                 }
                                 .onKeyPress(.rightArrow) {
-                                    guard isSearchFieldFocused, matchingTags.count > 1 else {
-                                        return .ignored
+                                    if let idx = highlightedSelectedTagIndex {
+                                        highlightedSelectedTagIndex = min(selectedSearchTags.count - 1, idx + 1)
+                                        return .handled
                                     }
-                                    moveHighlightedTag(step: 1)
+                                    guard candidateTags.count > 1 else { return .ignored }
+                                    moveHighlightedCandidateTag(step: 1)
                                     return .handled
+                                }
+                                .onKeyPress(.delete) {
+                                    guard removeHighlightedSearchTag() else { return .ignored }
+                                    return .handled
+                                }
+                                .background {
+                                    SearchTagDeleteKeyMonitor(
+                                        isEnabled: isSearchFieldFocused && highlightedSelectedTagIndex != nil
+                                    ) {
+                                        removeHighlightedSearchTag()
+                                    }
+                                    .frame(width: 0, height: 0)
                                 }
 
                             Text("\(filteredTasks.count)条")
@@ -140,10 +171,10 @@ struct IdeaPoolSection: View {
                             cleanupButton
                         }
 
-                        if !matchingTags.isEmpty {
+                        if !candidateTags.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
-                                    ForEach(matchingTags, id: \.self) { tag in
+                                    ForEach(candidateTags, id: \.self) { tag in
                                         Button {
                                             addSearchTag(tag)
                                         } label: {
@@ -151,7 +182,7 @@ struct IdeaPoolSection: View {
                                         }
                                         .buttonStyle(.plain)
                                         .overlay {
-                                            if highlightedTag == tag {
+                                            if highlightedCandidateTag == tag {
                                                 RoundedRectangle(cornerRadius: 999)
                                                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
                                             }
@@ -227,40 +258,61 @@ struct IdeaPoolSection: View {
         return String(prefix)
     }
 
-    private func syncHighlightedTag() {
-        if let highlightedTag, matchingTags.contains(highlightedTag) {
+    private func syncHighlightedCandidateTag() {
+        if let highlightedCandidateTag, candidateTags.contains(highlightedCandidateTag) {
             return
         }
-        self.highlightedTag = matchingTags.first
+        self.highlightedCandidateTag = candidateTags.first
     }
 
     private func commitActiveTagIfNeeded() {
-        guard let tag = highlightedTag ?? matchingTags.first else { return }
+        guard let tag = highlightedCandidateTag ?? candidateTags.first else { return }
         addSearchTag(tag)
     }
 
-    private func moveHighlightedTag(step: Int) {
-        guard !matchingTags.isEmpty else { return }
+    private func moveHighlightedCandidateTag(step: Int) {
+        guard !candidateTags.isEmpty else { return }
 
-        let currentIndex = highlightedTag.flatMap { matchingTags.firstIndex(of: $0) } ?? 0
-        let nextIndex = (currentIndex + step + matchingTags.count) % matchingTags.count
-        highlightedTag = matchingTags[nextIndex]
+        let currentIndex = highlightedCandidateTag.flatMap { candidateTags.firstIndex(of: $0) } ?? 0
+        let nextIndex = (currentIndex + step + candidateTags.count) % candidateTags.count
+        highlightedCandidateTag = candidateTags[nextIndex]
     }
 
     private func addSearchTag(_ tag: String) {
         guard !selectedSearchTags.contains(tag) else { return }
         selectedSearchTags.append(tag)
+        highlightedSelectedTagIndex = nil
 
         let plainText = removeActiveTagQuery(from: searchText)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         searchText = plainText.isEmpty ? "" : plainText + " "
-        highlightedTag = nil
+        highlightedCandidateTag = nil
         isSearchFieldFocused = true
     }
 
     private func removeSearchTag(_ tag: String) {
-        selectedSearchTags.removeAll { $0 == tag }
-        syncHighlightedTag()
+        guard let idx = selectedSearchTags.firstIndex(of: tag) else { return }
+        selectedSearchTags.remove(at: idx)
+        if let hIdx = highlightedSelectedTagIndex {
+            if selectedSearchTags.isEmpty {
+                highlightedSelectedTagIndex = nil
+            } else if hIdx >= selectedSearchTags.count {
+                highlightedSelectedTagIndex = selectedSearchTags.count - 1
+            } else if hIdx > idx {
+                highlightedSelectedTagIndex = hIdx - 1
+            }
+        }
+        syncHighlightedCandidateTag()
+    }
+
+    @discardableResult
+    private func removeHighlightedSearchTag() -> Bool {
+        guard let idx = highlightedSelectedTagIndex,
+              selectedSearchTags.indices.contains(idx) else { return false }
+
+        removeSearchTag(selectedSearchTags[idx])
+        highlightedSelectedTagIndex = selectedSearchTags.isEmpty ? nil : min(idx, selectedSearchTags.count - 1)
+        return true
     }
 
     // MARK: - 清理按钮
@@ -312,20 +364,31 @@ struct IdeaPoolSection: View {
 
 private struct SearchTagToken: View {
     let text: String
+    var isHighlighted: Bool = false
     let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 4) {
             TagChip(text: text)
 
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+            if !isHighlighted {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.trailing, 2)
+        .background(
+            Capsule()
+                .fill(Color.accentColor.opacity(isHighlighted ? 0.15 : 0))
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.accentColor, lineWidth: isHighlighted ? 1.5 : 0)
+        )
     }
 }
 
@@ -349,6 +412,66 @@ private struct DraftSearchTagToken: View {
         )
         .clipShape(Capsule())
         .foregroundStyle(Color.accentColor)
+    }
+}
+
+private struct SearchTagDeleteKeyMonitor: NSViewRepresentable {
+    var isEnabled: Bool
+    let onDelete: () -> Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isEnabled: isEnabled, onDelete: onDelete)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.installMonitor()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.isEnabled = isEnabled
+        context.coordinator.onDelete = onDelete
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.removeMonitor()
+    }
+
+    final class Coordinator {
+        var isEnabled: Bool
+        var onDelete: () -> Bool
+        private var monitor: Any?
+
+        init(isEnabled: Bool, onDelete: @escaping () -> Bool) {
+            self.isEnabled = isEnabled
+            self.onDelete = onDelete
+        }
+
+        deinit {
+            removeMonitor()
+        }
+
+        func installMonitor() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.isEnabled, event.isSearchTagDeleteKey else { return event }
+                return self.onDelete() ? nil : event
+            }
+        }
+
+        func removeMonitor() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+    }
+}
+
+private extension NSEvent {
+    var isSearchTagDeleteKey: Bool {
+        keyCode == 51 || keyCode == 117
     }
 }
 
