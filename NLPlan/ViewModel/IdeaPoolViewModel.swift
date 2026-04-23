@@ -125,6 +125,22 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func addProjectNote(taskId: UUID, content: String) async {
+        do {
+            try await taskManager.addProjectNote(taskId: taskId, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateProjectNote(noteId: UUID, content: String) async {
+        do {
+            try await taskManager.updateProjectNote(noteId: noteId, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func updateProjectState(taskId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
         do {
             guard let task = try await taskManager.fetchIdeaPoolTask(taskId: taskId) else { return }

@@ -2,7 +2,8 @@ import Foundation
 import SwiftData
 
 /// 每日管理器 — 管理"一天"的生命周期，触发日终评分，处理跨天逻辑
-actor DayManager {
+@MainActor
+final class DayManager {
 
     private let taskRepo: TaskRepository
     private let summaryRepo: SummaryRepository

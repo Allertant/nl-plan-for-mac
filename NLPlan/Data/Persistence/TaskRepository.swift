@@ -50,6 +50,13 @@ final class TaskRepository {
         return try modelContext.fetch(descriptor).first
     }
 
+    func fetchProjectNoteById(_ id: UUID) throws -> ProjectNoteEntity? {
+        let descriptor = FetchDescriptor<ProjectNoteEntity>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try modelContext.fetch(descriptor).first
+    }
+
     func fetchTasks(date: Date, pool: TaskPool) throws -> [TaskEntity] {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
@@ -124,6 +131,19 @@ final class TaskRepository {
 
     func updateStatus(_ task: TaskEntity, status: TaskStatus) throws {
         task.status = status.rawValue
+        try modelContext.save()
+    }
+
+    func createProjectNote(task: TaskEntity, content: String) throws -> ProjectNoteEntity {
+        let note = ProjectNoteEntity(content: content, createdAt: .now, updatedAt: .now, projectTask: task)
+        modelContext.insert(note)
+        try modelContext.save()
+        return note
+    }
+
+    func updateProjectNote(_ note: ProjectNoteEntity, content: String) throws {
+        note.content = content
+        note.updatedAt = .now
         try modelContext.save()
     }
 

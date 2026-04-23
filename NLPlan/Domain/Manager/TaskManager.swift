@@ -2,7 +2,8 @@ import Foundation
 import SwiftData
 
 /// 任务生命周期管理
-actor TaskManager {
+@MainActor
+final class TaskManager {
 
     private let taskRepo: TaskRepository
     private let thoughtRepo: ThoughtRepository
@@ -163,6 +164,27 @@ actor TaskManager {
             throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
         }
         try taskRepo.delete(task)
+    }
+
+    /// 为项目想法添加备注记录
+    func addProjectNote(taskId: UUID, content: String) async throws {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let task = try taskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "Task", id: taskId)
+        }
+        guard task.isProjectTask else { return }
+        _ = try taskRepo.createProjectNote(task: task, content: trimmed)
+    }
+
+    /// 编辑项目备注记录
+    func updateProjectNote(noteId: UUID, content: String) async throws {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let note = try taskRepo.fetchProjectNoteById(noteId) else {
+            throw NLPlanError.dataNotFound(entity: "ProjectNote", id: noteId)
+        }
+        try taskRepo.updateProjectNote(note, content: trimmed)
     }
 
     // MARK: - 必做项操作

@@ -28,7 +28,10 @@ struct HistoryView: View {
                 VStack(spacing: 10) {
                     HistoryGradeLegend()
 
+                    historyCalendarNavigationBar
+
                     HistoryMonthCalendarView(
+                        monthStart: viewModel.displayedMonthStart,
                         summaries: viewModel.summaries
                     ) { summary in
                         viewModel.selectSummary(summary)
@@ -62,26 +65,65 @@ struct HistoryView: View {
         }
         .frame(width: 360, height: 520)
         .onAppear {
-            Task { await viewModel.loadCurrentMonth() }
+            viewModel.loadCurrentMonth()
         }
+    }
+
+    private var historyCalendarNavigationBar: some View {
+        HStack(spacing: 6) {
+            navIconButton(systemName: "backward.end.fill") {
+                viewModel.showPreviousYear()
+            }
+            .disabled(viewModel.isLoadingMonth)
+
+            navIconButton(systemName: "chevron.left") {
+                viewModel.showPreviousMonth()
+            }
+            .disabled(viewModel.isLoadingMonth)
+
+            Spacer()
+
+            Text(viewModel.displayedMonthStart.yearMonthTitle)
+                .font(.system(size: 12, weight: .semibold))
+
+            Spacer()
+
+            navIconButton(systemName: "chevron.right") {
+                viewModel.showNextMonth()
+            }
+            .disabled(viewModel.isLoadingMonth)
+
+            navIconButton(systemName: "forward.end.fill") {
+                viewModel.showNextYear()
+            }
+            .disabled(viewModel.isLoadingMonth)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func navIconButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
     }
 }
 
 private struct HistoryMonthCalendarView: View {
+    let monthStart: Date
     let summaries: [DailySummaryEntity]
     let onSelectSummary: (DailySummaryEntity) -> Void
 
     private var calendar: Calendar { .current }
-
-    private var monthStart: Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: .now)) ?? .now
-    }
-
-    private var monthTitle: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月"
-        return formatter.string(from: monthStart)
-    }
 
     private var weekSymbols: [String] {
         let symbols = calendar.shortWeekdaySymbols
@@ -125,10 +167,6 @@ private struct HistoryMonthCalendarView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(monthTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             HStack(spacing: 6) {
                 ForEach(weekSymbols, id: \.self) { symbol in
                     Text(symbol)
@@ -341,5 +379,13 @@ private extension Grade {
         case .E: return .orange
         case .F: return .red
         }
+    }
+}
+
+private extension Date {
+    var yearMonthTitle: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter.string(from: self)
     }
 }

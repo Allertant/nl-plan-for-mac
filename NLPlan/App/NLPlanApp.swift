@@ -15,6 +15,7 @@ struct NLPlanApp: App {
             let schema = Schema([
                 ThoughtEntity.self,
                 TaskEntity.self,
+                ProjectNoteEntity.self,
                 SessionLogEntity.self,
                 DailySummaryEntity.self,
                 ParseQueueItemEntity.self

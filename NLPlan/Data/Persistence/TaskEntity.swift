@@ -28,6 +28,9 @@ final class TaskEntity {
     @Relationship(deleteRule: .cascade, inverse: \SessionLogEntity.task)
     var sessionLogs: [SessionLogEntity] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \ProjectNoteEntity.projectTask)
+    var projectNotes: [ProjectNoteEntity] = []
+
     @Transient
     var totalElapsedSeconds: Int {
         sessionLogs.reduce(0) { $0 + $1.durationSeconds }
