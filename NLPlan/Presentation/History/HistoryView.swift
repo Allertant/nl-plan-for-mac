@@ -4,6 +4,7 @@ import SwiftUI
 struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
     @Environment(AppState.self) private var appState
+    @State private var hoveredSummary: DailySummaryEntity?
 
     init(dayManager: DayManager) {
         _viewModel = State(initialValue: HistoryViewModel(dayManager: dayManager))
@@ -11,7 +12,7 @@ struct HistoryView: View {
 
     var body: some View {
         ZStack {
-            // 列表
+            // 月历视图
             VStack(spacing: 0) {
                 HStack {
                     BackButton { appState.currentPage = .main }
@@ -25,20 +26,32 @@ struct HistoryView: View {
 
                 Divider()
 
-                ScrollView {
-                    VStack(spacing: 10) {
-                        HistoryGradeLegend()
+                VStack(spacing: 10) {
+                    HistoryGradeLegend()
 
-                        LazyVStack(spacing: 8) {
-                            ForEach(viewModel.summaries, id: \.id) { summary in
-                                HistoryCard(summary: summary) {
-                                    viewModel.selectSummary(summary)
-                                }
-                            }
-                        }
+                    HistoryMonthCalendarView(
+                        summaries: viewModel.summaries,
+                        hoveredSummary: $hoveredSummary
+                    ) { summary in
+                        viewModel.selectSummary(summary)
                     }
-                    .padding(12)
+
+                    if let hoveredSummary {
+                        HistoryHoverDetailView(summary: hoveredSummary)
+                    } else {
+                        Text("将鼠标移动到日期圆点上可查看当天详情")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(Color(nsColor: .textBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
+                    Spacer(minLength: 0)
                 }
+                .padding(12)
 
                 if let error = viewModel.errorMessage {
                     Text(error)
@@ -66,6 +79,177 @@ struct HistoryView: View {
         .onAppear {
             Task { await viewModel.loadCurrentMonth() }
         }
+    }
+}
+
+private struct HistoryMonthCalendarView: View {
+    let summaries: [DailySummaryEntity]
+    @Binding var hoveredSummary: DailySummaryEntity?
+    let onSelectSummary: (DailySummaryEntity) -> Void
+
+    private var calendar: Calendar { .current }
+
+    private var monthStart: Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: .now)) ?? .now
+    }
+
+    private var monthTitle: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter.string(from: monthStart)
+    }
+
+    private var weekSymbols: [String] {
+        let symbols = calendar.shortWeekdaySymbols
+        let first = max(0, calendar.firstWeekday - 1)
+        return Array(symbols[first...] + symbols[..<first])
+    }
+
+    private var summaryByDay: [Int: DailySummaryEntity] {
+        summaries.reduce(into: [Int: DailySummaryEntity]()) { result, summary in
+            let day = calendar.component(.day, from: summary.date)
+            if let existing = result[day], existing.createdAt >= summary.createdAt {
+                return
+            }
+            result[day] = summary
+        }
+    }
+
+    private var dayCells: [HistoryDayCell] {
+        guard
+            let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
+            let firstDate = calendar.date(from: calendar.dateComponents([.year, .month], from: monthStart))
+        else {
+            return []
+        }
+
+        let firstWeekdayOfMonth = calendar.component(.weekday, from: firstDate)
+        let leadingEmptyCount = (firstWeekdayOfMonth - calendar.firstWeekday + 7) % 7
+        var cells: [HistoryDayCell] = Array(repeating: .empty, count: leadingEmptyCount)
+
+        for day in dayRange {
+            guard let date = calendar.date(bySetting: .day, value: day, of: monthStart) else { continue }
+            cells.append(.day(day: day, date: date, summary: summaryByDay[day]))
+        }
+
+        while cells.count % 7 != 0 {
+            cells.append(.empty)
+        }
+
+        return cells
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(monthTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                ForEach(weekSymbols, id: \.self) { symbol in
+                    Text(symbol)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
+                ForEach(Array(dayCells.enumerated()), id: \.offset) { _, cell in
+                    switch cell {
+                    case .empty:
+                        Circle()
+                            .fill(Color.clear)
+                            .frame(width: 34, height: 34)
+                    case .day(let day, _, let summary):
+                        HistoryDayCircle(day: day, summary: summary)
+                            .onHover { hovering in
+                                guard let summary else { return }
+                                hoveredSummary = hovering ? summary : nil
+                            }
+                            .onTapGesture {
+                                guard let summary else { return }
+                                onSelectSummary(summary)
+                            }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private enum HistoryDayCell {
+    case empty
+    case day(day: Int, date: Date, summary: DailySummaryEntity?)
+}
+
+private struct HistoryDayCircle: View {
+    let day: Int
+    let summary: DailySummaryEntity?
+
+    private var fillColor: Color {
+        guard let summary else { return Color(nsColor: .controlBackgroundColor).opacity(0.35) }
+        return summary.gradeEnum.historyColor.opacity(0.9)
+    }
+
+    private var textColor: Color {
+        summary == nil ? .secondary : .white
+    }
+
+    var body: some View {
+        Circle()
+            .fill(fillColor)
+            .frame(width: 34, height: 34)
+            .overlay(
+                Text("\(day)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(textColor)
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.primary.opacity(summary == nil ? 0.08 : 0.2), lineWidth: 1)
+            )
+    }
+}
+
+private struct HistoryHoverDetailView: View {
+    let summary: DailySummaryEntity
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(summary.date.dateString)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(summary.grade)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(summary.gradeEnum.historyColor)
+            }
+
+            Text(summary.summary)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            Text("完成 \(summary.completedCount)/\(summary.totalCount)")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(summary.gradeEnum.historyColor.opacity(0.35), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
