@@ -550,10 +550,6 @@ private struct ProjectDetailOverlay: View {
                 HStack(spacing: 8) {
                     TagChip(text: project.category)
 
-                    Label(project.estimatedMinutes.hourMinuteString, systemImage: "clock")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-
                     Text(project.createdDate.shortDateTimeString)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
@@ -938,7 +934,9 @@ struct IdeaPoolTaskRow: View {
                         categoryMenu
                     }
 
-                    if editingMinutes {
+                    if task.isProjectTask {
+                        EmptyView()
+                    } else if editingMinutes {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                             TextField("1h30m", text: $draftMinutes)
