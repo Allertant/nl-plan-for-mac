@@ -56,7 +56,7 @@ final class DayManager {
         }
 
         // 3. 保存评分
-        return try summaryRepo.create(
+        let summary = try summaryRepo.create(
             date: settlementDate,
             grade: grade.grade,
             summary: grade.summary,
@@ -67,6 +67,12 @@ final class DayManager {
             totalCount: grade.stats.totalTasks,
             gradingBasis: grade.gradingBasis
         )
+        try archiveAndClearSettledTasks(
+            tasks: mustDoTasks,
+            settlementDate: settlementDate,
+            incompleteNotes: incompleteNotes
+        )
+        return summary
     }
 
     /// 检查是否存在需要用户手动补结算的日期。只返回提醒日期，不自动评分或迁移。
@@ -298,7 +304,7 @@ final class DayManager {
 
     private func summarySourceType(for task: TaskEntity) throws -> String {
         guard let sourceIdeaId = task.sourceIdeaId else {
-            return "无来源必做项"
+            return task.aiRecommended ? "无来源必做项" : "普通想法来源必做项"
         }
         guard let source = try taskRepo.fetchById(sourceIdeaId) else {
             return "普通想法来源必做项"
@@ -315,5 +321,33 @@ final class DayManager {
             parts.append(note)
         }
         return parts.isEmpty ? nil : parts.joined(separator: "\n结算备注：")
+    }
+
+    private func archiveAndClearSettledTasks(
+        tasks: [TaskEntity],
+        settlementDate: Date,
+        incompleteNotes: [UUID: String]
+    ) throws {
+        for task in tasks {
+            let sourceType = try summarySourceType(for: task)
+            let note = summaryNote(for: task, incompleteNotes: incompleteNotes)
+            try taskRepo.createSettlementRecord(
+                task: task,
+                settlementDate: settlementDate,
+                actualMinutes: max(0, task.totalElapsedSeconds / 60),
+                sourceType: sourceType,
+                note: note
+            )
+
+            if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
+                task.pool = TaskPool.ideaPool.rawValue
+                task.status = TaskStatus.pending.rawValue
+                task.date = Date.now
+                task.attempted = true
+            } else {
+                taskRepo.deleteWithoutSaving(task)
+            }
+        }
+        try taskRepo.save()
     }
 }

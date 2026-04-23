@@ -147,10 +147,40 @@ final class TaskRepository {
         try modelContext.save()
     }
 
+    func createSettlementRecord(
+        task: TaskEntity,
+        settlementDate: Date,
+        actualMinutes: Int,
+        sourceType: String,
+        note: String?
+    ) throws {
+        let record = TaskSettlementRecordEntity(
+            taskId: task.id,
+            sourceIdeaId: task.sourceIdeaId,
+            settlementDate: settlementDate,
+            title: task.title,
+            estimatedMinutes: task.estimatedMinutes,
+            actualMinutes: actualMinutes,
+            priority: task.priority,
+            completed: task.status == TaskStatus.done.rawValue,
+            sourceType: sourceType,
+            note: note
+        )
+        modelContext.insert(record)
+    }
+
     // MARK: - Delete
 
     func delete(_ task: TaskEntity) throws {
         modelContext.delete(task)
+        try modelContext.save()
+    }
+
+    func deleteWithoutSaving(_ task: TaskEntity) {
+        modelContext.delete(task)
+    }
+
+    func save() throws {
         try modelContext.save()
     }
 
