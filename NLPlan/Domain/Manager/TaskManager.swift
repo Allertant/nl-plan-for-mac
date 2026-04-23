@@ -356,12 +356,17 @@ final class TaskManager {
 
     /// 获取所有想法池任务
     func fetchIdeaPool() async throws -> [TaskEntity] {
-        try taskRepo.fetchAllIdeaPoolTasks()
+        let ideas = try ideaRepo.fetchVisibleIdeas()
+        let mapped = try ideas.compactMap { idea in
+            try taskRepo.fetchById(idea.id)
+        }
+        return mapped.sorted { $0.createdDate > $1.createdDate }
     }
 
     /// 获取想法池中的单个任务
     func fetchIdeaPoolTask(taskId: UUID) async throws -> TaskEntity? {
-        try taskRepo.fetchById(taskId)
+        guard try ideaRepo.fetchById(taskId) != nil else { return nil }
+        return try taskRepo.fetchById(taskId)
     }
 
     /// 更新任务（直接保存已有实体的修改）
@@ -372,12 +377,18 @@ final class TaskManager {
 
     /// 获取指定日期的必做项
     func fetchMustDo(date: Date = .now) async throws -> [TaskEntity] {
-        try taskRepo.fetchTasks(date: date, pool: .mustDo)
+        let dailyTasks = try dailyTaskRepo.fetchTasks(date: date)
+        return try dailyTasks.compactMap { dailyTask in
+            try taskRepo.fetchById(dailyTask.id)
+        }
     }
 
     /// 获取绑定到指定项目想法的全部必做项
     func fetchMustDo(sourceIdeaId: UUID) async throws -> [TaskEntity] {
-        try taskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
+        let dailyTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
+        return try dailyTasks.compactMap { dailyTask in
+            try taskRepo.fetchById(dailyTask.id)
+        }
     }
 
     /// 获取绑定到指定项目想法的归档记录
@@ -387,7 +398,10 @@ final class TaskManager {
 
     /// 获取活跃的正在运行的任务
     func fetchRunningTasks() async throws -> [TaskEntity] {
-        try taskRepo.fetchActiveRunningTasks()
+        let runningDailyTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        return try runningDailyTasks.compactMap { dailyTask in
+            try taskRepo.fetchById(dailyTask.id)
+        }
     }
 
     /// 保存任务的排序顺序（拖拽排序后调用）

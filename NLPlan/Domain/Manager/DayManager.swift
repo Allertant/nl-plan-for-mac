@@ -45,7 +45,7 @@ final class DayManager {
         let isToday = Calendar.current.isDateInToday(settlementDate)
 
         // 1. 先评分（可安全取消，不修改任何数据）
-        let mustDoTasks = try taskRepo.fetchTasks(date: settlementDate, pool: .mustDo)
+        let mustDoTasks = try fetchLegacyMustDoTasks(date: settlementDate)
         let grade = try await gradeWithFallback(tasks: mustDoTasks, incompleteNotes: incompleteNotes)
 
         // 2. 今日评分成功后，停止所有运行中任务
@@ -88,7 +88,7 @@ final class DayManager {
         if try summaryRepo.fetch(date: yesterdayStart) != nil {
             return nil
         }
-        let yesterdayTasks = try taskRepo.fetchTasks(date: yesterdayStart, pool: .mustDo)
+        let yesterdayTasks = try fetchLegacyMustDoTasks(date: yesterdayStart)
         return yesterdayTasks.isEmpty ? nil : yesterdayStart
     }
 
@@ -105,7 +105,7 @@ final class DayManager {
         }
 
         // 检查昨天是否有必做项
-        let yesterdayTasks = try taskRepo.fetchTasks(date: yesterdayStart, pool: .mustDo)
+        let yesterdayTasks = try fetchLegacyMustDoTasks(date: yesterdayStart)
         if yesterdayTasks.isEmpty {
             return nil
         }
@@ -150,7 +150,7 @@ final class DayManager {
             throw NLPlanError.appealLimitExceeded
         }
 
-        let tasks = try taskRepo.fetchTasks(date: date, pool: .mustDo)
+        let tasks = try fetchLegacyMustDoTasks(date: date)
         let stats = computeStats(tasks: tasks)
         let originalInput = try buildSummaryInput(tasks: tasks, stats: stats)
         let originalGrade = DailyGrade(
@@ -198,7 +198,7 @@ final class DayManager {
     /// 获取今日统计
     func todayStats() async throws -> DayStats {
         let today = Calendar.current.startOfDay(for: .now)
-        let tasks = try taskRepo.fetchTasks(date: today, pool: .mustDo)
+        let tasks = try fetchLegacyMustDoTasks(date: today)
         return computeStats(tasks: tasks)
     }
 
@@ -215,7 +215,7 @@ final class DayManager {
 
     /// 获取指定日期必做项
     func fetchMustDoTasks(date: Date) async throws -> [TaskEntity] {
-        try taskRepo.fetchTasks(date: Calendar.current.startOfDay(for: date), pool: .mustDo)
+        try fetchLegacyMustDoTasks(date: date)
     }
 
     /// 获取历史评分
@@ -435,6 +435,14 @@ final class DayManager {
             relatedTaskId: relatedTaskId,
             settlementDate: settlementDate
         )
+    }
+
+    private func fetchLegacyMustDoTasks(date: Date) throws -> [TaskEntity] {
+        let targetDate = Calendar.current.startOfDay(for: date)
+        let dailyTasks = try dailyTaskRepo.fetchTasks(date: targetDate)
+        return try dailyTasks.compactMap { dailyTask in
+            try taskRepo.fetchById(dailyTask.id)
+        }
     }
 
     private func settlementLogContent(task: TaskEntity, note: String?) -> String {
