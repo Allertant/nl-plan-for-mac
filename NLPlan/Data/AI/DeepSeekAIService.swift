@@ -96,7 +96,7 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
 
         return DailyGrade(
-            grade: Grade(rawValue: gradeResponse.grade) ?? .D,
+            grade: Grade(rawValue: gradeResponse.grade) ?? .F,
             summary: gradeResponse.summary,
             stats: GradeStats(
                 totalTasks: gradeResponse.stats.totalTasks,
@@ -128,7 +128,7 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
 
         return DailyGrade(
-            grade: Grade(rawValue: gradeResponse.grade) ?? .D,
+            grade: Grade(rawValue: gradeResponse.grade) ?? .F,
             summary: gradeResponse.summary,
             stats: GradeStats(
                 totalTasks: gradeResponse.stats.totalTasks,

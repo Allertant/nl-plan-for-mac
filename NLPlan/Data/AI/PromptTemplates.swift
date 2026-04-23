@@ -137,9 +137,11 @@ enum PromptTemplates {
         评分标准：
         - S：必做项全部完成，时间偏差 ≤10%，额外完成想法池任务
         - A：必做项全部完成，时间偏差 ≤20%
-        - B：必做项完成 ≥80%
-        - C：必做项完成 ≥50%
-        - D：必做项完成 <50%
+        - B：必做项完成 ≥90%
+        - C：必做项完成 ≥80%
+        - D：必做项完成 ≥60%
+        - E：必做项完成 ≥40%
+        - F：必做项完成 <40%
 
         要求：
         1. 给出等级和具体评价（2-3句）
@@ -151,7 +153,7 @@ enum PromptTemplates {
 
         输出严格的 JSON 格式：
         {
-          "grade": "S|A|B|C|D",
+          "grade": "S|A|B|C|D|E|F",
           "summary": "评价文本",
           "grading_basis": "评分依据和理由",
           "stats": {
@@ -345,7 +347,7 @@ enum PromptTemplates {
 
         请根据用户的反馈重新评估，输出严格的 JSON 格式：
         {
-          "grade": "S|A|B|C|D",
+          "grade": "S|A|B|C|D|E|F",
           "summary": "重新评价文本",
           "grading_basis": "重新评分的依据，需回应用户的反馈",
           "stats": {

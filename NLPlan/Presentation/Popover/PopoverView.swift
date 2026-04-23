@@ -233,9 +233,11 @@ private struct ToolbarIconButton<Label: View>: View {
 private func gradeColor(_ grade: Grade) -> Color {
     switch grade {
     case .S: return .purple
-    case .A: return .green
-    case .B: return .blue
-    case .C: return .orange
-    case .D: return .red
+    case .A: return .blue
+    case .B: return .cyan
+    case .C: return .green
+    case .D: return .yellow
+    case .E: return .orange
+    case .F: return .red
     }
 }

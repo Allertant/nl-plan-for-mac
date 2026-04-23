@@ -6,7 +6,7 @@ import SwiftData
 final class DailySummaryEntity {
     @Attribute(.unique) var id: UUID
     var date: Date
-    var grade: String        // "S" / "A" / "B" / "C" / "D"
+    var grade: String        // "S" / "A" / "B" / "C" / "D" / "E" / "F"
     var summary: String
     var suggestion: String?
     var totalPlannedMinutes: Int
@@ -20,14 +20,14 @@ final class DailySummaryEntity {
 
     @Transient
     var gradeEnum: Grade {
-        get { Grade(rawValue: grade) ?? .D }
+        get { Grade(rawValue: grade) ?? .F }
         set { grade = newValue.rawValue }
     }
 
     init(
         id: UUID = UUID(),
         date: Date = .now,
-        grade: String = "D",
+        grade: String = "F",
         summary: String = "",
         suggestion: String? = nil,
         totalPlannedMinutes: Int = 0,

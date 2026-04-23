@@ -23,25 +23,31 @@ struct GradeTests {
     @Test("完成率 80%-99% → B")
     func testCompletionRate80() {
         let grade = Grade.fromCompletionRate(0.85)
-        #expect(grade == .B)
-    }
-
-    @Test("完成率 50%-79% → C")
-    func testCompletionRate50() {
-        let grade = Grade.fromCompletionRate(0.6)
         #expect(grade == .C)
     }
 
-    @Test("完成率 <50% → D")
-    func testCompletionRate30() {
-        let grade = Grade.fromCompletionRate(0.3)
+    @Test("完成率 60%-79% → D")
+    func testCompletionRate60() {
+        let grade = Grade.fromCompletionRate(0.6)
         #expect(grade == .D)
     }
 
-    @Test("完成率 0% → D")
+    @Test("完成率 40%-59% → E")
+    func testCompletionRate40() {
+        let grade = Grade.fromCompletionRate(0.45)
+        #expect(grade == .E)
+    }
+
+    @Test("完成率 <40% → F")
+    func testCompletionRate30() {
+        let grade = Grade.fromCompletionRate(0.3)
+        #expect(grade == .F)
+    }
+
+    @Test("完成率 0% → F")
     func testCompletionRate0() {
         let grade = Grade.fromCompletionRate(0.0)
-        #expect(grade == .D)
+        #expect(grade == .F)
     }
 }
 
