@@ -374,30 +374,32 @@ private struct HistoryGradeLegend: View {
     ]
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Text("优")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text("差")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tertiary)
-            }
+        VStack(spacing: 0) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: levels.map { $0.historyColor.opacity(0.9) },
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
 
-            HStack(spacing: 4) {
-                ForEach(levels, id: \.rawValue) { level in
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(level.historyColor.opacity(0.9))
+                HStack(spacing: 0) {
+                    ForEach(levels, id: \.rawValue) { level in
                         Text(level.rawValue)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(level.legendTextColor)
+                            .shadow(color: .black.opacity(level == .D ? 0 : 0.22), radius: 1, x: 0, y: 0.5)
+                            .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 22)
                 }
             }
+            .frame(height: 24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
         }
         .padding(8)
         .background(Color(nsColor: .textBackgroundColor))
