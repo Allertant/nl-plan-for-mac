@@ -32,6 +32,7 @@ struct PromptTemplatesTests {
     @Test("dailyGrade 包含统计数据")
     func testDailyGradeContainsStats() {
         let input = DailySummaryInput(
+            settlementDate: "2026年4月23日",
             totalTasks: 5,
             completedTasks: 4,
             totalPlannedMinutes: 240,
@@ -39,13 +40,29 @@ struct PromptTemplatesTests {
             deviationRate: 0.1,
             extraCompleted: 1,
             taskDetails: [
-                TaskDetail(title: "写文档", estimatedMinutes: 60, actualMinutes: 80, completed: true)
+                TaskDetail(
+                    title: "写文档",
+                    estimatedMinutes: 60,
+                    actualMinutes: 80,
+                    completed: true,
+                    priority: "high",
+                    sourceType: "项目链接必做项",
+                    note: "完成了核心结构"
+                )
             ]
         )
         let prompt = PromptTemplates.dailyGrade(input: input)
         #expect(prompt.contains("5"))
         #expect(prompt.contains("4"))
         #expect(prompt.contains("写文档"))
+        #expect(prompt.contains("2026年4月23日"))
+        #expect(prompt.contains("项目链接必做项"))
+        #expect(prompt.contains("high"))
+        #expect(prompt.contains("完成了核心结构"))
+        #expect(prompt.contains("完成率只是参考指标之一"))
+        #expect(prompt.contains("少量高难任务"))
+        #expect(prompt.contains("大量简单任务全部完成"))
+        #expect(prompt.contains("无备注未完成"))
     }
 
     @Test("appealGrade 包含用户反馈")

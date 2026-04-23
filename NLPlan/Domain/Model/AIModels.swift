@@ -116,6 +116,7 @@ struct ProjectProgressAnalysis: Sendable, Equatable {
 
 /// 日终评分输入
 struct DailySummaryInput: Sendable {
+    let settlementDate: String
     let totalTasks: Int
     let completedTasks: Int
     let totalPlannedMinutes: Int
@@ -123,6 +124,26 @@ struct DailySummaryInput: Sendable {
     let deviationRate: Double
     let extraCompleted: Int
     let taskDetails: [TaskDetail]
+
+    init(
+        settlementDate: String = "",
+        totalTasks: Int,
+        completedTasks: Int,
+        totalPlannedMinutes: Int,
+        totalActualMinutes: Int,
+        deviationRate: Double,
+        extraCompleted: Int,
+        taskDetails: [TaskDetail]
+    ) {
+        self.settlementDate = settlementDate
+        self.totalTasks = totalTasks
+        self.completedTasks = completedTasks
+        self.totalPlannedMinutes = totalPlannedMinutes
+        self.totalActualMinutes = totalActualMinutes
+        self.deviationRate = deviationRate
+        self.extraCompleted = extraCompleted
+        self.taskDetails = taskDetails
+    }
 
     var completionRate: Double {
         guard totalTasks > 0 else { return 0 }
@@ -137,6 +158,27 @@ struct TaskDetail: Sendable, Identifiable {
     let estimatedMinutes: Int
     let actualMinutes: Int
     let completed: Bool
+    let priority: String
+    let sourceType: String
+    let note: String?
+
+    init(
+        title: String,
+        estimatedMinutes: Int,
+        actualMinutes: Int,
+        completed: Bool,
+        priority: String = "medium",
+        sourceType: String = "无来源",
+        note: String? = nil
+    ) {
+        self.title = title
+        self.estimatedMinutes = estimatedMinutes
+        self.actualMinutes = actualMinutes
+        self.completed = completed
+        self.priority = priority
+        self.sourceType = sourceType
+        self.note = note
+    }
 }
 
 /// 日终评分输出

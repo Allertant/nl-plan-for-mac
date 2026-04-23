@@ -120,7 +120,7 @@ final class DayManager {
 
         let tasks = try taskRepo.fetchTasks(date: date, pool: .mustDo)
         let stats = computeStats(tasks: tasks)
-        let originalInput = buildSummaryInput(tasks: tasks, stats: stats)
+        let originalInput = try buildSummaryInput(tasks: tasks, stats: stats)
         let originalGrade = DailyGrade(
             grade: summary.gradeEnum,
             summary: summary.summary,
@@ -184,20 +184,24 @@ final class DayManager {
     // MARK: - Private
 
     /// 从任务列表构建 AI 评分输入
-    private func buildSummaryInput(tasks: [TaskEntity], stats: DayStats) -> DailySummaryInput {
+    private func buildSummaryInput(tasks: [TaskEntity], stats: DayStats) throws -> DailySummaryInput {
         DailySummaryInput(
+            settlementDate: Date.now.dateString,
             totalTasks: stats.totalTasks,
             completedTasks: stats.completedTasks,
             totalPlannedMinutes: stats.totalPlannedMinutes,
             totalActualMinutes: stats.totalActualMinutes,
             deviationRate: stats.deviationRate,
             extraCompleted: stats.extraCompleted,
-            taskDetails: tasks.map { task in
+            taskDetails: try tasks.map { task in
                 TaskDetail(
                     title: task.title,
                     estimatedMinutes: task.estimatedMinutes,
                     actualMinutes: max(0, task.totalElapsedSeconds / 60),
-                    completed: task.status == TaskStatus.done.rawValue
+                    completed: task.status == TaskStatus.done.rawValue,
+                    priority: task.priority,
+                    sourceType: try summarySourceType(for: task),
+                    note: task.note
                 )
             }
         )
@@ -206,7 +210,7 @@ final class DayManager {
     /// AI 评分（带降级方案）
     private func gradeWithFallback(tasks: [TaskEntity], fallbackSummary: String = "AI 评分不可用，使用基础评分。") async throws -> DailyGrade {
         let stats = computeStats(tasks: tasks)
-        let input = buildSummaryInput(tasks: tasks, stats: stats)
+        let input = try buildSummaryInput(tasks: tasks, stats: stats)
 
         do {
             return try await aiService.generateDailyGrade(summaryInput: input)
@@ -252,5 +256,15 @@ final class DayManager {
             deviationRate: deviationRate,
             extraCompleted: 0  // TODO: 计算额外完成的想法池任务
         )
+    }
+
+    private func summarySourceType(for task: TaskEntity) throws -> String {
+        guard let sourceIdeaId = task.sourceIdeaId else {
+            return "无来源必做项"
+        }
+        guard let source = try taskRepo.fetchById(sourceIdeaId) else {
+            return "普通想法来源必做项"
+        }
+        return source.isProjectTask ? "项目链接必做项" : "普通想法来源必做项"
     }
 }
