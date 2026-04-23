@@ -35,7 +35,9 @@ final class SummaryViewModel {
         errorMessage = nil
         endDayTask = Task {
             do {
-                summary = try await dayManager.endDay()
+                let result = try await dayManager.endDay()
+                guard !Task.isCancelled else { return }
+                summary = result
             } catch {
                 if !Task.isCancelled {
                     errorMessage = error.localizedDescription

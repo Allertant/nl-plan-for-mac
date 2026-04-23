@@ -325,6 +325,8 @@ final class DeepSeekAIService: AIServiceProtocol {
             } catch let urlError as URLError where urlError.code == .timedOut {
                 print("⏳ DeepSeek \(model) 第 \(attempt + 1) 次请求超时（\(Int(timeoutInterval))s）")
                 throw NLPlanError.aiRequestTimeout
+            } catch let urlError as URLError where urlError.code == .cancelled {
+                throw CancellationError()
             } catch let error as NLPlanError {
                 throw error
             } catch is CancellationError {
