@@ -6,6 +6,8 @@ import SwiftData
 final class DayManager {
 
     private let taskRepo: TaskRepository
+    private let ideaRepo: IdeaRepository
+    private let dailyTaskRepo: DailyTaskRepository
     private let summaryRepo: SummaryRepository
     private let sessionLogRepo: SessionLogRepository
     private let timerEngine: TimerEngine
@@ -13,12 +15,16 @@ final class DayManager {
 
     init(
         taskRepo: TaskRepository,
+        ideaRepo: IdeaRepository,
+        dailyTaskRepo: DailyTaskRepository,
         summaryRepo: SummaryRepository,
         sessionLogRepo: SessionLogRepository,
         timerEngine: TimerEngine,
         aiService: AIServiceProtocol
     ) {
         self.taskRepo = taskRepo
+        self.ideaRepo = ideaRepo
+        self.dailyTaskRepo = dailyTaskRepo
         self.summaryRepo = summaryRepo
         self.sessionLogRepo = sessionLogRepo
         self.timerEngine = timerEngine
@@ -328,6 +334,8 @@ final class DayManager {
         settlementDate: Date,
         incompleteNotes: [UUID: String]
     ) throws {
+        var affectedProjectIdeaIds: Set<UUID> = []
+
         for task in tasks {
             let sourceType = try summarySourceType(for: task)
             let note = summaryNote(for: task, incompleteNotes: incompleteNotes)
@@ -338,10 +346,20 @@ final class DayManager {
                 sourceType: sourceType,
                 note: note
             )
+            try archiveSplitDailyTask(task, note: note)
 
             if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try taskRepo.fetchById(sourceIdeaId) {
                 if task.status == TaskStatus.done.rawValue {
                     sourceIdea.status = TaskStatus.done.rawValue
+                    try updateSplitIdea(
+                        sourceIdeaId: sourceIdeaId,
+                        status: .completed,
+                        attempted: sourceIdea.attempted,
+                        logType: .completed,
+                        logContent: "完成必做项：\(task.title)",
+                        relatedTaskId: task.id,
+                        settlementDate: settlementDate
+                    )
                 } else {
                     sourceIdea.status = IdeaStatus.attempted.rawValue
                     sourceIdea.attempted = true
@@ -356,7 +374,19 @@ final class DayManager {
                             }
                             .joined(separator: "\n\n")
                     }
+                    try updateSplitIdea(
+                        sourceIdeaId: sourceIdeaId,
+                        status: .attempted,
+                        attempted: true,
+                        logType: .attempted,
+                        logContent: settlementLogContent(task: task, note: note),
+                        relatedTaskId: task.id,
+                        settlementDate: settlementDate
+                    )
                 }
+                taskRepo.deleteWithoutSaving(task)
+            } else if sourceType == "项目链接必做项", let sourceIdeaId = task.sourceIdeaId {
+                affectedProjectIdeaIds.insert(sourceIdeaId)
                 taskRepo.deleteWithoutSaving(task)
             } else if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
                 task.pool = TaskPool.ideaPool.rawValue
@@ -368,5 +398,64 @@ final class DayManager {
             }
         }
         try taskRepo.save()
+        try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
+    }
+
+    private func archiveSplitDailyTask(_ task: TaskEntity, note: String?) throws {
+        guard let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) else { return }
+        dailyTask.settlementNote = note
+        dailyTask.status = task.status
+        try dailyTaskRepo.update(dailyTask)
+        try dailyTaskRepo.delete(dailyTask)
+    }
+
+    private func updateSplitIdea(
+        sourceIdeaId: UUID,
+        status: IdeaStatus,
+        attempted: Bool,
+        logType: IdeaLogType,
+        logContent: String,
+        relatedTaskId: UUID,
+        settlementDate: Date
+    ) throws {
+        guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return }
+        idea.ideaStatus = status
+        idea.attempted = attempted
+        try ideaRepo.update(idea)
+        _ = try ideaRepo.addLog(
+            ideaId: sourceIdeaId,
+            type: logType,
+            content: logContent,
+            relatedTaskId: relatedTaskId,
+            settlementDate: settlementDate
+        )
+    }
+
+    private func settlementLogContent(task: TaskEntity, note: String?) -> String {
+        let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmedNote, !trimmedNote.isEmpty else {
+            return "未完成必做项：\(task.title)"
+        }
+        return "未完成必做项：\(task.title)\n\(trimmedNote)"
+    }
+
+    private func refreshProjectIdeaStatusesAfterSettlement(_ ideaIds: Set<UUID>) throws {
+        for ideaId in ideaIds {
+            let activeTasks = try taskRepo.fetchTasks(sourceIdeaId: ideaId)
+                .filter { $0.status != TaskStatus.done.rawValue }
+            guard activeTasks.isEmpty else { continue }
+
+            if let sourceIdea = try taskRepo.fetchById(ideaId),
+               sourceIdea.status == IdeaStatus.inProgress.rawValue {
+                sourceIdea.status = TaskStatus.pending.rawValue
+                try taskRepo.update(sourceIdea)
+            }
+
+            if let idea = try ideaRepo.fetchById(ideaId),
+               idea.ideaStatus == .inProgress {
+                idea.ideaStatus = .pending
+                try ideaRepo.update(idea)
+            }
+        }
     }
 }

@@ -42,12 +42,16 @@ struct MainContentView: View {
     private func performStartupChecks() async {
         let context = appState.modelContainer.mainContext
         let taskRepo = TaskRepository(modelContext: context)
+        let ideaRepo = IdeaRepository(modelContext: context)
+        let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
         let summaryRepo = SummaryRepository(modelContext: context)
         let engine = appState.timerEngine
         let aiService = appState.makeAIService()
         let dayMgr = DayManager(
             taskRepo: taskRepo,
+            ideaRepo: ideaRepo,
+            dailyTaskRepo: dailyTaskRepo,
             summaryRepo: summaryRepo,
             sessionLogRepo: sessionLogRepo,
             timerEngine: engine,
