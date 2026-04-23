@@ -191,12 +191,16 @@ final class AppState {
         }
 
         let taskRepo = TaskRepository(modelContext: context)
+        let ideaRepo = IdeaRepository(modelContext: context)
+        let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let thoughtRepo = ThoughtRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
         let aiService = makeAIService()
 
         let taskMgr = TaskManager(
             taskRepo: taskRepo,
+            ideaRepo: ideaRepo,
+            dailyTaskRepo: dailyTaskRepo,
             thoughtRepo: thoughtRepo,
             sessionLogRepo: sessionLogRepo,
             aiService: aiService,

@@ -11,6 +11,7 @@ final class IdeaRepository {
     }
 
     func create(
+        id: UUID = UUID(),
         title: String,
         category: String,
         estimatedMinutes: Int,
@@ -26,9 +27,11 @@ final class IdeaRepository {
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
         projectProgressUpdatedAt: Date? = nil,
+        createdDate: Date = .now,
         migratedFromTaskId: UUID? = nil
     ) throws -> IdeaEntity {
         let idea = IdeaEntity(
+            id: id,
             title: title,
             category: category,
             estimatedMinutes: estimatedMinutes,
@@ -37,6 +40,8 @@ final class IdeaRepository {
             recommendationReason: recommendationReason,
             sortOrder: sortOrder,
             status: status.rawValue,
+            createdDate: createdDate,
+            updatedAt: .now,
             attempted: attempted,
             note: note,
             isProject: isProject,
@@ -91,6 +96,11 @@ final class IdeaRepository {
 
     func update(_ idea: IdeaEntity) throws {
         idea.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func delete(_ idea: IdeaEntity) throws {
+        modelContext.delete(idea)
         try modelContext.save()
     }
 

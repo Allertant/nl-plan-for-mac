@@ -6,6 +6,8 @@ import SwiftData
 final class TaskManager {
 
     private let taskRepo: TaskRepository
+    private let ideaRepo: IdeaRepository
+    private let dailyTaskRepo: DailyTaskRepository
     private let thoughtRepo: ThoughtRepository
     private let sessionLogRepo: SessionLogRepository
     private let aiService: AIServiceProtocol
@@ -13,12 +15,16 @@ final class TaskManager {
 
     init(
         taskRepo: TaskRepository,
+        ideaRepo: IdeaRepository,
+        dailyTaskRepo: DailyTaskRepository,
         thoughtRepo: ThoughtRepository,
         sessionLogRepo: SessionLogRepository,
         aiService: AIServiceProtocol,
         timerEngine: TimerEngine
     ) {
         self.taskRepo = taskRepo
+        self.ideaRepo = ideaRepo
+        self.dailyTaskRepo = dailyTaskRepo
         self.thoughtRepo = thoughtRepo
         self.sessionLogRepo = sessionLogRepo
         self.aiService = aiService
@@ -79,6 +85,26 @@ final class TaskManager {
                 task.projectProgressUpdatedAt = nil
             }
             try taskRepo.update(task)
+            _ = try ideaRepo.create(
+                id: task.id,
+                title: task.title,
+                category: task.category,
+                estimatedMinutes: task.estimatedMinutes,
+                priority: task.taskPriority,
+                aiRecommended: task.aiRecommended,
+                recommendationReason: task.recommendationReason,
+                sortOrder: task.sortOrder,
+                status: .pending,
+                attempted: task.attempted,
+                note: task.note,
+                isProject: task.isProjectTask,
+                projectDecisionSource: task.projectDecisionSource,
+                projectProgress: task.projectProgress,
+                projectProgressSummary: task.projectProgressSummary,
+                projectProgressUpdatedAt: task.projectProgressUpdatedAt,
+                createdDate: task.createdDate,
+                migratedFromTaskId: task.id
+            )
             createdTasks.append(task)
         }
 
@@ -107,6 +133,27 @@ final class TaskManager {
         if let priority { task.taskPriority = priority }
         if let sortOrder { task.sortOrder = sortOrder }
         try taskRepo.moveToMustDo(task)
+        if let idea = try ideaRepo.fetchById(task.id) {
+            idea.ideaStatus = .inProgress
+            try ideaRepo.update(idea)
+        }
+        _ = try dailyTaskRepo.create(
+            id: task.id,
+            title: task.title,
+            category: task.category,
+            estimatedMinutes: task.estimatedMinutes,
+            priority: task.taskPriority,
+            aiRecommended: task.aiRecommended,
+            recommendationReason: task.recommendationReason,
+            sortOrder: task.sortOrder,
+            date: task.date,
+            createdDate: task.createdDate,
+            attempted: task.attempted,
+            note: task.note,
+            sourceIdeaId: task.id,
+            sourceType: task.isProjectTask ? .project : .idea,
+            migratedFromTaskId: task.id
+        )
     }
 
     /// 创建新的必做项（用于项目切片）
@@ -132,6 +179,25 @@ final class TaskManager {
         )
         task.sortOrder = sortOrder
         try taskRepo.update(task)
+        _ = try dailyTaskRepo.create(
+            id: task.id,
+            title: task.title,
+            category: task.category,
+            estimatedMinutes: task.estimatedMinutes,
+            priority: task.taskPriority,
+            aiRecommended: task.aiRecommended,
+            recommendationReason: task.recommendationReason,
+            sortOrder: task.sortOrder,
+            date: task.date,
+            createdDate: task.createdDate,
+            sourceIdeaId: sourceIdeaId,
+            sourceType: try dailyTaskSourceType(sourceIdeaId: sourceIdeaId),
+            migratedFromTaskId: task.id
+        )
+        if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
+            idea.ideaStatus = .inProgress
+            try ideaRepo.update(idea)
+        }
         return task
     }
 
@@ -153,6 +219,12 @@ final class TaskManager {
         }
 
         try taskRepo.moveToIdeaPool(task, markAttempted: markAttempted)
+        try dailyTaskRepo.deleteByMigratedTaskId(task.id)
+        if let idea = try ideaRepo.fetchById(task.id) {
+            idea.ideaStatus = markAttempted ? .attempted : .pending
+            idea.attempted = markAttempted || idea.attempted
+            try ideaRepo.update(idea)
+        }
     }
 
     /// 删除想法池中的任务
@@ -162,6 +234,9 @@ final class TaskManager {
         }
         guard task.pool == TaskPool.ideaPool.rawValue else {
             throw NLPlanError.taskNotInExpectedPool(expected: .ideaPool, actual: task.taskPool)
+        }
+        if let idea = try ideaRepo.fetchById(task.id) {
+            try ideaRepo.delete(idea)
         }
         try taskRepo.delete(task)
     }
@@ -235,6 +310,10 @@ final class TaskManager {
         }
 
         try taskRepo.markComplete(task)
+        if let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) {
+            dailyTask.taskStatus = .done
+            try dailyTaskRepo.update(dailyTask)
+        }
     }
 
     // MARK: - 查询
@@ -252,6 +331,7 @@ final class TaskManager {
     /// 更新任务（直接保存已有实体的修改）
     func updateTask(_ task: TaskEntity) async throws {
         try taskRepo.update(task)
+        try syncSplitTables(from: task)
     }
 
     /// 获取指定日期的必做项
@@ -279,6 +359,49 @@ final class TaskManager {
         let tasks = try taskRepo.fetchTasks(date: .now, pool: .mustDo)
         if let anyTask = tasks.first {
             try taskRepo.update(anyTask)
+        }
+    }
+
+    private func dailyTaskSourceType(sourceIdeaId: UUID?) throws -> DailyTaskSourceType {
+        guard let sourceIdeaId else { return .none }
+        guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return .idea }
+        return idea.isProject ? .project : .idea
+    }
+
+    private func syncSplitTables(from task: TaskEntity) throws {
+        if task.pool == TaskPool.ideaPool.rawValue, let idea = try ideaRepo.fetchById(task.id) {
+            idea.title = task.title
+            idea.category = task.category
+            idea.estimatedMinutes = task.estimatedMinutes
+            idea.priority = task.priority
+            idea.aiRecommended = task.aiRecommended
+            idea.recommendationReason = task.recommendationReason
+            idea.sortOrder = task.sortOrder
+            idea.attempted = task.attempted
+            idea.note = task.note
+            idea.isProject = task.isProjectTask
+            idea.projectDecisionSource = task.projectDecisionSource
+            idea.projectProgress = task.projectProgress
+            idea.projectProgressSummary = task.projectProgressSummary
+            idea.projectProgressUpdatedAt = task.projectProgressUpdatedAt
+            try ideaRepo.update(idea)
+        }
+
+        if task.pool == TaskPool.mustDo.rawValue, let dailyTask = try dailyTaskRepo.fetchByMigratedTaskId(task.id) {
+            dailyTask.title = task.title
+            dailyTask.category = task.category
+            dailyTask.estimatedMinutes = task.estimatedMinutes
+            dailyTask.priority = task.priority
+            dailyTask.aiRecommended = task.aiRecommended
+            dailyTask.recommendationReason = task.recommendationReason
+            dailyTask.sortOrder = task.sortOrder
+            dailyTask.status = task.status
+            dailyTask.date = task.date
+            dailyTask.attempted = task.attempted
+            dailyTask.note = task.note
+            dailyTask.sourceIdeaId = task.sourceIdeaId
+            dailyTask.sourceType = try dailyTaskSourceType(sourceIdeaId: task.sourceIdeaId).rawValue
+            try dailyTaskRepo.update(dailyTask)
         }
     }
 }
