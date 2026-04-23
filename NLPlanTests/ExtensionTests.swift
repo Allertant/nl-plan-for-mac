@@ -39,11 +39,11 @@ struct DateExtensionTests {
         #expect(d1.isSameDay(as: d3) == false)
     }
 
-    @Test("relativeTimeString 返回刚刚")
-    func testRelativeTimeJustNow() {
+    @Test("relativeTimeString 返回秒前")
+    func testRelativeTimeSecondsAgo() {
         let reference = DateComponents(calendar: .current, year: 2026, month: 4, day: 14, hour: 12, minute: 0, second: 0).date!
         let date = reference.addingTimeInterval(-20)
-        #expect(date.relativeTimeString(reference: reference) == "刚刚")
+        #expect(date.relativeTimeString(reference: reference) == "20 秒前")
     }
 
     @Test("relativeTimeString 返回分钟前")

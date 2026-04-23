@@ -37,13 +37,13 @@ extension Date {
         return formatter.string(from: self)
     }
 
-    /// 相对时间展示（刚刚 / N 分钟前 / N 小时前 / N 天前）
+    /// 相对时间展示（N 秒前 / N 分钟前 / N 小时前 / N 天前）
     func relativeTimeString(reference: Date = .now) -> String {
         let seconds = Int(reference.timeIntervalSince(self))
-        guard seconds > 0 else { return "刚刚" }
+        guard seconds > 0 else { return "0 秒前" }
 
         if seconds < 60 {
-            return "刚刚"
+            return "\(seconds) 秒前"
         }
 
         let minutes = seconds / 60

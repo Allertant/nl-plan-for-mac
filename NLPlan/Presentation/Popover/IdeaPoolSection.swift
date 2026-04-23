@@ -258,7 +258,17 @@ struct IdeaPoolSection: View {
                 ProjectDetailOverlay(
                     project: selectedProjectTask,
                     linkedTasks: linkedMustDoTasks,
-                    isLoading: isLoadingProjectDetail
+                    isLoading: isLoadingProjectDetail,
+                    onAddNote: { content in
+                        Task {
+                            await viewModel.addProjectNote(taskId: selectedProjectTask.id, content: content)
+                        }
+                    },
+                    onUpdateNote: { noteId, content in
+                        Task {
+                            await viewModel.updateProjectNote(noteId: noteId, content: content)
+                        }
+                    }
                 ) {
                     closeProjectDetail()
                 }
@@ -483,10 +493,14 @@ private struct ProjectDetailOverlay: View {
     let project: TaskEntity
     let linkedTasks: [TaskEntity]
     let isLoading: Bool
+    let onAddNote: (String) -> Void
+    let onUpdateNote: (UUID, String) -> Void
     let onClose: () -> Void
 
-    private var noteText: String {
-        project.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    @State private var newNoteText: String = ""
+
+    private var projectNotes: [ProjectNoteEntity] {
+        project.projectNotes.sorted { $0.createdAt > $1.createdAt }
     }
 
     var body: some View {
@@ -597,7 +611,7 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var linkedTasksCard: some View {
-        DetailSectionCard(title: "绑定必做项", systemImage: "link") {
+        DetailSectionCard(title: "推进任务清单", systemImage: "link") {
             VStack(alignment: .leading, spacing: 8) {
                 if isLoading {
                     HStack(spacing: 8) {
@@ -609,7 +623,7 @@ private struct ProjectDetailOverlay: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else if linkedTasks.isEmpty {
-                    Text("暂无绑定必做项")
+                    Text("暂无推进任务")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -623,13 +637,49 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var noteCard: some View {
-        DetailSectionCard(title: "备注", systemImage: "note.text") {
-            Text(noteText.isEmpty ? "暂无备注" : noteText)
-                .font(.system(size: 11))
-                .foregroundStyle(noteText.isEmpty ? .tertiary : .secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        DetailSectionCard(title: "项目备注记录", systemImage: "note.text") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
+                    TextField("新增备注...", text: $newNoteText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 5)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .submitLabel(.done)
+                        .onSubmit {
+                            submitNewNote()
+                        }
+
+                    Button("添加") { submitNewNote() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                if projectNotes.isEmpty {
+                    Text("暂无备注记录")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(projectNotes, id: \.id) { note in
+                        ProjectNoteRow(note: note) { updatedText in
+                            onUpdateNote(note.id, updatedText)
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private func submitNewNote() {
+        let trimmed = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onAddNote(trimmed)
+        newNoteText = ""
     }
 }
 
@@ -719,6 +769,85 @@ private struct ProjectLinkedTaskRow: View {
             .padding(.vertical, 2)
             .background(statusColor.opacity(0.1))
             .clipShape(Capsule())
+    }
+}
+
+private struct ProjectNoteRow: View {
+    let note: ProjectNoteEntity
+    let onUpdate: (String) -> Void
+
+    @State private var isEditing = false
+    @State private var draftText = ""
+
+    private var createdText: String {
+        note.createdAt.relativeTimeString()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if isEditing {
+                TextField("备注内容", text: $draftText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(2...4)
+                    .font(.system(size: 11))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Text(note.content)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 8) {
+                Text(createdText)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+
+                Spacer(minLength: 0)
+
+                if isEditing {
+                    Button("取消") {
+                        isEditing = false
+                        draftText = note.content
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+
+                    Button("保存") {
+                        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty, trimmed != note.content else {
+                            isEditing = false
+                            draftText = note.content
+                            return
+                        }
+                        onUpdate(trimmed)
+                        isEditing = false
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                } else {
+                    Button("编辑") {
+                        draftText = note.content
+                        isEditing = true
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .onAppear {
+            draftText = note.content
+        }
     }
 }
 
