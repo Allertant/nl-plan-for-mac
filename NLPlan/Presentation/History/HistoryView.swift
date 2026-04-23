@@ -36,6 +36,9 @@ struct HistoryView: View {
                     ) { summary in
                         viewModel.selectSummary(summary)
                     }
+                    .id(viewModel.displayedMonthStart.yearMonthTitle)
+                    .transition(.opacity.combined(with: .scale(scale: 0.985)))
+                    .animation(.easeInOut(duration: 0.22), value: viewModel.displayedMonthStart)
 
                     Spacer(minLength: 0)
                 }
@@ -133,6 +136,7 @@ private struct HistoryMonthCalendarView: View {
 
     private var summaryByDay: [Int: DailySummaryEntity] {
         summaries.reduce(into: [Int: DailySummaryEntity]()) { result, summary in
+            guard calendar.isDate(summary.date, equalTo: monthStart, toGranularity: .month) else { return }
             let day = calendar.component(.day, from: summary.date)
             if let existing = result[day], existing.createdAt >= summary.createdAt {
                 return

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 /// 历史记录 ViewModel
 @MainActor
@@ -14,6 +15,7 @@ final class HistoryViewModel {
 
     let dayManager: DayManager
     private var monthLoadTask: Task<Void, Never>?
+    private let monthSwitchAnimation = Animation.easeInOut(duration: 0.22)
 
     init(dayManager: DayManager) {
         self.dayManager = dayManager
@@ -57,17 +59,22 @@ final class HistoryViewModel {
                 let fetched = try await dayManager.fetchHistory(from: monthStart, to: endOfMonth)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard self.displayedMonthStart == monthStart else { return }
-                    self.summaries = fetched
-                    self.errorMessage = nil
-                    self.isLoadingMonth = false
+                    withAnimation(self.monthSwitchAnimation) {
+                        self.displayedMonthStart = monthStart
+                        self.summaries = fetched
+                        self.errorMessage = nil
+                        self.isLoadingMonth = false
+                    }
                 }
             } catch {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard self.displayedMonthStart == monthStart else { return }
-                    self.errorMessage = error.localizedDescription
-                    self.isLoadingMonth = false
+                    withAnimation(self.monthSwitchAnimation) {
+                        self.displayedMonthStart = monthStart
+                        self.summaries = []
+                        self.errorMessage = error.localizedDescription
+                        self.isLoadingMonth = false
+                    }
                 }
             }
         }
@@ -76,17 +83,15 @@ final class HistoryViewModel {
     private func shiftMonth(by value: Int) {
         let calendar = Calendar.current
         guard let next = calendar.date(byAdding: .month, value: value, to: displayedMonthStart) else { return }
-        displayedMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: next)) ?? next
         selectedSummary = nil
-        startMonthLoad(for: displayedMonthStart)
+        startMonthLoad(for: calendar.date(from: calendar.dateComponents([.year, .month], from: next)) ?? next)
     }
 
     private func shiftYear(by value: Int) {
         let calendar = Calendar.current
         guard let next = calendar.date(byAdding: .year, value: value, to: displayedMonthStart) else { return }
-        displayedMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: next)) ?? next
         selectedSummary = nil
-        startMonthLoad(for: displayedMonthStart)
+        startMonthLoad(for: calendar.date(from: calendar.dateComponents([.year, .month], from: next)) ?? next)
     }
 
     /// 选择某天的总结
