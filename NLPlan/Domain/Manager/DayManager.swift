@@ -387,6 +387,12 @@ final class DayManager {
                 taskRepo.deleteWithoutSaving(task)
             } else if sourceType == "项目链接必做项", let sourceIdeaId = task.sourceIdeaId {
                 affectedProjectIdeaIds.insert(sourceIdeaId)
+                try appendProjectSettlementNoteIfNeeded(
+                    sourceIdeaId: sourceIdeaId,
+                    task: task,
+                    note: note,
+                    settlementDate: settlementDate
+                )
                 taskRepo.deleteWithoutSaving(task)
             } else if task.status != TaskStatus.done.rawValue && sourceType == "普通想法来源必做项" {
                 task.pool = TaskPool.ideaPool.rawValue
@@ -437,6 +443,26 @@ final class DayManager {
             return "未完成必做项：\(task.title)"
         }
         return "未完成必做项：\(task.title)\n\(trimmedNote)"
+    }
+
+    private func appendProjectSettlementNoteIfNeeded(
+        sourceIdeaId: UUID,
+        task: TaskEntity,
+        note: String?,
+        settlementDate: Date
+    ) throws {
+        guard task.status != TaskStatus.done.rawValue else { return }
+        guard let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedNote.isEmpty else {
+            return
+        }
+        guard let projectIdea = try taskRepo.fetchById(sourceIdeaId) else { return }
+
+        let content = """
+        \(settlementDate.shortDateTimeString)
+        必做项：\(task.title)
+        备注：\(trimmedNote)
+        """
+        _ = try taskRepo.createProjectNote(task: projectIdea, content: content)
     }
 
     private func refreshProjectIdeaStatusesAfterSettlement(_ ideaIds: Set<UUID>) throws {
