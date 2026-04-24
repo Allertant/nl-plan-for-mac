@@ -563,12 +563,9 @@ private struct ProjectDetailOverlay: View {
     @State private var isEditingDescription = false
     @State private var showCopyToast = false
     @State private var draftProjectDescription = ""
-    @State private var isEditingPlanningBackground = false
     @State private var draftPlanningBackground = ""
     @State private var showCopyPromptToast = false
-    @State private var isShowingPromptSheet = false
     @FocusState private var isDescriptionFocused: Bool
-    @FocusState private var isPlanningBackgroundFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -598,11 +595,6 @@ private struct ProjectDetailOverlay: View {
             draftProjectDescription = project.projectDescription ?? ""
             draftPlanningBackground = project.planningBackground ?? ""
         }
-        .sheet(isPresented: $isShowingPromptSheet) {
-            PlanningPromptSheet(
-                prompt: project.planningResearchPrompt ?? ""
-            )
-        }
     }
 
     private var header: some View {
@@ -630,29 +622,19 @@ private struct ProjectDetailOverlay: View {
                             showCopyToast = false
                         }
                     } label: {
-                        Image(systemName: showCopyToast ? "checkmark" : "doc.on.clipboard")
-                            .font(.system(size: 11))
-                            .foregroundStyle(showCopyToast ? .green : .secondary)
+                        if showCopyToast {
+                            Label("已复制", systemImage: "checkmark")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.green)
+                        } else {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .buttonStyle(.plain)
                     .help("复制标题")
                     .animation(.easeInOut(duration: 0.2), value: showCopyToast)
-
-                    Button(action: onGeneratePlanningPrompt) {
-                        Group {
-                            if isGeneratingPlanningPrompt {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.indigo)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isGeneratingPlanningPrompt)
-                    .help("生成研究提示词")
                 }
                 HStack(spacing: 8) {
                     TagChip(text: project.category)
@@ -762,73 +744,9 @@ private struct ProjectDetailOverlay: View {
                     }
 
                     Spacer()
-
-                    Button(isEditingPlanningBackground ? "取消" : "编辑") {
-                        if isEditingPlanningBackground {
-                            isEditingPlanningBackground = false
-                            draftPlanningBackground = project.planningBackground ?? ""
-                            isPlanningBackgroundFocused = false
-                        } else {
-                            draftPlanningBackground = project.planningBackground ?? ""
-                            isEditingPlanningBackground = true
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
                 }
 
-                if let reason = project.planningResearchPromptReason, !reason.isEmpty {
-                    Text(reason)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text("当项目缺少外部知识时，可先生成研究提示词，交给联网 AI 产出结构化规划背景。")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-
-                if let prompt = project.planningResearchPrompt, !prompt.isEmpty {
-                    Text(promptPreview(prompt))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(8)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    if prompt.count > 280 {
-                        Button("查看完整提示词") {
-                            isShowingPromptSheet = true
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                if isEditingPlanningBackground {
-                    TextEditor(text: $draftPlanningBackground)
-                        .font(.system(size: 11))
-                        .frame(minHeight: 150)
-                        .padding(6)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .focused($isPlanningBackgroundFocused)
-
-                    HStack {
-                        Spacer()
-                        Button("保存") {
-                            onSavePlanningBackground(draftPlanningBackground)
-                            isEditingPlanningBackground = false
-                            isPlanningBackgroundFocused = false
-                        }
-                        .font(.system(size: 10, weight: .medium))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
-                    }
-                } else if let planningBackground = project.planningBackground, !planningBackground.isEmpty {
+                if let planningBackground = project.planningBackground, !planningBackground.isEmpty {
                     Text(planningBackground)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -840,12 +758,6 @@ private struct ProjectDetailOverlay: View {
                 }
             }
         }
-    }
-
-    private func promptPreview(_ prompt: String, limit: Int = 280) -> String {
-        guard prompt.count > limit else { return prompt }
-        let index = prompt.index(prompt.startIndex, offsetBy: limit)
-        return String(prompt[..<index]) + "..."
     }
 
     private var progressCard: some View {
@@ -946,38 +858,6 @@ private struct ProjectSettlementRecordRow: View {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }.padding(8).background(Color(nsColor: .windowBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-}
-
-private struct PlanningPromptSheet: View {
-    let prompt: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("完整研究提示词")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Button("关闭") { dismiss() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11))
-            }
-            .padding(12)
-
-            Divider()
-
-            ScrollView {
-                Text(prompt)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .textSelection(.enabled)
-            }
-        }
-        .frame(minWidth: 520, minHeight: 420)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
