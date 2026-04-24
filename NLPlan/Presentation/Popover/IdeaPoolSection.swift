@@ -11,8 +11,8 @@ struct IdeaPoolSection: View {
     @State private var highlightedSelectedTagIndex: Int?
     @State private var didAutoFocusSearchField = false
     @State private var selectedProjectIdea: IdeaEntity?
-    @State private var linkedMustDoTasks: [DailyTaskEntity] = []
-    @State private var projectSettlementRecords: [DailyTaskEntity] = []
+    @State private var projectActiveTasks: [DailyTaskEntity] = []
+    @State private var projectSettledTasks: [DailyTaskEntity] = []
     @State private var projectNotes: [ProjectNoteEntity] = []
     @State private var isLoadingProjectDetail = false
     @FocusState private var isSearchFieldFocused: Bool
@@ -287,8 +287,8 @@ struct IdeaPoolSection: View {
             if let selectedProjectIdea {
                 ProjectDetailOverlay(
                     project: selectedProjectIdea,
-                    linkedTasks: linkedMustDoTasks,
-                    settlementRecords: projectSettlementRecords,
+                    activeTasks: projectActiveTasks,
+                    settledTasks: projectSettledTasks,
                     notes: projectNotes,
                     isLoading: isLoadingProjectDetail,
                     onAddNote: { content in
@@ -394,19 +394,19 @@ struct IdeaPoolSection: View {
     private func openProjectDetail(_ idea: IdeaEntity) {
         guard idea.isProject else { return }
         selectedProjectIdea = idea
-        linkedMustDoTasks = []
-        projectSettlementRecords = []
+        projectActiveTasks = []
+        projectSettledTasks = []
         projectNotes = []
         isLoadingProjectDetail = true
         isSearchFieldFocused = false
 
         Task {
             async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: idea.id)
-            async let records = viewModel.fetchSettledTasks(sourceIdeaId: idea.id)
+            async let settled = viewModel.fetchSettledTasks(sourceIdeaId: idea.id)
             async let notes = viewModel.fetchProjectNotes(ideaId: idea.id)
             guard selectedProjectIdea?.id == idea.id else { return }
-            linkedMustDoTasks = await tasks
-            projectSettlementRecords = await records
+            projectActiveTasks = await tasks
+            projectSettledTasks = await settled
             projectNotes = await notes
             isLoadingProjectDetail = false
         }
@@ -414,8 +414,8 @@ struct IdeaPoolSection: View {
 
     private func closeProjectDetail() {
         selectedProjectIdea = nil
-        linkedMustDoTasks = []
-        projectSettlementRecords = []
+        projectActiveTasks = []
+        projectSettledTasks = []
         projectNotes = []
         isLoadingProjectDetail = false
     }
@@ -471,8 +471,8 @@ struct IdeaPoolSection: View {
 
 private struct ProjectDetailOverlay: View {
     let project: IdeaEntity
-    let linkedTasks: [DailyTaskEntity]
-    let settlementRecords: [DailyTaskEntity]
+    let activeTasks: [DailyTaskEntity]
+    let settledTasks: [DailyTaskEntity]
     let notes: [ProjectNoteEntity]
     let isLoading: Bool
     let onAddNote: (String) -> Void
@@ -490,8 +490,7 @@ private struct ProjectDetailOverlay: View {
                 VStack(alignment: .leading, spacing: 12) {
                     projectSummaryCard
                     progressCard
-                    linkedTasksCard
-                    settlementRecordsCard
+                    tasksCard
                     noteCard
                 }
                 .padding(12)
@@ -552,16 +551,26 @@ private struct ProjectDetailOverlay: View {
         }
     }
 
-    private var linkedTasksCard: some View {
-        DetailSectionCard(title: "推进任务清单", systemImage: "link", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22)) {
+    private var tasksCard: some View {
+        DetailSectionCard(title: "推进任务", systemImage: "link", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 8) {
                 if isLoading {
                     HStack(spacing: 8) { ProgressView().controlSize(.small); Text("加载中").font(.system(size: 11)).foregroundStyle(.secondary) }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                } else if linkedTasks.isEmpty {
-                    Text("暂无推进任务").font(.system(size: 11)).foregroundStyle(.tertiary).frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    ForEach(linkedTasks, id: \.id) { task in ProjectLinkedTaskRow(task: task) }
+                    if activeTasks.isEmpty && settledTasks.isEmpty {
+                        Text("暂无推进任务").font(.system(size: 11)).foregroundStyle(.tertiary).frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        if !activeTasks.isEmpty {
+                            ForEach(activeTasks, id: \.id) { task in ProjectLinkedTaskRow(task: task) }
+                        }
+                        if !activeTasks.isEmpty && !settledTasks.isEmpty {
+                            Divider()
+                        }
+                        if !settledTasks.isEmpty {
+                            ForEach(settledTasks, id: \.id) { record in ProjectSettlementRecordRow(record: record) }
+                        }
+                    }
                 }
             }
         }
@@ -581,20 +590,6 @@ private struct ProjectDetailOverlay: View {
                     Text("暂无备注记录").font(.system(size: 11)).foregroundStyle(.tertiary).frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ForEach(notes, id: \.id) { note in ProjectNoteRow(note: note) { updatedText in onUpdateNote(note.id, updatedText) } }
-                }
-            }
-        }
-    }
-
-    private var settlementRecordsCard: some View {
-        DetailSectionCard(title: "推进归档", systemImage: "archivebox", tint: .orange, background: Color.orange.opacity(0.08), border: Color.orange.opacity(0.22)) {
-            VStack(alignment: .leading, spacing: 8) {
-                if isLoading {
-                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("加载中").font(.system(size: 11)).foregroundStyle(.secondary) }
-                } else if settlementRecords.isEmpty {
-                    Text("暂无归档记录").font(.system(size: 11)).foregroundStyle(.tertiary)
-                } else {
-                    ForEach(settlementRecords, id: \.id) { record in ProjectSettlementRecordRow(record: record) }
                 }
             }
         }
