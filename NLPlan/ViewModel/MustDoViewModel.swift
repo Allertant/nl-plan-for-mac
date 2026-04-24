@@ -25,22 +25,22 @@ final class MustDoViewModel {
     // MARK: - AI 推荐
 
     enum RecommendationStrategy: String, CaseIterable, Identifiable {
-        case quickWin = "quick_win"
-        case hardFirst = "hard_first"
+        case quick = "quick"
+        case comprehensive = "comprehensive"
 
         var id: String { rawValue }
 
         var displayName: String {
             switch self {
-            case .quickWin: return "快速完成优先"
-            case .hardFirst: return "高难度优先"
+            case .quick: return "快速推荐"
+            case .comprehensive: return "综合推荐"
             }
         }
 
         var shortName: String {
             switch self {
-            case .quickWin: return "快速"
-            case .hardFirst: return "挑战"
+            case .quick: return "快速"
+            case .comprehensive: return "综合"
             }
         }
     }
@@ -53,7 +53,7 @@ final class MustDoViewModel {
     }
 
     var recommendationState: RecommendationState = .idle
-    var recommendationStrategy: RecommendationStrategy = .quickWin
+    var recommendationStrategy: RecommendationStrategy = .quick
 
     /// 已加入的推荐项 id
     var acceptedRecommendationIds: Set<UUID> = []
@@ -265,10 +265,19 @@ final class MustDoViewModel {
         acceptedRecommendationIds = []
         selectedPriorities = [:]
 
-        let recommendationCandidates = ideaPoolIdeas.filter { idea in
+        let allCandidates = ideaPoolIdeas.filter { idea in
             idea.ideaStatus != .inProgress &&
             idea.ideaStatus != .completed &&
             idea.ideaStatus != .archived
+        }
+
+        let recommendationCandidates: [IdeaEntity]
+        switch recommendationStrategy {
+        case .quick:
+            let nonProjectCandidates = allCandidates.filter { !$0.isProject }
+            recommendationCandidates = nonProjectCandidates.isEmpty ? allCandidates : nonProjectCandidates
+        case .comprehensive:
+            recommendationCandidates = allCandidates
         }
 
         let ideaInputs = recommendationCandidates.map { idea in

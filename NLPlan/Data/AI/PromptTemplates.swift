@@ -16,8 +16,10 @@ enum PromptTemplates {
         1. 用户列出的每个独立事项 = 一个任务，原样保留用户的措辞
         2. 禁止将一个活动拆解为多个步骤（如"整理房间"不要拆成扫地、叠被子、洗衣服）
         3. 禁止合并不同事项（如"补电影A"和"补电影B"是两个独立任务）
-        4. 为每个任务从以下分类中选择最合适的一个：\(tagList)。必须从中选择，不得自创分类。并预估时长（分钟）
-        5. 推荐最应该今天完成的任务（recommended = true）
+        4. 为每个任务从以下分类中选择最合适的一个：\(tagList)。必须从中选择，不得自创分类。
+        5. 如果任务是普通单次事项，estimated_minutes 必须给出分钟数。
+        6. 如果任务明显是长期项目、系列计划、学习路线或无法整体一次完成的目标，不要给整项预估时长，estimated_minutes 设为 null。
+        7. 推荐最应该今天完成的任务（recommended = true）
 
         示例输入：「今天要把项目报告初稿写完，顺便整理工位，下午产品评审会」
         正确输出：3 个任务 — 「完成项目报告初稿」「整理工位」「产品评审会」
@@ -55,7 +57,8 @@ enum PromptTemplates {
         availableTags: [String] = AppConstants.defaultTags
     ) -> String {
         let taskList = currentTasks.enumerated().map { i, t in
-            "\(i + 1). 「\(t.title)」(\(t.category)，\(t.estimatedMinutes)分钟)\(t.recommended ? " [推荐]" : "")\(t.reason.isEmpty ? "" : " —— \(t.reason)")"
+            let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
+            return "\(i + 1). 「\(t.title)」(\(t.category)，\(durationText))\(t.recommended ? " [推荐]" : "")\(t.reason.isEmpty ? "" : " —— \(t.reason)")"
         }.joined(separator: "\n")
 
         return """
@@ -75,6 +78,7 @@ enum PromptTemplates {
         核心原则：按用户的意图粒度拆分，不按执行步骤拆分。每个用户提到的独立事项 = 一个任务。
 
         分类必须从以下列表中选择：\(availableTags.joined(separator: "/"))，不得自创分类。
+        普通单次事项必须填写 estimated_minutes；长期项目、系列计划、学习路线等整体不可一次完成的条目，estimated_minutes 设为 null。
 
         输出严格的 JSON：
         {
@@ -95,7 +99,8 @@ enum PromptTemplates {
 
     static func cleanupIdeaPool(tasks: [TaskRecommendationInput]) -> String {
         let taskList = tasks.enumerated().map { i, t in
-            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试过" : "")"
+            let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
+            return "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试过" : "")"
         }.joined(separator: "\n")
 
         return """
@@ -244,11 +249,12 @@ enum PromptTemplates {
         strategy: MustDoViewModel.RecommendationStrategy
     ) -> String {
         let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). \(t.title) - \(t.estimatedMinutes)分钟 - \(t.status == "running" ? "进行中" : "待开始")"
+            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status == "running" ? "进行中" : "待开始")"
         }.joined(separator: "\n")
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
-            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
+            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
             if let background = t.planningBackground, !background.isEmpty {
                 return "\(base)\n   规划背景：\(background)"
             }
@@ -258,15 +264,15 @@ enum PromptTemplates {
             return base
         }.joined(separator: "\n")
 
-        let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + $1.estimatedMinutes }
+        let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + ($1.estimatedMinutes ?? 0) }
         let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
 
         let strategyHint: String
         switch strategy {
-        case .quickWin:
-            strategyHint = "优先推荐预估时间短、容易完成的任务，让用户快速积累完成感。按预估时间从短到长排列推荐结果。"
-        case .hardFirst:
-            strategyHint = "优先推荐预估时间长、挑战性高的任务，趁用户精力充沛时先完成困难事项。按预估时间从长到短排列推荐结果。"
+        case .quick:
+            strategyHint = "本轮是快速推荐模式，目标是优先清理想法池并快速形成完成感。默认优先考虑普通想法而非项目，倾向选择明确、低阻力、容易完成的事项。"
+        case .comprehensive:
+            strategyHint = "本轮是综合推荐模式，目标是在普通想法和项目之间综合权衡今天最值得推进的内容，不偏袒普通想法，也不默认偏袒项目。"
         }
 
         return """
@@ -295,8 +301,9 @@ enum PromptTemplates {
         2. 已尝试过（attempted）的任务优先级适当降低
         3. 分类尽量分散
         4. 按推荐执行顺序排列（第一个最应该先做）
-        5. 如果某条想法是“项目型想法”，优先推荐一个今天可执行的小切片任务，而不是直接推荐整个项目标题
-        6. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
+        5. 若候选中包含项目型想法，优先推荐一个今天可执行的小切片任务，而不是直接推荐整个项目标题
+        6. 快速模式下应明显偏向普通想法的清理与消化；综合模式下允许普通想法和项目同时竞争
+        7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
 
         输出严格的 JSON 格式：
         {
@@ -317,7 +324,7 @@ enum PromptTemplates {
 
     static func classifyProjects(tasks: [ProjectClassificationInput]) -> String {
         let taskList = tasks.enumerated().map { index, task in
-            "\(index + 1). [id: \(task.id.uuidString)] \(task.title) - \(task.category) - \(task.estimatedMinutes)分钟"
+            "\(index + 1). [id: \(task.id.uuidString)] \(task.title) - \(task.category)"
         }.joined(separator: "\n")
 
         return """
@@ -440,7 +447,7 @@ enum PromptTemplates {
         当前项目：
         - 标题：\(input.title)
         - 分类：\(input.category)
-        - 预估时长：\(input.estimatedMinutes) 分钟
+        - 预估时长：\(input.estimatedMinutes.map { "\($0) 分钟" } ?? "未提供 / 不适用")
         - 是否已尝试过：\(input.attempted ? "是" : "否")
 
         已有项目描述：

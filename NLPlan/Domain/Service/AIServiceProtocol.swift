@@ -31,7 +31,7 @@ protocol AIServiceProtocol: Sendable {
     ///   - ideaPoolTasks: 想法池中的全部任务
     ///   - mustDoTasks: 当前必做项列表
     ///   - remainingHours: 剩余可用工作小时数
-    ///   - strategy: 推荐策略（快速完成优先 / 高难度优先）
+    ///   - strategy: 推荐策略（快速 / 综合）
     /// - Returns: 推荐结果（按推荐顺序排列）
     func recommendTasks(
         ideaPoolTasks: [TaskRecommendationInput],
