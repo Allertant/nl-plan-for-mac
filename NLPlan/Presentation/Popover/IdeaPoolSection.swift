@@ -710,23 +710,25 @@ private struct ProjectDetailOverlay: View {
         DetailSectionCard(title: "规划背景", systemImage: "map", tint: .brown, background: Color.brown.opacity(0.08), border: Color.brown.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
-                    Button(action: onGeneratePlanningPrompt) {
-                        if isGeneratingPlanningPrompt {
-                            HStack(spacing: 6) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("生成中")
-                            }
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.indigo)
-                        } else {
-                            Label("生成研究提示词", systemImage: "sparkles")
+                    if project.planningResearchPrompt?.isEmpty != false {
+                        Button(action: onGeneratePlanningPrompt) {
+                            if isGeneratingPlanningPrompt {
+                                HStack(spacing: 6) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("生成中")
+                                }
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.indigo)
+                            } else {
+                                Label("生成提示词", systemImage: "sparkles")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.indigo)
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .disabled(isGeneratingPlanningPrompt)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isGeneratingPlanningPrompt)
 
                     if let prompt = project.planningResearchPrompt, !prompt.isEmpty {
                         Button {
@@ -745,6 +747,8 @@ private struct ProjectDetailOverlay: View {
                         .buttonStyle(.plain)
                     }
 
+                    Spacer()
+
                     Button(isEditingPlanningBackground ? "取消" : "编辑") {
                         if isEditingPlanningBackground {
                             isEditingPlanningBackground = false
@@ -757,8 +761,6 @@ private struct ProjectDetailOverlay: View {
                     .buttonStyle(.plain)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-
-                    Spacer()
                 }
 
                 if isEditingPlanningBackground {
@@ -796,26 +798,14 @@ private struct ProjectDetailOverlay: View {
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.green)
                         }
-
-                        Text(planningBackgroundSummary(planningBackground))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("暂无规划背景。点击编辑后可直接粘贴并保存。")
+                        Text("暂无规划背景")
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
                     }
                 }
             }
         }
-    }
-
-    private func planningBackgroundSummary(_ content: String, limit: Int = 120) -> String {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > limit else { return trimmed }
-        let index = trimmed.index(trimmed.startIndex, offsetBy: limit)
-        return String(trimmed[..<index]) + "..."
     }
 
     private var progressCard: some View {
