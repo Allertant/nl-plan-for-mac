@@ -565,6 +565,8 @@ private struct ProjectDetailOverlay: View {
     @State private var draftProjectDescription = ""
     @State private var draftPlanningBackground = ""
     @State private var showCopyPromptToast = false
+    @State private var isEditingPlanningBackground = false
+    @State private var showPlanningBackgroundSavedToast = false
     @FocusState private var isDescriptionFocused: Bool
 
     var body: some View {
@@ -743,21 +745,77 @@ private struct ProjectDetailOverlay: View {
                         .buttonStyle(.plain)
                     }
 
+                    Button(isEditingPlanningBackground ? "取消" : "编辑") {
+                        if isEditingPlanningBackground {
+                            isEditingPlanningBackground = false
+                            draftPlanningBackground = project.planningBackground ?? ""
+                        } else {
+                            draftPlanningBackground = project.planningBackground ?? ""
+                            isEditingPlanningBackground = true
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+
                     Spacer()
                 }
 
-                if let planningBackground = project.planningBackground, !planningBackground.isEmpty {
-                    Text(planningBackground)
+                if isEditingPlanningBackground {
+                    TextEditor(text: $draftPlanningBackground)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text("暂无规划背景。复制研究提示词给外部 AI，再把返回的结构化模板贴回这里。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .frame(height: 72)
+                        .padding(8)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    HStack(spacing: 8) {
+                        Button("保存") {
+                            onSavePlanningBackground(draftPlanningBackground)
+                            isEditingPlanningBackground = false
+                            showPlanningBackgroundSavedToast = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                showPlanningBackgroundSavedToast = false
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+
+                        Spacer()
+                    }
+                }
+
+                if !isEditingPlanningBackground {
+                    if let planningBackground = project.planningBackground, !planningBackground.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.green)
+                            Text(showPlanningBackgroundSavedToast ? "规划背景已保存" : "规划背景已设置")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.green)
+                        }
+
+                        Text(planningBackgroundSummary(planningBackground))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("暂无规划背景。点击编辑后可直接粘贴并保存。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
         }
+    }
+
+    private func planningBackgroundSummary(_ content: String, limit: Int = 120) -> String {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > limit else { return trimmed }
+        let index = trimmed.index(trimmed.startIndex, offsetBy: limit)
+        return String(trimmed[..<index]) + "..."
     }
 
     private var progressCard: some View {
