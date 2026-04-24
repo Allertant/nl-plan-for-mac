@@ -279,7 +279,8 @@ final class MustDoViewModel {
                 estimatedMinutes: idea.estimatedMinutes,
                 attempted: idea.attempted,
                 status: idea.status,
-                isProject: idea.isProject
+                isProject: idea.isProject,
+                projectDescription: idea.projectDescription
             )
         }
 
@@ -291,7 +292,8 @@ final class MustDoViewModel {
                 estimatedMinutes: task.estimatedMinutes,
                 attempted: task.attempted,
                 status: task.status,
-                isProject: false
+                isProject: false,
+                projectDescription: nil
             )
         }
 

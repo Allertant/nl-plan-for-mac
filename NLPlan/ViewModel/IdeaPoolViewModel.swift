@@ -274,7 +274,8 @@ final class IdeaPoolViewModel {
                 estimatedMinutes: idea.estimatedMinutes,
                 attempted: idea.attempted,
                 status: idea.status,
-                isProject: idea.isProject
+                isProject: idea.isProject,
+                projectDescription: idea.projectDescription
             )
         }
 

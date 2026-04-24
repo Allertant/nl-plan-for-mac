@@ -480,6 +480,8 @@ private struct ProjectDetailOverlay: View {
     let onClose: () -> Void
 
     @State private var newNoteText: String = ""
+    @State private var isEditingDescription = false
+    @FocusState private var isDescriptionFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -489,6 +491,7 @@ private struct ProjectDetailOverlay: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     projectSummaryCard
+                    descriptionCard
                     progressCard
                     tasksCard
                     noteCard
@@ -527,6 +530,53 @@ private struct ProjectDetailOverlay: View {
                 if project.attempted {
                     Text("已尝试").font(.system(size: 9, weight: .medium)).foregroundStyle(.orange)
                         .padding(.horizontal, 6).padding(.vertical, 2).background(Color.orange.opacity(0.12)).clipShape(Capsule())
+                }
+            }
+        }
+    }
+
+    private var descriptionCard: some View {
+        DetailSectionCard(title: "项目说明", systemImage: "doc.text", tint: .purple, background: Color.purple.opacity(0.08), border: Color.purple.opacity(0.22)) {
+            VStack(alignment: .leading, spacing: 6) {
+                if isEditingDescription {
+                    TextField("描述项目背景、目标和你的计划...", text: Binding(
+                        get: { project.projectDescription ?? "" },
+                        set: { project.projectDescription = $0.isEmpty ? nil : $0 }
+                    ), axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .lineLimit(3...8)
+                    .padding(6)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .focused($isDescriptionFocused)
+
+                    HStack {
+                        Spacer()
+                        Button("保存") {
+                            isEditingDescription = false
+                            isDescriptionFocused = false
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                } else {
+                    if let desc = project.projectDescription, !desc.isEmpty {
+                        Text(desc)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("暂无说明，点击编辑添加项目描述")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .onTapGesture {
+                if !isEditingDescription {
+                    isEditingDescription = true
                 }
             }
         }

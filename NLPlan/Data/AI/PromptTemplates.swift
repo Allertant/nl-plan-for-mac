@@ -248,7 +248,11 @@ enum PromptTemplates {
         }.joined(separator: "\n")
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
-            "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            if let desc = t.projectDescription, !desc.isEmpty {
+                return "\(base)\n   项目说明：\(desc)"
+            }
+            return base
         }.joined(separator: "\n")
 
         let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + $1.estimatedMinutes }

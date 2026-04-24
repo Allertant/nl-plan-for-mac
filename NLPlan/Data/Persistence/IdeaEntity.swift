@@ -22,6 +22,7 @@ final class IdeaEntity {
     var projectProgress: Double?
     var projectProgressSummary: String?
     var projectProgressUpdatedAt: Date?
+    var projectDescription: String?
     @Transient
     var ideaStatus: IdeaStatus {
         get { IdeaStatus(rawValue: status) ?? .pending }
@@ -52,7 +53,8 @@ final class IdeaEntity {
         projectDecisionSource: String? = nil,
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
-        projectProgressUpdatedAt: Date? = nil
+        projectProgressUpdatedAt: Date? = nil,
+        projectDescription: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -72,6 +74,7 @@ final class IdeaEntity {
         self.projectProgress = projectProgress
         self.projectProgressSummary = projectProgressSummary
         self.projectProgressUpdatedAt = projectProgressUpdatedAt
+        self.projectDescription = projectDescription
     }
 }
 

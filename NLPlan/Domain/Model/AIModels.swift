@@ -38,6 +38,7 @@ struct TaskRecommendationInput: Sendable {
     let attempted: Bool
     let status: String
     let isProject: Bool
+    let projectDescription: String?
 }
 
 /// AI 推荐结果（单条）
