@@ -342,18 +342,11 @@ final class DayManager {
             let note = summaryNote(for: task, incompleteNotes: incompleteNotes)
             let actualMinutes = max(0, try sessionLogRepo.totalElapsedSeconds(taskId: task.id) / 60)
 
-            try ideaRepo.createSettlementRecord(
-                taskId: task.id,
-                sourceIdeaId: task.sourceIdeaId,
-                settlementDate: settlementDate,
-                title: task.title,
-                estimatedMinutes: task.estimatedMinutes,
-                actualMinutes: actualMinutes,
-                priority: task.priority,
-                completed: task.taskStatus == .done,
-                sourceType: sourceType,
-                note: note
-            )
+            task.isSettled = true
+            task.settledAt = settlementDate
+            task.actualMinutes = actualMinutes
+            task.settlementNote = note
+            try dailyTaskRepo.update(task)
 
             if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
                 if task.taskStatus == .done {
@@ -400,8 +393,6 @@ final class DayManager {
                     settlementDate: settlementDate
                 )
             }
-
-            try dailyTaskRepo.delete(task)
         }
         try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
     }

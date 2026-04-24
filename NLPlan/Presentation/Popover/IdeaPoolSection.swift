@@ -12,7 +12,7 @@ struct IdeaPoolSection: View {
     @State private var didAutoFocusSearchField = false
     @State private var selectedProjectIdea: IdeaEntity?
     @State private var linkedMustDoTasks: [DailyTaskEntity] = []
-    @State private var projectSettlementRecords: [TaskSettlementRecordEntity] = []
+    @State private var projectSettlementRecords: [DailyTaskEntity] = []
     @State private var projectNotes: [ProjectNoteEntity] = []
     @State private var isLoadingProjectDetail = false
     @FocusState private var isSearchFieldFocused: Bool
@@ -402,7 +402,7 @@ struct IdeaPoolSection: View {
 
         Task {
             async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: idea.id)
-            async let records = viewModel.fetchSettlementRecords(sourceIdeaId: idea.id)
+            async let records = viewModel.fetchSettledTasks(sourceIdeaId: idea.id)
             async let notes = viewModel.fetchProjectNotes(ideaId: idea.id)
             guard selectedProjectIdea?.id == idea.id else { return }
             linkedMustDoTasks = await tasks
@@ -472,7 +472,7 @@ struct IdeaPoolSection: View {
 private struct ProjectDetailOverlay: View {
     let project: IdeaEntity
     let linkedTasks: [DailyTaskEntity]
-    let settlementRecords: [TaskSettlementRecordEntity]
+    let settlementRecords: [DailyTaskEntity]
     let notes: [ProjectNoteEntity]
     let isLoading: Bool
     let onAddNote: (String) -> Void
@@ -611,24 +611,27 @@ private struct ProjectDetailOverlay: View {
 // MARK: - Shared subviews
 
 private struct ProjectSettlementRecordRow: View {
-    let record: TaskSettlementRecordEntity
-    private var statusColor: Color { record.completed ? .green : .orange }
+    let record: DailyTaskEntity
+    private var isCompleted: Bool { record.taskStatus == .done }
+    private var statusColor: Color { isCompleted ? .green : .orange }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: record.completed ? "checkmark.circle.fill" : "exclamationmark.circle.fill").font(.system(size: 11)).foregroundStyle(statusColor)
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "exclamationmark.circle.fill").font(.system(size: 11)).foregroundStyle(statusColor)
                 Text(record.title).font(.system(size: 11, weight: .medium)).lineLimit(2)
                 Spacer(minLength: 0)
-                Text(record.completed ? "已完成" : "未完成").font(.system(size: 9, weight: .medium)).foregroundStyle(statusColor)
+                Text(isCompleted ? "已完成" : "未完成").font(.system(size: 9, weight: .medium)).foregroundStyle(statusColor)
                     .padding(.horizontal, 6).padding(.vertical, 2).background(statusColor.opacity(0.1)).clipShape(Capsule())
             }
             HStack(spacing: 8) {
-                Label(record.settlementDate.dateString, systemImage: "calendar")
+                if let settledAt = record.settledAt {
+                    Label(settledAt.dateString, systemImage: "calendar")
+                }
                 Label(record.estimatedMinutes.hourMinuteString, systemImage: "clock")
-                if record.actualMinutes > 0 { Label(record.actualMinutes.hourMinuteString, systemImage: "timer") }
+                if let actual = record.actualMinutes, actual > 0 { Label(actual.hourMinuteString, systemImage: "timer") }
             }.font(.system(size: 9)).foregroundStyle(.secondary)
-            if let note = record.note, !note.isEmpty {
+            if let note = record.settlementNote, !note.isEmpty {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }.padding(8).background(Color(nsColor: .windowBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 7))

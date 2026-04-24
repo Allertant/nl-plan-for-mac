@@ -153,44 +153,4 @@ final class IdeaRepository {
         note.updatedAt = .now
         try modelContext.save()
     }
-
-    // MARK: - Settlement Records
-
-    func createSettlementRecord(
-        taskId: UUID,
-        sourceIdeaId: UUID?,
-        settlementDate: Date,
-        title: String,
-        estimatedMinutes: Int,
-        actualMinutes: Int,
-        priority: String,
-        completed: Bool,
-        sourceType: String,
-        note: String? = nil
-    ) throws {
-        let record = TaskSettlementRecordEntity(
-            taskId: taskId,
-            sourceIdeaId: sourceIdeaId,
-            settlementDate: settlementDate,
-            title: title,
-            estimatedMinutes: estimatedMinutes,
-            actualMinutes: actualMinutes,
-            priority: priority,
-            completed: completed,
-            sourceType: sourceType,
-            note: note
-        )
-        modelContext.insert(record)
-    }
-
-    func fetchSettlementRecords(sourceIdeaId: UUID) throws -> [TaskSettlementRecordEntity] {
-        let sourceId = sourceIdeaId
-        let descriptor = FetchDescriptor<TaskSettlementRecordEntity>(
-            predicate: #Predicate { record in
-                record.sourceIdeaId == sourceId
-            },
-            sortBy: [SortDescriptor(\.settlementDate, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor)
-    }
 }

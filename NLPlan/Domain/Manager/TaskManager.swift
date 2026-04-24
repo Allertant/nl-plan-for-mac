@@ -280,9 +280,9 @@ final class TaskManager {
         try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
     }
 
-    /// 获取绑定到指定项目想法的归档记录
-    func fetchSettlementRecords(sourceIdeaId: UUID) async throws -> [TaskSettlementRecordEntity] {
-        try ideaRepo.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
+    /// 获取绑定到指定项目想法的已归档任务
+    func fetchSettledTasks(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: sourceIdeaId)
     }
 
     /// 获取活跃的正在运行的任务

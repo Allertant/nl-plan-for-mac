@@ -125,9 +125,9 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func fetchSettlementRecords(sourceIdeaId: UUID) async -> [TaskSettlementRecordEntity] {
+    func fetchSettledTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
-            return try await taskManager.fetchSettlementRecords(sourceIdeaId: sourceIdeaId)
+            return try await taskManager.fetchSettledTasks(sourceIdeaId: sourceIdeaId)
         } catch {
             errorMessage = error.localizedDescription
             return []

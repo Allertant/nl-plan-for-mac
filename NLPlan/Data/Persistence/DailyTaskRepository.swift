@@ -64,7 +64,7 @@ final class DailyTaskRepository {
 
         let descriptor = FetchDescriptor<DailyTaskEntity>(
             predicate: #Predicate { task in
-                task.date >= startOfDay && task.date < endOfDay
+                task.date >= startOfDay && task.date < endOfDay && task.isSettled == false
             },
             sortBy: [SortDescriptor(\.sortOrder)]
         )
@@ -76,7 +76,7 @@ final class DailyTaskRepository {
         let done = TaskStatus.done.rawValue
         let descriptor = FetchDescriptor<DailyTaskEntity>(
             predicate: #Predicate { task in
-                task.sourceIdeaId == sourceId && task.status != done
+                task.sourceIdeaId == sourceId && task.status != done && task.isSettled == false
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
@@ -97,7 +97,7 @@ final class DailyTaskRepository {
     func fetchActiveRunningTasks() throws -> [DailyTaskEntity] {
         let statusRaw = TaskStatus.running.rawValue
         let descriptor = FetchDescriptor<DailyTaskEntity>(
-            predicate: #Predicate { $0.status == statusRaw }
+            predicate: #Predicate { $0.status == statusRaw && $0.isSettled == false }
         )
         return try modelContext.fetch(descriptor)
     }
@@ -113,9 +113,15 @@ final class DailyTaskRepository {
         try modelContext.save()
     }
 
-    func delete(_ task: DailyTaskEntity) throws {
-        modelContext.delete(task)
-        try modelContext.save()
+    func fetchSettledTasks(sourceIdeaId: UUID) throws -> [DailyTaskEntity] {
+        let sourceId = sourceIdeaId
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                task.sourceIdeaId == sourceId && task.isSettled == true
+            },
+            sortBy: [SortDescriptor(\.settledAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
     func save() throws {

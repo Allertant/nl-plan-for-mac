@@ -18,7 +18,6 @@ struct NLPlanApp: App {
                 DailyTaskEntity.self,
                 IdeaLogEntity.self,
                 ProjectNoteEntity.self,
-                TaskSettlementRecordEntity.self,
                 SessionLogEntity.self,
                 DailySummaryEntity.self,
                 ParseQueueItemEntity.self
