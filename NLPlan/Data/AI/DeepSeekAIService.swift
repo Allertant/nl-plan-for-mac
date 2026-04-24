@@ -229,6 +229,19 @@ final class DeepSeekAIService: AIServiceProtocol {
         }
     }
 
+    func generateProjectRecommendationSummary(
+        input: ProjectRecommendationSummaryInput
+    ) async throws -> ProjectRecommendationSummaryResult {
+        let prompt = PromptTemplates.generateProjectRecommendationSummary(input: input)
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个项目状态摘要助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ProjectRecommendationSummaryResponse.self
+        )
+
+        return ProjectRecommendationSummaryResult(summary: response.summary)
+    }
+
     func generatePlanningBackgroundPrompt(
         input: PlanningBackgroundPromptInput
     ) async throws -> PlanningBackgroundPromptResult {

@@ -200,6 +200,14 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func refreshProjectRecommendationSummary(ideaId: UUID) async {
+        do {
+            try await taskManager.refreshProjectRecommendationSummary(ideaId: ideaId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func fetchSettledTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
             return try await taskManager.fetchSettledTasks(sourceIdeaId: sourceIdeaId)

@@ -288,6 +288,45 @@ final class TaskManager {
         try ideaRepo.update(idea)
     }
 
+    /// 为单个项目生成推荐阶段使用的状态摘要，并写回项目
+    func refreshProjectRecommendationSummary(ideaId: UUID) async throws {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+        }
+        guard idea.isProject else { return }
+
+        let notes = try ideaRepo.fetchProjectNotes(ideaId: ideaId)
+        let activeTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: ideaId).filter { !$0.isSettled }
+        let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: ideaId)
+
+        let result = try await aiService.generateProjectRecommendationSummary(
+            input: ProjectRecommendationSummaryInput(
+                title: idea.title,
+                category: idea.category,
+                projectDescription: idea.projectDescription,
+                planningBackground: idea.planningBackground,
+                projectProgressSummary: idea.projectProgressSummary,
+                notes: notes.map(\.content),
+                activeTasks: activeTasks.map { task in
+                    let note = task.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let noteText = (note?.isEmpty == false) ? " - 备注：\(note!)" : ""
+                    return "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟\(noteText)"
+                },
+                settledTasks: settledTasks.map { task in
+                    let note = task.settlementNote?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let noteText = (note?.isEmpty == false) ? " - 备注：\(note!)" : ""
+                    return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 实际\(task.actualMinutes ?? 0)分钟\(noteText)"
+                }
+            )
+        )
+
+        let contextUpdatedAt = idea.projectRecommendationContextUpdatedAt ?? idea.updatedAt
+        idea.projectRecommendationSummary = result.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        idea.projectRecommendationSummaryGeneratedAt = .now
+        idea.projectRecommendationSummarySourceUpdatedAt = contextUpdatedAt
+        try ideaRepo.update(idea)
+    }
+
     /// 获取指定日期的必做项
     func fetchMustDo(date: Date = .now) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchTasks(date: date)

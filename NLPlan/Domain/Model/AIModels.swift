@@ -59,6 +59,21 @@ struct PlanningBackgroundPromptResult: Sendable, Equatable {
     let researchPrompt: String
 }
 
+struct ProjectRecommendationSummaryInput: Sendable {
+    let title: String
+    let category: String
+    let projectDescription: String?
+    let planningBackground: String?
+    let projectProgressSummary: String?
+    let notes: [String]
+    let activeTasks: [String]
+    let settledTasks: [String]
+}
+
+struct ProjectRecommendationSummaryResult: Sendable, Equatable {
+    let summary: String
+}
+
 /// AI 推荐结果（单条）
 struct TaskRecommendation: Sendable, Identifiable, Equatable {
     let id = UUID()

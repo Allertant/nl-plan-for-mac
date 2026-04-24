@@ -89,6 +89,15 @@ struct MockAIService: AIServiceProtocol {
         return projects.map { ProjectProgressAnalysis(ideaId: $0.ideaId, progress: 0, summary: "测试进度") }
     }
 
+    func generateProjectRecommendationSummary(
+        input: ProjectRecommendationSummaryInput
+    ) async throws -> ProjectRecommendationSummaryResult {
+        if shouldFail {
+            throw NLPlanError.aiServiceUnavailable
+        }
+        return ProjectRecommendationSummaryResult(summary: "测试项目摘要")
+    }
+
     func generatePlanningBackgroundPrompt(
         input: PlanningBackgroundPromptInput
     ) async throws -> PlanningBackgroundPromptResult {

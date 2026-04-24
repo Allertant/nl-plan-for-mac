@@ -154,6 +154,10 @@ struct ProjectProgressDTO: Decodable {
     }
 }
 
+struct ProjectRecommendationSummaryResponse: Decodable {
+    let summary: String
+}
+
 struct PlanningBackgroundPromptResponse: Decodable {
     let reason: String
     let researchPrompt: String

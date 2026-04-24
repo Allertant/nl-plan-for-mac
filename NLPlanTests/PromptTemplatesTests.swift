@@ -110,4 +110,26 @@ struct PromptTemplatesTests {
         #expect(prompt.contains("可信来源"))
         #expect(prompt.contains("不确定项 / 待确认项"))
     }
+
+    @Test("generateProjectRecommendationSummary 包含项目状态压缩要求")
+    func testGenerateProjectRecommendationSummaryContainsRequirements() {
+        let prompt = PromptTemplates.generateProjectRecommendationSummary(
+            input: ProjectRecommendationSummaryInput(
+                title: "做个人网站",
+                category: "技术",
+                projectDescription: "希望做一个个人作品展示站",
+                planningBackground: "常见路径包括先整理内容再搭建首页",
+                projectProgressSummary: "已经完成初步方向确认",
+                notes: ["偏向极简风格", "还没确定技术栈"],
+                activeTasks: ["整理首页模块 - 待开始 - 预估45分钟"],
+                settledTasks: ["整理参考网站 - 已完成 - 实际35分钟"]
+            )
+        )
+
+        #expect(prompt.contains("做个人网站"))
+        #expect(prompt.contains("项目推荐状态摘要器"))
+        #expect(prompt.contains("当前大致处于哪个阶段"))
+        #expect(prompt.contains("下一步最适合承接的方向"))
+        #expect(prompt.contains("\"summary\""))
+    }
 }

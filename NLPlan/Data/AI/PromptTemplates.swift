@@ -399,6 +399,61 @@ enum PromptTemplates {
         """
     }
 
+    static func generateProjectRecommendationSummary(input: ProjectRecommendationSummaryInput) -> String {
+        let notesText = input.notes.isEmpty ? "（无）" : input.notes.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+        let activeTasksText = input.activeTasks.isEmpty ? "（无）" : input.activeTasks.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+        let settledTasksText = input.settledTasks.isEmpty ? "（无）" : input.settledTasks.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个项目推荐状态摘要器。你的目标不是直接推荐任务，而是把一个项目当前的真实推进状态压缩成一段短摘要，供后续“AI 推荐必做项”使用。
+
+        这段摘要必须帮助后续推荐 AI 快速理解：
+        1. 这个项目当前大致处于哪个阶段
+        2. 最近已经推进了什么
+        3. 当前还有哪些未完成推进项或阻塞
+        4. 下一步最适合承接的方向是什么
+
+        输出要求：
+        1. 输出简洁、稳定、信息密度高的中文摘要
+        2. 不要复述所有细节，只保留最影响“下一步推荐”的内容
+        3. 摘要控制在 2 到 4 句
+        4. 不要输出 Markdown
+
+        输出严格 JSON：
+        {
+          "summary": "项目当前状态摘要"
+        }
+
+        当前项目：
+        - 标题：\(input.title)
+        - 分类：\(input.category)
+
+        项目描述：
+        \(input.projectDescription?.isEmpty == false ? input.projectDescription! : "（无）")
+
+        规划背景：
+        \(input.planningBackground?.isEmpty == false ? input.planningBackground! : "（无）")
+
+        当前进度摘要：
+        \(input.projectProgressSummary?.isEmpty == false ? input.projectProgressSummary! : "（无）")
+
+        最近项目备注：
+        \(notesText)
+
+        当前未归档推进任务：
+        \(activeTasksText)
+
+        已归档推进记录：
+        \(settledTasksText)
+        """
+    }
+
     static func generatePlanningBackgroundPrompt(input: PlanningBackgroundPromptInput) -> String {
         let notesText = input.notes.isEmpty ? "（无）" : input.notes.enumerated().map {
             "\($0.offset + 1). \($0.element)"
