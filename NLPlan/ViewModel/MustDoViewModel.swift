@@ -416,8 +416,7 @@ final class MustDoViewModel {
         do {
             guard let task = try await taskManager.fetchMustDo(date: .now).first(where: { $0.id == taskId }) else { return }
             let previousSourceIdeaId = task.sourceIdeaId
-            task.sourceIdeaId = sourceIdeaId
-            try await taskManager.updateDailyTask(task)
+            try await taskManager.rebindTaskSource(taskId: taskId, sourceIdeaId: sourceIdeaId)
             await refresh()
             await onProjectLinkChanged?(previousSourceIdeaId)
             if sourceIdeaId != previousSourceIdeaId {

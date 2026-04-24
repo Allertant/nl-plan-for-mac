@@ -64,16 +64,17 @@ final class TaskManager {
         // 2. 转为 IdeaEntity 并保存
         var createdIdeas: [IdeaEntity] = []
         for (index, parsed) in parsedTasks.enumerated() {
+            let isProject = parsed.isProject ?? false
             let idea = try ideaRepo.create(
                 title: parsed.title,
                 category: parsed.category,
-                estimatedMinutes: parsed.estimatedMinutes,
+                estimatedMinutes: isProject ? nil : parsed.estimatedMinutes,
                 aiRecommended: parsed.recommended,
                 recommendationReason: parsed.reason,
                 sortOrder: index,
-                isProject: parsed.isProject ?? false,
+                isProject: isProject,
                 projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
-                projectProgress: parsed.isProject == true ? 0 : nil
+                projectProgress: isProject ? 0 : nil
             )
             createdIdeas.append(idea)
         }
@@ -100,6 +101,9 @@ final class TaskManager {
         guard idea.ideaStatus != .completed, idea.ideaStatus != .archived else { return }
 
         if !idea.isProject {
+            guard idea.estimatedMinutes != nil else {
+                throw NLPlanError.invalidData(message: "普通想法缺少预估时长，无法加入必做项")
+            }
             let activeLinkedTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: idea.id)
             guard activeLinkedTasks.isEmpty else { return }
         }
@@ -107,7 +111,7 @@ final class TaskManager {
         _ = try dailyTaskRepo.create(
             title: idea.title,
             category: idea.category,
-            estimatedMinutes: idea.estimatedMinutes,
+            estimatedMinutes: idea.estimatedMinutes ?? 30,
             priority: priority ?? idea.taskPriority,
             aiRecommended: idea.aiRecommended,
             recommendationReason: idea.recommendationReason,
@@ -117,6 +121,9 @@ final class TaskManager {
             sourceType: idea.isProject ? .project : .idea
         )
 
+        if idea.isProject {
+            try ideaRepo.touchProjectRecommendationContext(idea)
+        }
         idea.ideaStatus = .inProgress
         try ideaRepo.update(idea)
     }
@@ -147,6 +154,8 @@ final class TaskManager {
         if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
             idea.ideaStatus = .inProgress
             try ideaRepo.update(idea)
+        } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), idea.isProject {
+            try ideaRepo.touchProjectRecommendationContext(idea)
         }
         return task
     }
@@ -172,6 +181,7 @@ final class TaskManager {
             sourceIdea.ideaStatus = markAttempted ? .attempted : .pending
             sourceIdea.attempted = markAttempted || sourceIdea.attempted
             try ideaRepo.update(sourceIdea)
+            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
         }
     }
 
@@ -192,6 +202,7 @@ final class TaskManager {
         }
         guard idea.isProject else { return }
         _ = try ideaRepo.createProjectNote(ideaId: idea.id, content: trimmed)
+        try ideaRepo.touchProjectRecommendationContext(idea)
     }
 
     /// 编辑项目备注记录
@@ -202,6 +213,9 @@ final class TaskManager {
             throw NLPlanError.dataNotFound(entity: "ProjectNote", id: noteId)
         }
         try ideaRepo.updateProjectNote(note, content: trimmed)
+        if let ideaId = note.ideaId, let idea = try ideaRepo.fetchById(ideaId) {
+            try ideaRepo.touchProjectRecommendationContext(idea)
+        }
     }
 
     // MARK: - 必做项操作
@@ -251,6 +265,10 @@ final class TaskManager {
 
         dailyTask.taskStatus = .done
         try dailyTaskRepo.update(dailyTask)
+        if let sourceIdeaId = dailyTask.sourceIdeaId,
+           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        }
     }
 
     // MARK: - 查询
@@ -298,6 +316,34 @@ final class TaskManager {
     /// 更新必做项实体
     func updateDailyTask(_ task: DailyTaskEntity) async throws {
         try dailyTaskRepo.update(task)
+        if let sourceIdeaId = task.sourceIdeaId,
+           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        }
+    }
+
+    func rebindTaskSource(taskId: UUID, sourceIdeaId: UUID?) async throws {
+        guard let task = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
+        }
+        let previousSourceIdeaId = task.sourceIdeaId
+        task.sourceIdeaId = sourceIdeaId
+        task.sourceType = try dailyTaskSourceType(sourceIdeaId: sourceIdeaId).rawValue
+        try dailyTaskRepo.update(task)
+
+        let affectedIdeaIds = Set([previousSourceIdeaId, sourceIdeaId].compactMap { $0 })
+        for ideaId in affectedIdeaIds {
+            if let idea = try ideaRepo.fetchById(ideaId) {
+                try ideaRepo.touchProjectRecommendationContext(idea)
+            }
+        }
+    }
+
+    func touchProjectRecommendationContext(ideaId: UUID) async throws {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+        }
+        try ideaRepo.touchProjectRecommendationContext(idea)
     }
 
     /// 获取项目备注列表

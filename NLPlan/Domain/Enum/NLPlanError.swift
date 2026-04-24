@@ -15,6 +15,7 @@ enum NLPlanError: LocalizedError {
     // 数据错误
     case dataSaveFailed(underlying: Error)
     case dataNotFound(entity: String, id: UUID)
+    case invalidData(message: String)
 
     // 同步错误
     case notesSyncFailed(underlying: Error)
@@ -44,6 +45,8 @@ enum NLPlanError: LocalizedError {
             return "数据保存失败：\(error.localizedDescription)"
         case .dataNotFound(let entity, let id):
             return "未找到 \(entity)：\(id)"
+        case .invalidData(let message):
+            return message
         case .notesSyncFailed(let error):
             return "同步到备忘录失败：\(error.localizedDescription)"
         case .networkUnavailable:

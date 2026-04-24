@@ -179,9 +179,11 @@ private struct CleanupDetailRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
 
-                    Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    if let estimatedMinutes = task.estimatedMinutes {
+                        Label(estimatedMinutes.hourMinuteString, systemImage: "clock")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
 
                 HStack(spacing: 4) {

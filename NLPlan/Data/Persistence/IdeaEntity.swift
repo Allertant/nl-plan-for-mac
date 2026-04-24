@@ -7,7 +7,7 @@ final class IdeaEntity {
     @Attribute(.unique) var id: UUID
     var title: String
     var category: String
-    var estimatedMinutes: Int
+    var estimatedMinutes: Int?
     var priority: String
     var aiRecommended: Bool
     var recommendationReason: String?
@@ -26,6 +26,10 @@ final class IdeaEntity {
     var planningBackground: String?
     var planningResearchPrompt: String?
     var planningResearchPromptReason: String?
+    var projectRecommendationContextUpdatedAt: Date?
+    var projectRecommendationSummary: String?
+    var projectRecommendationSummaryGeneratedAt: Date?
+    var projectRecommendationSummarySourceUpdatedAt: Date?
     @Transient
     var ideaStatus: IdeaStatus {
         get { IdeaStatus(rawValue: status) ?? .pending }
@@ -42,7 +46,7 @@ final class IdeaEntity {
         id: UUID = UUID(),
         title: String,
         category: String,
-        estimatedMinutes: Int,
+        estimatedMinutes: Int? = nil,
         priority: String = TaskPriority.medium.rawValue,
         aiRecommended: Bool = false,
         recommendationReason: String? = nil,
@@ -60,7 +64,11 @@ final class IdeaEntity {
         projectDescription: String? = nil,
         planningBackground: String? = nil,
         planningResearchPrompt: String? = nil,
-        planningResearchPromptReason: String? = nil
+        planningResearchPromptReason: String? = nil,
+        projectRecommendationContextUpdatedAt: Date? = nil,
+        projectRecommendationSummary: String? = nil,
+        projectRecommendationSummaryGeneratedAt: Date? = nil,
+        projectRecommendationSummarySourceUpdatedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -84,6 +92,10 @@ final class IdeaEntity {
         self.planningBackground = planningBackground
         self.planningResearchPrompt = planningResearchPrompt
         self.planningResearchPromptReason = planningResearchPromptReason
+        self.projectRecommendationContextUpdatedAt = projectRecommendationContextUpdatedAt
+        self.projectRecommendationSummary = projectRecommendationSummary
+        self.projectRecommendationSummaryGeneratedAt = projectRecommendationSummaryGeneratedAt
+        self.projectRecommendationSummarySourceUpdatedAt = projectRecommendationSummarySourceUpdatedAt
     }
 }
 

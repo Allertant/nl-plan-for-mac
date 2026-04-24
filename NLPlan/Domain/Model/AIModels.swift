@@ -5,7 +5,7 @@ struct ParsedTask: Sendable, Identifiable, Codable {
     let id: UUID
     var title: String
     var category: String
-    var estimatedMinutes: Int
+    var estimatedMinutes: Int?
     let recommended: Bool
     let reason: String
     var isProject: Bool?
@@ -14,7 +14,7 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         id: UUID = UUID(),
         title: String,
         category: String,
-        estimatedMinutes: Int,
+        estimatedMinutes: Int? = nil,
         recommended: Bool,
         reason: String,
         isProject: Bool? = nil
@@ -34,7 +34,7 @@ struct TaskRecommendationInput: Sendable {
     let id: UUID
     let title: String
     let category: String
-    let estimatedMinutes: Int
+    let estimatedMinutes: Int?
     let attempted: Bool
     let status: String
     let isProject: Bool
@@ -45,7 +45,7 @@ struct TaskRecommendationInput: Sendable {
 struct PlanningBackgroundPromptInput: Sendable {
     let title: String
     let category: String
-    let estimatedMinutes: Int
+    let estimatedMinutes: Int?
     let attempted: Bool
     let projectDescription: String?
     let planningBackground: String?
@@ -103,7 +103,6 @@ struct ProjectClassificationInput: Sendable {
     let id: UUID
     let title: String
     let category: String
-    let estimatedMinutes: Int
 }
 
 struct ProjectClassification: Sendable, Equatable {

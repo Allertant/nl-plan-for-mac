@@ -106,11 +106,15 @@ final class IdeaPoolViewModel {
     func updateIdea(ideaId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil) async {
         do {
             if let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) {
+                let shouldTouchRecommendationContext = idea.isProject && (title != nil || category != nil || note != nil)
                 if let title { idea.title = title }
                 if let category { idea.category = category }
-                if let estimatedMinutes { idea.estimatedMinutes = estimatedMinutes }
+                if let estimatedMinutes, !idea.isProject { idea.estimatedMinutes = estimatedMinutes }
                 if let note { idea.note = note }
                 try await taskManager.updateIdea(idea)
+                if shouldTouchRecommendationContext {
+                    try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -122,6 +126,7 @@ final class IdeaPoolViewModel {
             guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
             idea.projectDescription = normalizeOptionalText(description)
             try await taskManager.updateIdea(idea)
+            try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -132,6 +137,7 @@ final class IdeaPoolViewModel {
             guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
             idea.planningBackground = normalizeOptionalText(planningBackground)
             try await taskManager.updateIdea(idea)
+            try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -233,12 +239,16 @@ final class IdeaPoolViewModel {
             guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
             idea.isProject = isProject
             idea.projectDecisionSource = source.rawValue
+            idea.estimatedMinutes = isProject ? nil : (idea.estimatedMinutes ?? 30)
             if !isProject {
                 idea.projectProgress = 0
                 idea.projectProgressSummary = nil
                 idea.projectProgressUpdatedAt = nil
             }
             try await taskManager.updateIdea(idea)
+            if isProject {
+                try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
+            }
             await refresh()
         } catch {
             errorMessage = error.localizedDescription

@@ -170,7 +170,9 @@ struct AIModelStabilityTests {
 
                 for task in results {
                     #expect(!task.title.isEmpty, "\(modelConfig.name) 返回了空标题的任务")
-                    #expect(task.estimatedMinutes > 0, "\(modelConfig.name) 返回了预估时间为0的任务: \(task.title)")
+                    if let estimatedMinutes = task.estimatedMinutes {
+                        #expect(estimatedMinutes > 0, "\(modelConfig.name) 返回了预估时间为0的任务: \(task.title)")
+                    }
                 }
 
                 print("  ✅ \(modelConfig.name): 返回 \(results.count) 个任务")
@@ -201,7 +203,9 @@ struct AIModelStabilityTests {
         for (index, task) in results.enumerated() {
             #expect(!task.title.isEmpty, "任务[\(index)] 标题为空")
             #expect(!task.category.isEmpty, "任务[\(index)] 分类为空: \(task.title)")
-            #expect(task.estimatedMinutes > 0, "任务[\(index)] 预估时间 ≤ 0: \(task.title)")
+            if let estimatedMinutes = task.estimatedMinutes {
+                #expect(estimatedMinutes > 0, "任务[\(index)] 预估时间 ≤ 0: \(task.title)")
+            }
             #expect(!task.reason.isEmpty, "任务[\(index)] 理由为空: \(task.title)")
         }
 

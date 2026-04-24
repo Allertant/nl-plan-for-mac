@@ -4,7 +4,7 @@ import SwiftUI
 struct ParsedTaskRow: View {
     let task: ParsedTask
     var isLocked: Bool = false
-    let onEdit: (_ title: String, _ category: String, _ minutes: Int) -> Void
+    let onEdit: (_ title: String, _ category: String, _ minutes: Int?) -> Void
     let onDelete: () -> Void
 
     @State private var isEditing = false
@@ -46,7 +46,7 @@ struct ParsedTaskRow: View {
                     Button {
                         editTitle = task.title
                         editCategory = task.category
-                        editMinutes = String(task.estimatedMinutes)
+                        editMinutes = task.estimatedMinutes.map(String.init) ?? ""
                         isEditing = true
                     } label: {
                         Image(systemName: "pencil")
@@ -94,7 +94,12 @@ struct ParsedTaskRow: View {
 
             HStack(spacing: 8) {
                 Label(task.category, systemImage: "folder")
-                Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                if let estimatedMinutes = task.estimatedMinutes {
+                    Label(estimatedMinutes.hourMinuteString, systemImage: "clock")
+                }
+                if task.isProject == true {
+                    Label("项目", systemImage: "square.stack")
+                }
                 if task.recommended {
                     Label("AI 推荐", systemImage: "star.fill")
                         .foregroundStyle(.yellow)
@@ -127,10 +132,12 @@ struct ParsedTaskRow: View {
                     .font(.system(size: 11))
                     .frame(width: 80)
 
-                TextField("时长(分钟)", text: $editMinutes)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                    .frame(width: 70)
+                if task.isProject != true {
+                    TextField("时长(分钟)", text: $editMinutes)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .frame(width: 70)
+                }
             }
 
             HStack {
@@ -143,7 +150,7 @@ struct ParsedTaskRow: View {
                 Spacer()
 
                 Button("保存") {
-                    let minutes = Int(editMinutes) ?? task.estimatedMinutes
+                    let minutes = task.isProject == true ? nil : (Int(editMinutes) ?? task.estimatedMinutes ?? 30)
                     onEdit(editTitle, editCategory, minutes)
                     isEditing = false
                 }

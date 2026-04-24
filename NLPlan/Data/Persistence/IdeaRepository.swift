@@ -14,7 +14,7 @@ final class IdeaRepository {
         id: UUID = UUID(),
         title: String,
         category: String,
-        estimatedMinutes: Int,
+        estimatedMinutes: Int? = nil,
         priority: TaskPriority = .medium,
         aiRecommended: Bool = false,
         recommendationReason: String? = nil,
@@ -31,6 +31,10 @@ final class IdeaRepository {
         planningBackground: String? = nil,
         planningResearchPrompt: String? = nil,
         planningResearchPromptReason: String? = nil,
+        projectRecommendationContextUpdatedAt: Date? = nil,
+        projectRecommendationSummary: String? = nil,
+        projectRecommendationSummaryGeneratedAt: Date? = nil,
+        projectRecommendationSummarySourceUpdatedAt: Date? = nil,
         createdDate: Date = .now
     ) throws -> IdeaEntity {
         let idea = IdeaEntity(
@@ -55,7 +59,11 @@ final class IdeaRepository {
             projectDescription: projectDescription,
             planningBackground: planningBackground,
             planningResearchPrompt: planningResearchPrompt,
-            planningResearchPromptReason: planningResearchPromptReason
+            planningResearchPromptReason: planningResearchPromptReason,
+            projectRecommendationContextUpdatedAt: isProject ? (projectRecommendationContextUpdatedAt ?? .now) : projectRecommendationContextUpdatedAt,
+            projectRecommendationSummary: projectRecommendationSummary,
+            projectRecommendationSummaryGeneratedAt: projectRecommendationSummaryGeneratedAt,
+            projectRecommendationSummarySourceUpdatedAt: projectRecommendationSummarySourceUpdatedAt
         )
         modelContext.insert(idea)
         try modelContext.save()
@@ -66,7 +74,9 @@ final class IdeaRepository {
         let descriptor = FetchDescriptor<IdeaEntity>(
             predicate: #Predicate { $0.id == id }
         )
-        return try modelContext.fetch(descriptor).first
+        let idea = try modelContext.fetch(descriptor).first
+        try normalizeProjectEstimatedMinutes(in: idea.map { [$0] } ?? [])
+        return idea
     }
 
     func fetchVisibleIdeas() throws -> [IdeaEntity] {
@@ -78,7 +88,9 @@ final class IdeaRepository {
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
-        return try modelContext.fetch(descriptor)
+        let ideas = try modelContext.fetch(descriptor)
+        try normalizeProjectEstimatedMinutes(in: ideas)
+        return ideas
     }
 
     func fetchRecommendationCandidates() throws -> [IdeaEntity] {
@@ -90,11 +102,20 @@ final class IdeaRepository {
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
-        return try modelContext.fetch(descriptor)
+        let ideas = try modelContext.fetch(descriptor)
+        try normalizeProjectEstimatedMinutes(in: ideas)
+        return ideas
     }
 
     func update(_ idea: IdeaEntity) throws {
         idea.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func touchProjectRecommendationContext(_ idea: IdeaEntity, at date: Date = .now) throws {
+        guard idea.isProject else { return }
+        idea.projectRecommendationContextUpdatedAt = date
+        idea.updatedAt = date
         try modelContext.save()
     }
 
@@ -132,5 +153,26 @@ final class IdeaRepository {
         note.content = content
         note.updatedAt = .now
         try modelContext.save()
+    }
+
+    private func normalizeProjectEstimatedMinutes(in ideas: [IdeaEntity]) throws {
+        let now = Date()
+        var requiresSave = false
+
+        for idea in ideas where idea.isProject {
+            if idea.estimatedMinutes != nil {
+                idea.estimatedMinutes = nil
+                idea.updatedAt = now
+                requiresSave = true
+            }
+            if idea.projectRecommendationContextUpdatedAt == nil {
+                idea.projectRecommendationContextUpdatedAt = idea.updatedAt
+                requiresSave = true
+            }
+        }
+
+        if requiresSave {
+            try modelContext.save()
+        }
     }
 }

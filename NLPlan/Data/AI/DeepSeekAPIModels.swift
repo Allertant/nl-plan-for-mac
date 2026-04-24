@@ -54,7 +54,7 @@ struct ParsedTasksResponse: Decodable {
 struct ParsedTaskDTO: Decodable {
     let title: String
     let category: String
-    let estimatedMinutes: Int
+    let estimatedMinutes: Int?
     let recommended: Bool
     let reason: String
 

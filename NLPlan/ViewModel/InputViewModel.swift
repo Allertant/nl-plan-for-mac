@@ -168,7 +168,7 @@ final class InputViewModel {
     // MARK: - 详情页操作
 
     /// 编辑队列项中的某个任务
-    func updateParsedTask(queueItemID: UUID, taskIndex: Int, title: String, category: String, estimatedMinutes: Int) {
+    func updateParsedTask(queueItemID: UUID, taskIndex: Int, title: String, category: String, estimatedMinutes: Int?) {
         guard let item = queueItems.first(where: { $0.id == queueItemID }),
               var tasks = item.parsedTasks,
               taskIndex >= 0, taskIndex < tasks.count else { return }
@@ -238,8 +238,7 @@ final class InputViewModel {
             ProjectClassificationInput(
                 id: $0.id,
                 title: $0.title,
-                category: $0.category,
-                estimatedMinutes: $0.estimatedMinutes
+                category: $0.category
             )
         }
         let classifications = try await taskManager.classifyProjects(tasks: inputs)
@@ -249,6 +248,11 @@ final class InputViewModel {
             var updated = task
             if let classification = classificationMap[task.id] {
                 updated.isProject = classification.isProject
+                if classification.isProject {
+                    updated.estimatedMinutes = nil
+                } else if updated.estimatedMinutes == nil {
+                    updated.estimatedMinutes = 30
+                }
             }
             return updated
         }
