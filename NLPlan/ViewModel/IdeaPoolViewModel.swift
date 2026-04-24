@@ -60,6 +60,7 @@ final class IdeaPoolViewModel {
     }
 
     private let taskManager: TaskManager
+    private let aiExecutionCoordinator = AIExecutionCoordinator()
 
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
@@ -155,24 +156,26 @@ final class IdeaPoolViewModel {
             let notes = try await taskManager.fetchProjectNotes(ideaId: ideaId)
             let aiService = await makeAIService()
 
-            let result = try await aiService.generatePlanningBackgroundPrompt(
-                input: PlanningBackgroundPromptInput(
-                    title: idea.title,
-                    category: idea.category,
-                    estimatedMinutes: idea.estimatedMinutes,
-                    attempted: idea.attempted,
-                    projectDescription: idea.projectDescription,
-                    planningBackground: idea.planningBackground,
-                    notes: notes.map(\.content),
-                    activeTasks: activeTasks.map { task in
-                        "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
-                    },
-                    settledTasks: settledTasks.map { task in
-                        let note = normalizeOptionalText(task.settlementNote) ?? "无备注"
-                        return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 备注：\(note)"
-                    }
+            let result = try await aiExecutionCoordinator.run {
+                try await aiService.generatePlanningBackgroundPrompt(
+                    input: PlanningBackgroundPromptInput(
+                        title: idea.title,
+                        category: idea.category,
+                        estimatedMinutes: idea.estimatedMinutes,
+                        attempted: idea.attempted,
+                        projectDescription: idea.projectDescription,
+                        planningBackground: idea.planningBackground,
+                        notes: notes.map(\.content),
+                        activeTasks: activeTasks.map { task in
+                            "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
+                        },
+                        settledTasks: settledTasks.map { task in
+                            let note = normalizeOptionalText(task.settlementNote) ?? "无备注"
+                            return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 备注：\(note)"
+                        }
+                    )
                 )
-            )
+            }
 
             idea.planningResearchPrompt = normalizeOptionalText(result.researchPrompt)
             idea.planningResearchPromptReason = normalizeOptionalText(result.reason)
@@ -322,7 +325,9 @@ final class IdeaPoolViewModel {
 
             if !progressTargets.isEmpty {
                 let analyses = try await withProjectAnalysisTimeout {
-                    try await aiService.analyzeProjectProgress(projects: progressTargets)
+                    try await self.aiExecutionCoordinator.run {
+                        try await aiService.analyzeProjectProgress(projects: progressTargets)
+                    }
                 }
                 let analysisMap = Dictionary(uniqueKeysWithValues: analyses.map { ($0.ideaId, $0) })
 
@@ -370,7 +375,9 @@ final class IdeaPoolViewModel {
 
         do {
             let aiService = await makeAIService()
-            let result = try await aiService.cleanupIdeaPool(tasks: inputs)
+            let result = try await aiExecutionCoordinator.run {
+                try await aiService.cleanupIdeaPool(tasks: inputs)
+            }
 
             let ideaIds = Set(ideas.map { $0.id })
             let validItems = result.items.filter { ideaIds.contains($0.taskId) }

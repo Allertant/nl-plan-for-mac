@@ -324,12 +324,14 @@ final class MustDoViewModel {
 
         do {
             let aiService = await makeAIService()
-            let result = try await aiService.recommendTasks(
+            let result = try await aiExecutionCoordinator.run {
+                try await aiService.recommendTasks(
                 ideaPoolTasks: ideaInputs,
                 mustDoTasks: mustDoInputs,
                 remainingHours: remainingHours,
                 strategy: recommendationStrategy
-            )
+                )
+            }
 
             let ideaIds = Set(recommendationCandidates.map { $0.id })
             let validRecs = result.recommendations.filter { recommendation in

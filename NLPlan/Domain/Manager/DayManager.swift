@@ -11,6 +11,7 @@ final class DayManager {
     private let sessionLogRepo: SessionLogRepository
     private let timerEngine: TimerEngine
     private let aiService: AIServiceProtocol
+    private let aiExecutionCoordinator = AIExecutionCoordinator()
 
     init(
         ideaRepo: IdeaRepository,
@@ -55,6 +56,10 @@ final class DayManager {
                 if let task = try dailyTaskRepo.fetchById(stopInfo.taskId) {
                     task.taskStatus = .pending
                     try dailyTaskRepo.update(task)
+                    if let sourceIdeaId = task.sourceIdeaId,
+                       let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                        try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+                    }
                 }
             }
         }
@@ -166,11 +171,13 @@ final class DayManager {
             gradingBasis: summary.gradingBasis ?? ""
         )
 
-        let newGrade = try await aiService.appealGrade(
-            originalGrade: originalGrade,
-            originalInput: originalInput,
-            userFeedback: userFeedback
-        )
+        let newGrade = try await aiExecutionCoordinator.run {
+            try await self.aiService.appealGrade(
+                originalGrade: originalGrade,
+                originalInput: originalInput,
+                userFeedback: userFeedback
+            )
+        }
 
         summary.grade = newGrade.grade.rawValue
         summary.summary = newGrade.summary
@@ -261,7 +268,9 @@ final class DayManager {
         let input = try buildSummaryInput(tasks: tasks, stats: stats, incompleteNotes: incompleteNotes)
 
         do {
-            return try await aiService.generateDailyGrade(summaryInput: input)
+            return try await aiExecutionCoordinator.run {
+                try await self.aiService.generateDailyGrade(summaryInput: input)
+            }
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -356,6 +365,7 @@ final class DayManager {
                     sourceIdea.attempted = true
                 }
                 try ideaRepo.update(sourceIdea)
+                try ideaRepo.touchProjectRecommendationContext(sourceIdea)
 
                 if sourceType == "项目链接必做项" {
                     affectedProjectIdeaIds.insert(sourceIdeaId)
@@ -374,6 +384,7 @@ final class DayManager {
                idea.ideaStatus == .inProgress {
                 idea.ideaStatus = .pending
                 try ideaRepo.update(idea)
+                try ideaRepo.touchProjectRecommendationContext(idea)
             }
         }
     }

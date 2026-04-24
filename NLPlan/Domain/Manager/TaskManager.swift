@@ -11,6 +11,7 @@ final class TaskManager {
     private let sessionLogRepo: SessionLogRepository
     private let aiService: AIServiceProtocol
     private let timerEngine: TimerEngine
+    private let aiExecutionCoordinator = AIExecutionCoordinator()
 
     init(
         ideaRepo: IdeaRepository,
@@ -32,10 +33,12 @@ final class TaskManager {
 
     /// 仅调用 AI 解析，不保存（供确认流程使用）
     func parseThoughts(rawText: String, existingTaskTitles: [String]) async throws -> [ParsedTask] {
-        try await aiService.parseThoughts(
-            input: rawText,
-            existingTaskTitles: existingTaskTitles
-        )
+        try await aiExecutionCoordinator.run {
+            try await self.aiService.parseThoughts(
+                input: rawText,
+                existingTaskTitles: existingTaskTitles
+            )
+        }
     }
 
     /// 根据用户指令修改已解析的任务（供确认流程使用）
@@ -44,16 +47,20 @@ final class TaskManager {
         currentTasks: [ParsedTask],
         userInstruction: String
     ) async throws -> [ParsedTask] {
-        try await aiService.refineTasks(
-            originalInput: originalInput,
-            currentTasks: currentTasks,
-            userInstruction: userInstruction
-        )
+        try await aiExecutionCoordinator.run {
+            try await self.aiService.refineTasks(
+                originalInput: originalInput,
+                currentTasks: currentTasks,
+                userInstruction: userInstruction
+            )
+        }
     }
 
     /// 判断解析结果中的任务是否属于项目型想法
     func classifyProjects(tasks: [ProjectClassificationInput]) async throws -> [ProjectClassification] {
-        try await aiService.classifyProjects(tasks: tasks)
+        try await aiExecutionCoordinator.run {
+            try await self.aiService.classifyProjects(tasks: tasks)
+        }
     }
 
     /// 将已解析的任务保存到想法池
@@ -238,6 +245,10 @@ final class TaskManager {
             if let stoppedTask = try dailyTaskRepo.fetchById(stopInfo.taskId) {
                 stoppedTask.taskStatus = .pending
                 try dailyTaskRepo.update(stoppedTask)
+                if let sourceIdeaId = stoppedTask.sourceIdeaId,
+                   let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+                }
             }
         }
 
@@ -247,6 +258,10 @@ final class TaskManager {
         // 4. 更新任务状态
         dailyTask.taskStatus = .running
         try dailyTaskRepo.update(dailyTask)
+        if let sourceIdeaId = dailyTask.sourceIdeaId,
+           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        }
     }
 
     /// 标记任务完成
@@ -291,7 +306,9 @@ final class TaskManager {
     /// 为单个项目生成推荐阶段使用的状态摘要，并写回项目
     func refreshProjectRecommendationSummary(ideaId: UUID) async throws {
         guard let job = try await makeProjectRecommendationSummaryJob(ideaId: ideaId) else { return }
-        let result = try await aiService.generateProjectRecommendationSummary(input: job.input)
+        let result = try await aiExecutionCoordinator.run {
+            try await self.aiService.generateProjectRecommendationSummary(input: job.input)
+        }
         _ = try await saveProjectRecommendationSummary(
             ideaId: ideaId,
             summary: result.summary,
