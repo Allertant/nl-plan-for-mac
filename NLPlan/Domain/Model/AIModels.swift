@@ -40,6 +40,7 @@ struct TaskRecommendationInput: Sendable {
     let isProject: Bool
     let projectDescription: String?
     let planningBackground: String?
+    let projectRecommendationSummary: String?
 }
 
 struct PlanningBackgroundPromptInput: Sendable {

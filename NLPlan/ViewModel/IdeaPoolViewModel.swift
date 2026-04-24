@@ -363,7 +363,8 @@ final class IdeaPoolViewModel {
                 status: idea.status,
                 isProject: idea.isProject,
                 projectDescription: idea.projectDescription,
-                planningBackground: idea.planningBackground
+                planningBackground: idea.planningBackground,
+                projectRecommendationSummary: idea.projectRecommendationSummary
             )
         }
 

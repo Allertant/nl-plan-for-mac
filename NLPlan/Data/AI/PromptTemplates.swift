@@ -255,6 +255,9 @@ enum PromptTemplates {
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            if let summary = t.projectRecommendationSummary, !summary.isEmpty {
+                return "\(base)\n   项目状态摘要：\(summary)"
+            }
             if let background = t.planningBackground, !background.isEmpty {
                 return "\(base)\n   规划背景：\(background)"
             }

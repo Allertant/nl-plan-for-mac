@@ -277,7 +277,12 @@ final class MustDoViewModel {
             let nonProjectCandidates = allCandidates.filter { !$0.isProject }
             recommendationCandidates = nonProjectCandidates.isEmpty ? allCandidates : nonProjectCandidates
         case .comprehensive:
-            recommendationCandidates = allCandidates
+            do {
+                recommendationCandidates = try await prepareComprehensiveCandidates(from: allCandidates)
+            } catch {
+                recommendationState = .error(error.localizedDescription)
+                return
+            }
         }
 
         let ideaInputs = recommendationCandidates.map { idea in
@@ -290,7 +295,8 @@ final class MustDoViewModel {
                 status: idea.status,
                 isProject: idea.isProject,
                 projectDescription: idea.projectDescription,
-                planningBackground: idea.planningBackground
+                planningBackground: idea.planningBackground,
+                projectRecommendationSummary: idea.projectRecommendationSummary
             )
         }
 
@@ -304,7 +310,8 @@ final class MustDoViewModel {
                 status: task.status,
                 isProject: false,
                 projectDescription: nil,
-                planningBackground: nil
+                planningBackground: nil,
+                projectRecommendationSummary: nil
             )
         }
 
@@ -410,6 +417,33 @@ final class MustDoViewModel {
                 recommendationReason: recommendation.reason
             )
         }
+    }
+
+    private func prepareComprehensiveCandidates(from ideas: [IdeaEntity]) async throws -> [IdeaEntity] {
+        var refreshedIdeasById: [UUID: IdeaEntity] = [:]
+
+        for idea in ideas where idea.isProject && needsProjectRecommendationSummaryRefresh(idea) {
+            try await taskManager.refreshProjectRecommendationSummary(ideaId: idea.id)
+            if let refreshed = try await taskManager.fetchIdeaPoolTask(ideaId: idea.id) {
+                refreshedIdeasById[idea.id] = refreshed
+            }
+        }
+
+        return ideas.map { refreshedIdeasById[$0.id] ?? $0 }
+    }
+
+    private func needsProjectRecommendationSummaryRefresh(_ idea: IdeaEntity) -> Bool {
+        guard idea.isProject else { return false }
+
+        let summary = idea.projectRecommendationSummary?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let summary, !summary.isEmpty else { return true }
+
+        guard let sourceUpdatedAt = idea.projectRecommendationSummarySourceUpdatedAt else {
+            return true
+        }
+
+        let contextUpdatedAt = idea.projectRecommendationContextUpdatedAt ?? idea.updatedAt
+        return sourceUpdatedAt < contextUpdatedAt
     }
 
     func updateSource(taskId: UUID, sourceIdeaId: UUID?) async {
