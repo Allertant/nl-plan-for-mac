@@ -200,8 +200,8 @@ struct SettingsView: View {
             .scrollIndicators(.never)
         }
         .frame(width: 360, height: 520)
-        .onAppear {
-            viewModel.loadAll()
+        .task {
+            viewModel.loadLaunchAtLoginState()
         }
     }
 }

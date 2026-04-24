@@ -106,21 +106,16 @@ final class SettingsViewModel {
 
     // MARK: - Dependencies
 
-    private weak var appState: AppState?
+    weak var appState: AppState?
 
-    init(appState: AppState?) {
-        self.appState = appState
-    }
-
-    // MARK: - Lifecycle
-
-    func loadAll() {
+    init() {
         loadAPIKey()
         loadSelectedModel()
-        loadLaunchAtLoginState()
         loadWorkEndTime()
         loadTags()
     }
+
+    // MARK: - Lifecycle
 
     // MARK: - API Key
 
@@ -211,7 +206,12 @@ final class SettingsViewModel {
     // MARK: - 开机自启
 
     func loadLaunchAtLoginState() {
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        Task.detached {
+            let enabled = SMAppService.mainApp.status == .enabled
+            await MainActor.run { [weak self] in
+                self?.launchAtLogin = enabled
+            }
+        }
     }
 
     func updateLaunchAtLogin(enabled: Bool) {
