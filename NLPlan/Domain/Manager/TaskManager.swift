@@ -290,16 +290,28 @@ final class TaskManager {
 
     /// 为单个项目生成推荐阶段使用的状态摘要，并写回项目
     func refreshProjectRecommendationSummary(ideaId: UUID) async throws {
+        guard let job = try await makeProjectRecommendationSummaryJob(ideaId: ideaId) else { return }
+        let result = try await aiService.generateProjectRecommendationSummary(input: job.input)
+        _ = try await saveProjectRecommendationSummary(
+            ideaId: ideaId,
+            summary: result.summary,
+            sourceUpdatedAt: job.contextUpdatedAt
+        )
+    }
+
+    func makeProjectRecommendationSummaryJob(ideaId: UUID) async throws -> ProjectRecommendationSummaryJob? {
         guard let idea = try ideaRepo.fetchById(ideaId) else {
             throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
-        guard idea.isProject else { return }
+        guard idea.isProject else { return nil }
 
         let notes = try ideaRepo.fetchProjectNotes(ideaId: ideaId)
         let activeTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: ideaId).filter { !$0.isSettled }
         let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: ideaId)
+        let contextUpdatedAt = idea.projectRecommendationContextUpdatedAt ?? idea.updatedAt
 
-        let result = try await aiService.generateProjectRecommendationSummary(
+        return ProjectRecommendationSummaryJob(
+            ideaId: ideaId,
             input: ProjectRecommendationSummaryInput(
                 title: idea.title,
                 category: idea.category,
@@ -317,14 +329,26 @@ final class TaskManager {
                     let noteText = (note?.isEmpty == false) ? " - 备注：\(note!)" : ""
                     return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 实际\(task.actualMinutes ?? 0)分钟\(noteText)"
                 }
-            )
+            ),
+            contextUpdatedAt: contextUpdatedAt
         )
+    }
 
-        let contextUpdatedAt = idea.projectRecommendationContextUpdatedAt ?? idea.updatedAt
-        idea.projectRecommendationSummary = result.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    func saveProjectRecommendationSummary(
+        ideaId: UUID,
+        summary: String,
+        sourceUpdatedAt: Date
+    ) async throws -> IdeaEntity? {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+        }
+        guard idea.isProject else { return nil }
+
+        idea.projectRecommendationSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         idea.projectRecommendationSummaryGeneratedAt = .now
-        idea.projectRecommendationSummarySourceUpdatedAt = contextUpdatedAt
+        idea.projectRecommendationSummarySourceUpdatedAt = sourceUpdatedAt
         try ideaRepo.update(idea)
+        return idea
     }
 
     /// 获取指定日期的必做项

@@ -3,6 +3,11 @@ import Foundation
 /// 必做项 ViewModel
 @Observable
 final class MustDoViewModel {
+    private struct ProjectSummaryGenerationOutcome {
+        let ideaId: UUID
+        let summary: String?
+        let sourceUpdatedAt: Date
+    }
 
     var tasks: [DailyTaskEntity] = []
     var errorMessage: String?
@@ -89,6 +94,8 @@ final class MustDoViewModel {
     }
 
     private let taskManager: TaskManager
+    private let projectSummaryPreparationConcurrencyLimit = 2
+    private let aiExecutionCoordinator = AIExecutionCoordinator()
 
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
@@ -420,16 +427,75 @@ final class MustDoViewModel {
     }
 
     private func prepareComprehensiveCandidates(from ideas: [IdeaEntity]) async throws -> [IdeaEntity] {
-        var refreshedIdeasById: [UUID: IdeaEntity] = [:]
+        let staleProjectIdeas = ideas.filter { $0.isProject && needsProjectRecommendationSummaryRefresh($0) }
+        guard !staleProjectIdeas.isEmpty else { return ideas }
 
-        for idea in ideas where idea.isProject && needsProjectRecommendationSummaryRefresh(idea) {
-            try await taskManager.refreshProjectRecommendationSummary(ideaId: idea.id)
-            if let refreshed = try await taskManager.fetchIdeaPoolTask(ideaId: idea.id) {
-                refreshedIdeasById[idea.id] = refreshed
+        var jobs: [ProjectRecommendationSummaryJob] = []
+        for idea in staleProjectIdeas {
+            if let job = try await taskManager.makeProjectRecommendationSummaryJob(ideaId: idea.id) {
+                jobs.append(job)
+            }
+        }
+        let aiService = await makeAIService()
+        let refreshedIdeasById = try await generateProjectSummaries(jobs: jobs, aiService: aiService)
+        return ideas.map { refreshedIdeasById[$0.id] ?? $0 }
+    }
+
+    private func generateProjectSummaries(
+        jobs: [ProjectRecommendationSummaryJob],
+        aiService: AIServiceProtocol
+    ) async throws -> [UUID: IdeaEntity] {
+        guard !jobs.isEmpty else { return [:] }
+
+        var refreshedIdeasById: [UUID: IdeaEntity] = [:]
+        let maxConcurrent = min(projectSummaryPreparationConcurrencyLimit, jobs.count)
+        let executionCoordinator = aiExecutionCoordinator
+
+        try await withThrowingTaskGroup(of: ProjectSummaryGenerationOutcome.self) { group in
+            var nextIndex = 0
+
+            func submitNextJob() {
+                guard nextIndex < jobs.count else { return }
+                let job = jobs[nextIndex]
+                nextIndex += 1
+                group.addTask {
+                    do {
+                        let result = try await executionCoordinator.run {
+                            try await aiService.generateProjectRecommendationSummary(input: job.input)
+                        }
+                        return ProjectSummaryGenerationOutcome(
+                            ideaId: job.ideaId,
+                            summary: result.summary,
+                            sourceUpdatedAt: job.contextUpdatedAt
+                        )
+                    } catch {
+                        return ProjectSummaryGenerationOutcome(
+                            ideaId: job.ideaId,
+                            summary: nil,
+                            sourceUpdatedAt: job.contextUpdatedAt
+                        )
+                    }
+                }
+            }
+
+            for _ in 0..<maxConcurrent {
+                submitNextJob()
+            }
+
+            while let outcome = try await group.next() {
+                if let summary = outcome.summary,
+                   let refreshedIdea = try await taskManager.saveProjectRecommendationSummary(
+                    ideaId: outcome.ideaId,
+                    summary: summary,
+                    sourceUpdatedAt: outcome.sourceUpdatedAt
+                   ) {
+                    refreshedIdeasById[outcome.ideaId] = refreshedIdea
+                }
+                submitNextJob()
             }
         }
 
-        return ideas.map { refreshedIdeasById[$0.id] ?? $0 }
+        return refreshedIdeasById
     }
 
     private func needsProjectRecommendationSummaryRefresh(_ idea: IdeaEntity) -> Bool {

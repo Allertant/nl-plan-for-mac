@@ -75,6 +75,12 @@ struct ProjectRecommendationSummaryResult: Sendable, Equatable {
     let summary: String
 }
 
+struct ProjectRecommendationSummaryJob: Sendable {
+    let ideaId: UUID
+    let input: ProjectRecommendationSummaryInput
+    let contextUpdatedAt: Date
+}
+
 /// AI 推荐结果（单条）
 struct TaskRecommendation: Sendable, Identifiable, Equatable {
     let id = UUID()
