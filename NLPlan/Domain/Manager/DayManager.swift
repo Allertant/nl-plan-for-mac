@@ -348,103 +348,21 @@ final class DayManager {
             task.settlementNote = note
             try dailyTaskRepo.update(task)
 
-            if sourceType == "普通想法来源必做项", let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            if let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
                 if task.taskStatus == .done {
                     sourceIdea.ideaStatus = .completed
-                    try updateSplitIdea(
-                        sourceIdeaId: sourceIdeaId,
-                        status: .completed,
-                        attempted: sourceIdea.attempted,
-                        logType: .completed,
-                        logContent: "完成必做项：\(task.title)",
-                        relatedTaskId: task.id,
-                        settlementDate: settlementDate
-                    )
                 } else {
                     sourceIdea.ideaStatus = .attempted
                     sourceIdea.attempted = true
-                    if let note, !note.isEmpty {
-                        let timestamp = Date.now.dateString
-                        let existingNote = sourceIdea.note?.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let appendedNote = "\(timestamp)\n\(note)"
-                        sourceIdea.note = [existingNote, appendedNote]
-                            .compactMap { value in
-                                guard let value, !value.isEmpty else { return nil }
-                                return value
-                            }
-                            .joined(separator: "\n\n")
-                    }
-                    try updateSplitIdea(
-                        sourceIdeaId: sourceIdeaId,
-                        status: .attempted,
-                        attempted: true,
-                        logType: .attempted,
-                        logContent: settlementLogContent(task: task, note: note),
-                        relatedTaskId: task.id,
-                        settlementDate: settlementDate
-                    )
                 }
-            } else if sourceType == "项目链接必做项", let sourceIdeaId = task.sourceIdeaId {
-                affectedProjectIdeaIds.insert(sourceIdeaId)
-                try appendProjectSettlementNoteIfNeeded(
-                    sourceIdeaId: sourceIdeaId,
-                    task: task,
-                    note: note,
-                    settlementDate: settlementDate
-                )
+                try ideaRepo.update(sourceIdea)
+
+                if sourceType == "项目链接必做项" {
+                    affectedProjectIdeaIds.insert(sourceIdeaId)
+                }
             }
         }
         try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
-    }
-
-    private func updateSplitIdea(
-        sourceIdeaId: UUID,
-        status: IdeaStatus,
-        attempted: Bool,
-        logType: IdeaLogType,
-        logContent: String,
-        relatedTaskId: UUID,
-        settlementDate: Date
-    ) throws {
-        guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return }
-        idea.ideaStatus = status
-        idea.attempted = attempted
-        try ideaRepo.update(idea)
-        _ = try ideaRepo.addLog(
-            ideaId: sourceIdeaId,
-            type: logType,
-            content: logContent,
-            relatedTaskId: relatedTaskId,
-            settlementDate: settlementDate
-        )
-    }
-
-    private func settlementLogContent(task: DailyTaskEntity, note: String?) -> String {
-        let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let trimmedNote, !trimmedNote.isEmpty else {
-            return "未完成必做项：\(task.title)"
-        }
-        return "未完成必做项：\(task.title)\n\(trimmedNote)"
-    }
-
-    private func appendProjectSettlementNoteIfNeeded(
-        sourceIdeaId: UUID,
-        task: DailyTaskEntity,
-        note: String?,
-        settlementDate: Date
-    ) throws {
-        guard task.taskStatus != .done else { return }
-        guard let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedNote.isEmpty else {
-            return
-        }
-        guard let _ = try ideaRepo.fetchById(sourceIdeaId) else { return }
-
-        let content = """
-        \(settlementDate.shortDateTimeString)
-        必做项：\(task.title)
-        备注：\(trimmedNote)
-        """
-        _ = try ideaRepo.createProjectNote(ideaId: sourceIdeaId, content: content)
     }
 
     private func refreshProjectIdeaStatusesAfterSettlement(_ ideaIds: Set<UUID>) throws {

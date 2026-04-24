@@ -16,7 +16,6 @@ struct NLPlanApp: App {
                 ThoughtEntity.self,
                 IdeaEntity.self,
                 DailyTaskEntity.self,
-                IdeaLogEntity.self,
                 ProjectNoteEntity.self,
                 SessionLogEntity.self,
                 DailySummaryEntity.self,

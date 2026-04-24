@@ -95,34 +95,6 @@ final class IdeaRepository {
         try modelContext.save()
     }
 
-    func addLog(
-        ideaId: UUID,
-        type: IdeaLogType,
-        content: String,
-        relatedTaskId: UUID? = nil,
-        settlementDate: Date? = nil
-    ) throws -> IdeaLogEntity {
-        let log = IdeaLogEntity(
-            ideaId: ideaId,
-            type: type.rawValue,
-            content: content,
-            relatedTaskId: relatedTaskId,
-            settlementDate: settlementDate
-        )
-        modelContext.insert(log)
-        try modelContext.save()
-        return log
-    }
-
-    func fetchLogs(ideaId: UUID) throws -> [IdeaLogEntity] {
-        let targetId = ideaId
-        let descriptor = FetchDescriptor<IdeaLogEntity>(
-            predicate: #Predicate { $0.ideaId == targetId },
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor)
-    }
-
     // MARK: - Project Notes
 
     func createProjectNote(ideaId: UUID, content: String) throws -> ProjectNoteEntity {
