@@ -229,6 +229,22 @@ final class DeepSeekAIService: AIServiceProtocol {
         }
     }
 
+    func generatePlanningBackgroundPrompt(
+        input: PlanningBackgroundPromptInput
+    ) async throws -> PlanningBackgroundPromptResult {
+        let prompt = PromptTemplates.generatePlanningBackgroundPrompt(input: input)
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务规划助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: PlanningBackgroundPromptResponse.self
+        )
+
+        return PlanningBackgroundPromptResult(
+            reason: response.reason,
+            researchPrompt: response.researchPrompt
+        )
+    }
+
     // MARK: - Private
 
     /// 发送请求并解析 JSON，失败时携带原始响应和错误信息重试一次

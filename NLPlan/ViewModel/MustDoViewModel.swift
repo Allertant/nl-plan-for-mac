@@ -280,7 +280,8 @@ final class MustDoViewModel {
                 attempted: idea.attempted,
                 status: idea.status,
                 isProject: idea.isProject,
-                projectDescription: idea.projectDescription
+                projectDescription: idea.projectDescription,
+                planningBackground: idea.planningBackground
             )
         }
 
@@ -293,7 +294,8 @@ final class MustDoViewModel {
                 attempted: task.attempted,
                 status: task.status,
                 isProject: false,
-                projectDescription: nil
+                projectDescription: nil,
+                planningBackground: nil
             )
         }
 

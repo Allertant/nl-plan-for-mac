@@ -16,6 +16,7 @@ final class IdeaPoolViewModel {
     var newlyAddedIdeaIds: Set<UUID> = []
     var isRefreshingProjects: Bool = false
     var refreshingProjectIds: Set<UUID> = []
+    var generatingPlanningPromptIdeaIds: Set<UUID> = []
     private let minimumRefreshAnimationDuration: TimeInterval = 0.45
 
     /// 提升到必做项后的回调（用于通知必做项刷新）
@@ -116,12 +117,80 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func updateProjectDescription(ideaId: UUID, description: String?) async {
+        do {
+            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
+            idea.projectDescription = normalizeOptionalText(description)
+            try await taskManager.updateIdea(idea)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updatePlanningBackground(ideaId: UUID, planningBackground: String?) async {
+        do {
+            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
+            idea.planningBackground = normalizeOptionalText(planningBackground)
+            try await taskManager.updateIdea(idea)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func generatePlanningBackgroundPrompt(ideaId: UUID) async {
+        guard !generatingPlanningPromptIdeaIds.contains(ideaId) else { return }
+        generatingPlanningPromptIdeaIds.insert(ideaId)
+        defer { generatingPlanningPromptIdeaIds.remove(ideaId) }
+
+        do {
+            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
+            let activeTasks = try await taskManager.fetchMustDo(sourceIdeaId: ideaId)
+            let settledTasks = try await taskManager.fetchSettledTasks(sourceIdeaId: ideaId)
+            let notes = try await taskManager.fetchProjectNotes(ideaId: ideaId)
+            let aiService = await makeAIService()
+
+            let result = try await aiService.generatePlanningBackgroundPrompt(
+                input: PlanningBackgroundPromptInput(
+                    title: idea.title,
+                    category: idea.category,
+                    estimatedMinutes: idea.estimatedMinutes,
+                    attempted: idea.attempted,
+                    projectDescription: idea.projectDescription,
+                    planningBackground: idea.planningBackground,
+                    notes: notes.map(\.content),
+                    activeTasks: activeTasks.map { task in
+                        "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
+                    },
+                    settledTasks: settledTasks.map { task in
+                        let note = normalizeOptionalText(task.settlementNote) ?? "无备注"
+                        return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 备注：\(note)"
+                    }
+                )
+            )
+
+            idea.planningResearchPrompt = normalizeOptionalText(result.researchPrompt)
+            idea.planningResearchPromptReason = normalizeOptionalText(result.reason)
+            try await taskManager.updateIdea(idea)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func fetchLinkedMustDoTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
             return try await taskManager.fetchMustDo(sourceIdeaId: sourceIdeaId)
         } catch {
             errorMessage = error.localizedDescription
             return []
+        }
+    }
+
+    func fetchIdea(ideaId: UUID) async -> IdeaEntity? {
+        do {
+            return try await taskManager.fetchIdeaPoolTask(ideaId: ideaId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
         }
     }
 
@@ -275,7 +344,8 @@ final class IdeaPoolViewModel {
                 attempted: idea.attempted,
                 status: idea.status,
                 isProject: idea.isProject,
-                projectDescription: idea.projectDescription
+                projectDescription: idea.projectDescription,
+                planningBackground: idea.planningBackground
             )
         }
 
@@ -341,6 +411,12 @@ final class IdeaPoolViewModel {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
         return DeepSeekAIService(apiKey: apiKey, model: model)
+    }
+
+    private func normalizeOptionalText(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     private func withProjectAnalysisTimeout<T: Sendable>(

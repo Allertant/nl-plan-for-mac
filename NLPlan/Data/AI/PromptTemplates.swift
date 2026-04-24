@@ -249,8 +249,11 @@ enum PromptTemplates {
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(t.estimatedMinutes)分钟 - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            if let background = t.planningBackground, !background.isEmpty {
+                return "\(base)\n   规划背景：\(background)"
+            }
             if let desc = t.projectDescription, !desc.isEmpty {
-                return "\(base)\n   项目说明：\(desc)"
+                return "\(base)\n   项目描述：\(desc)"
             }
             return base
         }.joined(separator: "\n")
@@ -386,6 +389,74 @@ enum PromptTemplates {
             }
           ]
         }
+        """
+    }
+
+    static func generatePlanningBackgroundPrompt(input: PlanningBackgroundPromptInput) -> String {
+        let notesText = input.notes.isEmpty ? "（无）" : input.notes.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+        let activeTasksText = input.activeTasks.isEmpty ? "（无）" : input.activeTasks.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+        let settledTasksText = input.settledTasks.isEmpty ? "（无）" : input.settledTasks.enumerated().map {
+            "\($0.offset + 1). \($0.element)"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个“项目规划背景研究提示词生成器”。你的工作不是直接写规划背景，而是生成一段给外部联网 AI 使用的完整提示词。
+
+        目标：
+        1. 帮用户补足内部推荐 AI 缺少的外部知识。
+        2. 让外部 AI 返回一份结构化《规划背景》模板，而不是自由散文。
+        3. 让这份规划背景直接服务于后续必做项推荐、阶段拆分和时间估算。
+
+        你输出的 research_prompt 必须要求外部 AI：
+        1. 先联网搜索最新可信信息，并明确以当前日期为准。
+        2. 输出结构化《规划背景》，而不是泛泛介绍。
+        3. 重点回答“这个项目如何拆解、如何安排阶段、单次行动做什么”。
+        4. 如果缺少用户偏好或前置信息，必须列出“不确定项 / 待确认项”。
+        5. 必须给出“可信来源”。
+
+        外部 AI 返回的《规划背景》应尽量包含这些栏目：
+        - 项目主题
+        - 项目目标
+        - 关键客观事实
+        - 常见推进路径
+        - 推荐学习/执行方式
+        - 用户偏好与限制
+        - 可拆分阶段
+        - 单次行动建议
+        - 时间估算依据
+        - 可信来源
+        - 不确定项 / 待确认项
+
+        请输出严格 JSON：
+        {
+          "reason": "为什么这个项目需要补充规划背景，指出内部 AI 当前缺少什么外部知识",
+          "research_prompt": "给外部联网 AI 的完整提示词"
+        }
+
+        当前项目：
+        - 标题：\(input.title)
+        - 分类：\(input.category)
+        - 预估时长：\(input.estimatedMinutes) 分钟
+        - 是否已尝试过：\(input.attempted ? "是" : "否")
+
+        已有项目描述：
+        \(input.projectDescription?.isEmpty == false ? input.projectDescription! : "（无）")
+
+        已有规划背景：
+        \(input.planningBackground?.isEmpty == false ? input.planningBackground! : "（无）")
+
+        项目备注：
+        \(notesText)
+
+        当前推进任务：
+        \(activeTasksText)
+
+        已归档推进记录：
+        \(settledTasksText)
         """
     }
 

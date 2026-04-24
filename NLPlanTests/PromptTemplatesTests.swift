@@ -87,4 +87,27 @@ struct PromptTemplatesTests {
         #expect(prompt.contains("我觉得应该更高"))
         #expect(prompt.contains("B"))
     }
+
+    @Test("generatePlanningBackgroundPrompt 包含结构化规划背景要求")
+    func testGeneratePlanningBackgroundPromptContainsRequirements() {
+        let prompt = PromptTemplates.generatePlanningBackgroundPrompt(
+            input: PlanningBackgroundPromptInput(
+                title: "学习 Spring Boot 5",
+                category: "技术",
+                estimatedMinutes: 90,
+                attempted: false,
+                projectDescription: "希望做出一个简单后端服务",
+                planningBackground: nil,
+                notes: ["偏好实战学习"],
+                activeTasks: ["整理学习路径 - 待开始 - 预估45分钟"],
+                settledTasks: ["看过入门视频 - 已完成 - 备注：形成初步印象"]
+            )
+        )
+
+        #expect(prompt.contains("学习 Spring Boot 5"))
+        #expect(prompt.contains("项目规划背景研究提示词生成器"))
+        #expect(prompt.contains("关键客观事实"))
+        #expect(prompt.contains("可信来源"))
+        #expect(prompt.contains("不确定项 / 待确认项"))
+    }
 }

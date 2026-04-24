@@ -154,6 +154,16 @@ struct ProjectProgressDTO: Decodable {
     }
 }
 
+struct PlanningBackgroundPromptResponse: Decodable {
+    let reason: String
+    let researchPrompt: String
+
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case researchPrompt = "research_prompt"
+    }
+}
+
 // MARK: - Cleanup Response (from AI JSON)
 
 struct CleanupResponse: Decodable {

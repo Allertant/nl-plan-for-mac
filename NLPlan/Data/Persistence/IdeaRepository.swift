@@ -27,6 +27,10 @@ final class IdeaRepository {
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
         projectProgressUpdatedAt: Date? = nil,
+        projectDescription: String? = nil,
+        planningBackground: String? = nil,
+        planningResearchPrompt: String? = nil,
+        planningResearchPromptReason: String? = nil,
         createdDate: Date = .now
     ) throws -> IdeaEntity {
         let idea = IdeaEntity(
@@ -47,7 +51,11 @@ final class IdeaRepository {
             projectDecisionSource: projectDecisionSource,
             projectProgress: projectProgress,
             projectProgressSummary: projectProgressSummary,
-            projectProgressUpdatedAt: projectProgressUpdatedAt
+            projectProgressUpdatedAt: projectProgressUpdatedAt,
+            projectDescription: projectDescription,
+            planningBackground: planningBackground,
+            planningResearchPrompt: planningResearchPrompt,
+            planningResearchPromptReason: planningResearchPromptReason
         )
         modelContext.insert(idea)
         try modelContext.save()

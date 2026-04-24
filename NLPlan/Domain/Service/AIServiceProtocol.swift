@@ -57,4 +57,9 @@ protocol AIServiceProtocol: Sendable {
 
     /// 基于来源绑定的必做项分析项目进度
     func analyzeProjectProgress(projects: [ProjectProgressInput]) async throws -> [ProjectProgressAnalysis]
+
+    /// 为项目生成外部研究提示词，供联网 AI 产出结构化规划背景
+    func generatePlanningBackgroundPrompt(
+        input: PlanningBackgroundPromptInput
+    ) async throws -> PlanningBackgroundPromptResult
 }

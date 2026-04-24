@@ -39,6 +39,24 @@ struct TaskRecommendationInput: Sendable {
     let status: String
     let isProject: Bool
     let projectDescription: String?
+    let planningBackground: String?
+}
+
+struct PlanningBackgroundPromptInput: Sendable {
+    let title: String
+    let category: String
+    let estimatedMinutes: Int
+    let attempted: Bool
+    let projectDescription: String?
+    let planningBackground: String?
+    let notes: [String]
+    let activeTasks: [String]
+    let settledTasks: [String]
+}
+
+struct PlanningBackgroundPromptResult: Sendable, Equatable {
+    let reason: String
+    let researchPrompt: String
 }
 
 /// AI 推荐结果（单条）

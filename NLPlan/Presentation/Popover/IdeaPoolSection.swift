@@ -10,11 +10,13 @@ struct IdeaPoolSection: View {
     @State private var isCandidateTagNavigationEnabled = false
     @State private var highlightedSelectedTagIndex: Int?
     @State private var didAutoFocusSearchField = false
-    @State private var selectedProjectIdea: IdeaEntity?
+    @State private var selectedProjectID: UUID?
+    @State private var selectedProjectDetail: ProjectDetailSnapshot?
     @State private var projectActiveTasks: [DailyTaskEntity] = []
     @State private var projectSettledTasks: [DailyTaskEntity] = []
     @State private var projectNotes: [ProjectNoteEntity] = []
     @State private var isLoadingProjectDetail = false
+    @State private var isGeneratingPlanningPrompt = false
     @FocusState private var isSearchFieldFocused: Bool
 
     private var filteredIdeas: [IdeaEntity] {
@@ -284,23 +286,51 @@ struct IdeaPoolSection: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let selectedProjectIdea {
+            if let selectedProjectID, let projectDetail = selectedProjectDetail {
                 ProjectDetailOverlay(
-                    project: selectedProjectIdea,
+                    project: projectDetail,
                     activeTasks: projectActiveTasks,
                     settledTasks: projectSettledTasks,
                     notes: projectNotes,
                     isLoading: isLoadingProjectDetail,
+                    isGeneratingPlanningPrompt: isGeneratingPlanningPrompt,
                     onAddNote: { content in
                         Task {
-                            await viewModel.addProjectNote(ideaId: selectedProjectIdea.id, content: content)
-                            projectNotes = await viewModel.fetchProjectNotes(ideaId: selectedProjectIdea.id)
+                            await viewModel.addProjectNote(ideaId: selectedProjectID, content: content)
+                            projectNotes = await viewModel.fetchProjectNotes(ideaId: selectedProjectID)
                         }
                     },
                     onUpdateNote: { noteId, content in
                         Task {
                             await viewModel.updateProjectNote(noteId: noteId, content: content)
-                            projectNotes = await viewModel.fetchProjectNotes(ideaId: selectedProjectIdea.id)
+                            projectNotes = await viewModel.fetchProjectNotes(ideaId: selectedProjectID)
+                        }
+                    },
+                    onSaveProjectDescription: { description in
+                        Task {
+                            await viewModel.updateProjectDescription(ideaId: selectedProjectID, description: description)
+                            if var snapshot = selectedProjectDetail {
+                                snapshot.projectDescription = normalizeOptionalText(description)
+                                selectedProjectDetail = snapshot
+                            }
+                        }
+                    },
+                    onSavePlanningBackground: { planningBackground in
+                        Task {
+                            await viewModel.updatePlanningBackground(ideaId: selectedProjectID, planningBackground: planningBackground)
+                            if var snapshot = selectedProjectDetail {
+                                snapshot.planningBackground = normalizeOptionalText(planningBackground)
+                                selectedProjectDetail = snapshot
+                            }
+                        }
+                    },
+                    onGeneratePlanningPrompt: {
+                        guard !isGeneratingPlanningPrompt else { return }
+                        isGeneratingPlanningPrompt = true
+                        Task {
+                            await viewModel.generatePlanningBackgroundPrompt(ideaId: selectedProjectID)
+                            await reloadSelectedProjectDetail()
+                            isGeneratingPlanningPrompt = false
                         }
                     }
                 ) {
@@ -310,7 +340,7 @@ struct IdeaPoolSection: View {
                 .zIndex(1)
             }
         }
-        .animation(.easeInOut(duration: 0.18), value: selectedProjectIdea?.id)
+        .animation(.easeInOut(duration: 0.18), value: selectedProjectID)
     }
 
     // MARK: - Search helpers (unchanged logic)
@@ -393,7 +423,8 @@ struct IdeaPoolSection: View {
 
     private func openProjectDetail(_ idea: IdeaEntity) {
         guard idea.isProject else { return }
-        selectedProjectIdea = idea
+        selectedProjectID = idea.id
+        selectedProjectDetail = ProjectDetailSnapshot(idea: idea)
         projectActiveTasks = []
         projectSettledTasks = []
         projectNotes = []
@@ -404,20 +435,35 @@ struct IdeaPoolSection: View {
             async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: idea.id)
             async let settled = viewModel.fetchSettledTasks(sourceIdeaId: idea.id)
             async let notes = viewModel.fetchProjectNotes(ideaId: idea.id)
-            guard selectedProjectIdea?.id == idea.id else { return }
+            guard selectedProjectID == idea.id else { return }
             projectActiveTasks = await tasks
             projectSettledTasks = await settled
             projectNotes = await notes
+            await reloadSelectedProjectDetail()
             isLoadingProjectDetail = false
         }
     }
 
     private func closeProjectDetail() {
-        selectedProjectIdea = nil
+        selectedProjectID = nil
+        selectedProjectDetail = nil
         projectActiveTasks = []
         projectSettledTasks = []
         projectNotes = []
         isLoadingProjectDetail = false
+        isGeneratingPlanningPrompt = false
+    }
+
+    private func reloadSelectedProjectDetail() async {
+        guard let selectedProjectID,
+              let idea = await viewModel.fetchIdea(ideaId: selectedProjectID) else { return }
+        selectedProjectDetail = ProjectDetailSnapshot(idea: idea)
+    }
+
+    private func normalizeOptionalText(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     // MARK: - 清理按钮
@@ -469,20 +515,60 @@ struct IdeaPoolSection: View {
 
 // MARK: - ProjectDetailOverlay (now uses IdeaEntity)
 
+private struct ProjectDetailSnapshot {
+    let id: UUID
+    let title: String
+    let category: String
+    let createdDate: Date
+    let attempted: Bool
+    let projectProgress: Double?
+    let projectProgressSummary: String?
+    let projectProgressUpdatedAt: Date?
+    var projectDescription: String?
+    var planningBackground: String?
+    var planningResearchPrompt: String?
+    var planningResearchPromptReason: String?
+
+    init(idea: IdeaEntity) {
+        id = idea.id
+        title = idea.title
+        category = idea.category
+        createdDate = idea.createdDate
+        attempted = idea.attempted
+        projectProgress = idea.projectProgress
+        projectProgressSummary = idea.projectProgressSummary
+        projectProgressUpdatedAt = idea.projectProgressUpdatedAt
+        projectDescription = idea.projectDescription
+        planningBackground = idea.planningBackground
+        planningResearchPrompt = idea.planningResearchPrompt
+        planningResearchPromptReason = idea.planningResearchPromptReason
+    }
+}
+
 private struct ProjectDetailOverlay: View {
-    let project: IdeaEntity
+    let project: ProjectDetailSnapshot
     let activeTasks: [DailyTaskEntity]
     let settledTasks: [DailyTaskEntity]
     let notes: [ProjectNoteEntity]
     let isLoading: Bool
+    let isGeneratingPlanningPrompt: Bool
     let onAddNote: (String) -> Void
     let onUpdateNote: (UUID, String) -> Void
+    let onSaveProjectDescription: (String?) -> Void
+    let onSavePlanningBackground: (String?) -> Void
+    let onGeneratePlanningPrompt: () -> Void
     let onClose: () -> Void
 
     @State private var newNoteText: String = ""
     @State private var isEditingDescription = false
     @State private var showCopyToast = false
+    @State private var draftProjectDescription = ""
+    @State private var isEditingPlanningBackground = false
+    @State private var draftPlanningBackground = ""
+    @State private var showCopyPromptToast = false
+    @State private var isShowingPromptSheet = false
     @FocusState private var isDescriptionFocused: Bool
+    @FocusState private var isPlanningBackgroundFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -493,6 +579,7 @@ private struct ProjectDetailOverlay: View {
                 VStack(alignment: .leading, spacing: 12) {
                     projectSummaryCard
                     descriptionCard
+                    planningBackgroundCard
                     progressCard
                     tasksCard
                     noteCard
@@ -507,6 +594,15 @@ private struct ProjectDetailOverlay: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
         .padding(8)
+        .onAppear {
+            draftProjectDescription = project.projectDescription ?? ""
+            draftPlanningBackground = project.planningBackground ?? ""
+        }
+        .sheet(isPresented: $isShowingPromptSheet) {
+            PlanningPromptSheet(
+                prompt: project.planningResearchPrompt ?? ""
+            )
+        }
     }
 
     private var header: some View {
@@ -541,6 +637,22 @@ private struct ProjectDetailOverlay: View {
                     .buttonStyle(.plain)
                     .help("复制标题")
                     .animation(.easeInOut(duration: 0.2), value: showCopyToast)
+
+                    Button(action: onGeneratePlanningPrompt) {
+                        Group {
+                            if isGeneratingPlanningPrompt {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.indigo)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isGeneratingPlanningPrompt)
+                    .help("生成研究提示词")
                 }
                 HStack(spacing: 8) {
                     TagChip(text: project.category)
@@ -555,16 +667,29 @@ private struct ProjectDetailOverlay: View {
     }
 
     private var descriptionCard: some View {
-        DetailSectionCard(title: "项目说明", systemImage: "doc.text", tint: .purple, background: Color.purple.opacity(0.08), border: Color.purple.opacity(0.22)) {
+        DetailSectionCard(title: "项目描述", systemImage: "doc.text", tint: .purple, background: Color.purple.opacity(0.08), border: Color.purple.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Spacer()
+                    Button(isEditingDescription ? "取消" : "编辑") {
+                        if isEditingDescription {
+                            isEditingDescription = false
+                            draftProjectDescription = project.projectDescription ?? ""
+                            isDescriptionFocused = false
+                        } else {
+                            draftProjectDescription = project.projectDescription ?? ""
+                            isEditingDescription = true
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                }
+
                 if isEditingDescription {
-                    TextField("描述项目背景、目标和你的计划...", text: Binding(
-                        get: { project.projectDescription ?? "" },
-                        set: { project.projectDescription = $0.isEmpty ? nil : $0 }
-                    ), axis: .vertical)
-                    .textFieldStyle(.plain)
+                    TextEditor(text: $draftProjectDescription)
                     .font(.system(size: 11))
-                    .lineLimit(3...8)
+                    .frame(minHeight: 84)
                     .padding(6)
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -573,6 +698,7 @@ private struct ProjectDetailOverlay: View {
                     HStack {
                         Spacer()
                         Button("保存") {
+                            onSaveProjectDescription(draftProjectDescription)
                             isEditingDescription = false
                             isDescriptionFocused = false
                         }
@@ -587,18 +713,139 @@ private struct ProjectDetailOverlay: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("暂无说明，点击编辑添加项目描述")
+                        Text("暂无项目描述，点击编辑补充目标、背景和计划。")
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
                     }
                 }
             }
-            .onTapGesture {
-                if !isEditingDescription {
-                    isEditingDescription = true
+        }
+    }
+
+    private var planningBackgroundCard: some View {
+        DetailSectionCard(title: "规划背景", systemImage: "map", tint: .brown, background: Color.brown.opacity(0.08), border: Color.brown.opacity(0.22)) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Button(action: onGeneratePlanningPrompt) {
+                        if isGeneratingPlanningPrompt {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("生成中")
+                            }
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.indigo)
+                        } else {
+                            Label("生成研究提示词", systemImage: "sparkles")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.indigo)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isGeneratingPlanningPrompt)
+
+                    if let prompt = project.planningResearchPrompt, !prompt.isEmpty {
+                        Button {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(prompt, forType: .string)
+                            showCopyPromptToast = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                showCopyPromptToast = false
+                            }
+                        } label: {
+                            Label(showCopyPromptToast ? "已复制" : "复制提示词", systemImage: showCopyPromptToast ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(showCopyPromptToast ? .green : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Spacer()
+
+                    Button(isEditingPlanningBackground ? "取消" : "编辑") {
+                        if isEditingPlanningBackground {
+                            isEditingPlanningBackground = false
+                            draftPlanningBackground = project.planningBackground ?? ""
+                            isPlanningBackgroundFocused = false
+                        } else {
+                            draftPlanningBackground = project.planningBackground ?? ""
+                            isEditingPlanningBackground = true
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                }
+
+                if let reason = project.planningResearchPromptReason, !reason.isEmpty {
+                    Text(reason)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("当项目缺少外部知识时，可先生成研究提示词，交给联网 AI 产出结构化规划背景。")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if let prompt = project.planningResearchPrompt, !prompt.isEmpty {
+                    Text(promptPreview(prompt))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(8)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    if prompt.count > 280 {
+                        Button("查看完整提示词") {
+                            isShowingPromptSheet = true
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                if isEditingPlanningBackground {
+                    TextEditor(text: $draftPlanningBackground)
+                        .font(.system(size: 11))
+                        .frame(minHeight: 150)
+                        .padding(6)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .focused($isPlanningBackgroundFocused)
+
+                    HStack {
+                        Spacer()
+                        Button("保存") {
+                            onSavePlanningBackground(draftPlanningBackground)
+                            isEditingPlanningBackground = false
+                            isPlanningBackgroundFocused = false
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                } else if let planningBackground = project.planningBackground, !planningBackground.isEmpty {
+                    Text(planningBackground)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("暂无规划背景。复制研究提示词给外部 AI，再把返回的结构化模板贴回这里。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
+    }
+
+    private func promptPreview(_ prompt: String, limit: Int = 280) -> String {
+        guard prompt.count > limit else { return prompt }
+        let index = prompt.index(prompt.startIndex, offsetBy: limit)
+        return String(prompt[..<index]) + "..."
     }
 
     private var progressCard: some View {
@@ -699,6 +946,38 @@ private struct ProjectSettlementRecordRow: View {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }.padding(8).background(Color(nsColor: .windowBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+private struct PlanningPromptSheet: View {
+    let prompt: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("完整研究提示词")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button("关闭") { dismiss() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11))
+            }
+            .padding(12)
+
+            Divider()
+
+            ScrollView {
+                Text(prompt)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(minWidth: 520, minHeight: 420)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
