@@ -481,6 +481,7 @@ private struct ProjectDetailOverlay: View {
 
     @State private var newNoteText: String = ""
     @State private var isEditingDescription = false
+    @State private var showCopyToast = false
     @FocusState private var isDescriptionFocused: Bool
 
     var body: some View {
@@ -522,7 +523,25 @@ private struct ProjectDetailOverlay: View {
     private var projectSummaryCard: some View {
         DetailSectionCard(title: "项目信息", systemImage: "lightbulb.fill", tint: .yellow, background: Color.yellow.opacity(0.08), border: Color.yellow.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                HStack(spacing: 6) {
+                    Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                    Button {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(project.title, forType: .string)
+                        showCopyToast = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            showCopyToast = false
+                        }
+                    } label: {
+                        Image(systemName: showCopyToast ? "checkmark" : "doc.on.clipboard")
+                            .font(.system(size: 11))
+                            .foregroundStyle(showCopyToast ? .green : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("复制标题")
+                    .animation(.easeInOut(duration: 0.2), value: showCopyToast)
+                }
                 HStack(spacing: 8) {
                     TagChip(text: project.category)
                     Text(project.createdDate.shortDateTimeString).font(.system(size: 10)).foregroundStyle(.tertiary)
