@@ -125,6 +125,21 @@ final class SummaryViewModel {
         tasks.filter { $0.taskStatus != .done }
     }
 
+    /// 按优先级排序的任务列表（与面板一致：高→中→低，同优先级按 sortOrder）
+    var sortedTasks: [DailyTaskEntity] {
+        let priorityOrder: [String: Int] = [
+            TaskPriority.high.rawValue: 0,
+            TaskPriority.medium.rawValue: 1,
+            TaskPriority.low.rawValue: 2
+        ]
+        return tasks.sorted {
+            let p0 = priorityOrder[$0.priority] ?? 1
+            let p1 = priorityOrder[$1.priority] ?? 1
+            if p0 != p1 { return p0 < p1 }
+            return $0.sortOrder < $1.sortOrder
+        }
+    }
+
     var canSettle: Bool {
         incompleteTasks.allSatisfy { task in
             !(taskNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)

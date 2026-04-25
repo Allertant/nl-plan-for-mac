@@ -162,7 +162,7 @@ struct SummaryView: View {
                 VStack(spacing: 0) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
-                            ForEach(viewModel.tasks, id: \.id) { task in
+                            ForEach(viewModel.sortedTasks, id: \.id) { task in
                                 SettlementTaskRow(
                                     task: task,
                                     elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0,
@@ -289,12 +289,24 @@ struct SettlementTaskRow: View {
 
     private var isCompleted: Bool { task.taskStatus == .done }
 
+    private var priorityColor: Color {
+        switch task.taskPriority {
+        case .high: return .red
+        case .medium: return .orange
+        case .low: return .blue
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 12))
-                    .foregroundStyle(isCompleted ? .green : .orange)
+                    .foregroundStyle(isCompleted ? .green : priorityColor)
+
+                Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
+                    .font(.system(size: 9))
+                    .foregroundStyle(priorityColor)
 
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
@@ -348,8 +360,12 @@ struct SettlementTaskRow: View {
         }
         .padding(10)
         .background(isCompleted
-            ? Color.green.opacity(0.06)
-            : Color.orange.opacity(0.08))
+            ? Color.green.opacity(0.05)
+            : priorityColor.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(priorityColor.opacity(isCompleted ? 0.1 : 0.25), lineWidth: 1)
+        )
     }
 }
