@@ -190,6 +190,8 @@ private struct AIRecommendFloatingButton: View {
     let remainingWorkHours: Double
 
     @State private var isExpanded = false
+    @State private var extraContext: String = ""
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -200,35 +202,61 @@ private struct AIRecommendFloatingButton: View {
                 }
             }
 
-            // 主按钮
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isExpanded.toggle()
+            // 输入框 + 主按钮
+            HStack(spacing: 8) {
+                if isExpanded {
+                    TextField("额外要求（可选）", text: $extraContext, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(1...4)
+                        .font(.system(size: 11))
+                        .padding(8)
+                        .frame(width: 200, alignment: .leading)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                        .focused($isInputFocused)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-            } label: {
-                Image(systemName: isExpanded ? "xmark" : "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(isExpanded ? Color.secondary : Color.accentColor)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                // 主按钮
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isExpanded.toggle()
+                    }
+                    if isExpanded {
+                        DispatchQueue.main.async { isInputFocused = true }
+                    } else {
+                        extraContext = ""
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "xmark" : "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(isExpanded ? Color.secondary : Color.accentColor)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
     private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy, offsetIndex: Int) -> some View {
         Button {
+            let context = extraContext.trimmingCharacters(in: .whitespacesAndNewlines)
             viewModel.recommendationStrategy = strategy
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 isExpanded = false
             }
+            extraContext = ""
+            isInputFocused = false
             Task {
                 await viewModel.fetchRecommendations(
                     ideaPoolIdeas: ideaPoolIdeas,
-                    remainingHours: remainingWorkHours
+                    remainingHours: remainingWorkHours,
+                    extraContext: context.isEmpty ? nil : context
                 )
             }
         } label: {

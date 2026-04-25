@@ -247,7 +247,8 @@ enum PromptTemplates {
         ideaPoolTasks: [TaskRecommendationInput],
         mustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
-        strategy: MustDoViewModel.RecommendationStrategy
+        strategy: MustDoViewModel.RecommendationStrategy,
+        extraContext: String? = nil
     ) -> String {
         let mustDoList = mustDoTasks.enumerated().map { i, t in
             "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status == "running" ? "进行中" : "待开始")"
@@ -279,12 +280,19 @@ enum PromptTemplates {
             strategyHint = "本轮是综合推荐模式，目标是在普通想法和项目之间综合权衡今天最值得推进的内容，不偏袒普通想法，也不默认偏袒项目。"
         }
 
+        let extraSection: String
+        if let extraContext, !extraContext.isEmpty {
+            extraSection = "\n## 用户额外要求\n\(extraContext)\n"
+        } else {
+            extraSection = ""
+        }
+
         return """
         你是一个任务管理助手。请根据用户今天的情况，从想法池中推荐最合适的任务加入今日必做项。
 
         ## 推荐策略
         \(strategyHint)
-
+        \(extraSection)
         ## 当前时间
         剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
 

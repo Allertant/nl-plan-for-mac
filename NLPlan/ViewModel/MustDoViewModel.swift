@@ -265,7 +265,8 @@ final class MustDoViewModel {
 
     func fetchRecommendations(
         ideaPoolIdeas: [IdeaEntity],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String? = nil
     ) async {
         recommendationState = .loading
         errorMessage = nil
@@ -329,7 +330,8 @@ final class MustDoViewModel {
                 ideaPoolTasks: ideaInputs,
                 mustDoTasks: mustDoInputs,
                 remainingHours: remainingHours,
-                strategy: recommendationStrategy
+                strategy: recommendationStrategy,
+                extraContext: extraContext
                 )
             }
 

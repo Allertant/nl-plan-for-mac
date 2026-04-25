@@ -147,13 +147,15 @@ final class DeepSeekAIService: AIServiceProtocol {
         ideaPoolTasks: [TaskRecommendationInput],
         mustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
-        strategy: MustDoViewModel.RecommendationStrategy
+        strategy: MustDoViewModel.RecommendationStrategy,
+        extraContext: String? = nil
     ) async throws -> RecommendationResult {
         let prompt = PromptTemplates.recommendTasks(
             ideaPoolTasks: ideaPoolTasks,
             mustDoTasks: mustDoTasks,
             remainingHours: remainingHours,
-            strategy: strategy
+            strategy: strategy,
+            extraContext: extraContext
         )
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",

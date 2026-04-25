@@ -37,7 +37,8 @@ protocol AIServiceProtocol: Sendable {
         ideaPoolTasks: [TaskRecommendationInput],
         mustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
-        strategy: MustDoViewModel.RecommendationStrategy
+        strategy: MustDoViewModel.RecommendationStrategy,
+        extraContext: String?
     ) async throws -> RecommendationResult
 
     /// 驳斥评分：AI 根据用户反馈重新评分
