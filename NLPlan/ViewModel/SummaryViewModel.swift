@@ -12,14 +12,18 @@ final class SummaryViewModel {
     var showAppealInput: Bool = false
     var isAppealing: Bool = false
     var tasks: [DailyTaskEntity] = []
-    var incompleteNotes: [UUID: String] = [:]
+    var taskNotes: [UUID: String] = [:]
+    var expandedNoteTaskIds: Set<UUID> = []
+    var elapsedSecondsCache: [UUID: Int] = [:]
     let settlementDate: Date
 
     private let dayManager: DayManager
+    private let taskManager: TaskManager?
     private var endDayTask: Task<Void, Never>?
 
-    init(dayManager: DayManager, settlementDate: Date = .now) {
+    init(dayManager: DayManager, taskManager: TaskManager? = nil, settlementDate: Date = .now) {
         self.dayManager = dayManager
+        self.taskManager = taskManager
         self.settlementDate = Calendar.current.startOfDay(for: settlementDate)
     }
 
@@ -34,9 +38,14 @@ final class SummaryViewModel {
         do {
             summary = try await dayManager.fetchSummary(date: settlementDate)
             tasks = try await dayManager.fetchMustDoTasks(date: settlementDate)
-            incompleteNotes = Dictionary(
-                uniqueKeysWithValues: incompleteTasks.map { ($0.id, incompleteNotes[$0.id] ?? "") }
+            elapsedSecondsCache.removeAll()
+            for task in tasks {
+                elapsedSecondsCache[task.id] = (try? await taskManager?.totalElapsedSeconds(taskId: task.id)) ?? 0
+            }
+            taskNotes = Dictionary(
+                uniqueKeysWithValues: incompleteTasks.map { ($0.id, taskNotes[$0.id] ?? "") }
             )
+            expandedNoteTaskIds = Set(incompleteTasks.map { $0.id })
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -48,7 +57,7 @@ final class SummaryViewModel {
         errorMessage = nil
         endDayTask = Task {
             do {
-                let result = try await dayManager.settleDay(date: settlementDate, incompleteNotes: sanitizedIncompleteNotes)
+                let result = try await dayManager.settleDay(date: settlementDate, incompleteNotes: sanitizedTaskNotes)
                 guard !Task.isCancelled else { return }
                 summary = result
             } catch {
@@ -118,12 +127,20 @@ final class SummaryViewModel {
 
     var canSettle: Bool {
         incompleteTasks.allSatisfy { task in
-            !(incompleteNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            !(taskNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         }
     }
 
-    var sanitizedIncompleteNotes: [UUID: String] {
-        incompleteNotes.reduce(into: [UUID: String]()) { result, pair in
+    func toggleNoteExpanded(taskId: UUID) {
+        if expandedNoteTaskIds.contains(taskId) {
+            expandedNoteTaskIds.remove(taskId)
+        } else {
+            expandedNoteTaskIds.insert(taskId)
+        }
+    }
+
+    private var sanitizedTaskNotes: [UUID: String] {
+        taskNotes.reduce(into: [UUID: String]()) { result, pair in
             let note = pair.value.trimmingCharacters(in: .whitespacesAndNewlines)
             if !note.isEmpty {
                 result[pair.key] = note

@@ -158,68 +158,44 @@ struct SummaryView: View {
                     .padding(16)
                 }
             } else {
-                // 未评分
-                ScrollView {
-                    VStack(spacing: 16) {
-                    Text("该日期尚未结算")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-
-                    if !viewModel.incompleteTasks.isEmpty {
+                // 未评分 — 任务列表 + 备注 + 提交
+                VStack(spacing: 0) {
+                    ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("未完成必做项需要补充备注")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("备注会进入本次结算评分依据，用于说明阻塞、低估、调整或后续安排。")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-
-                            ForEach(viewModel.incompleteTasks, id: \.id) { task in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(task.title)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    TextField(
-                                        "补充未完成原因和后续安排...",
-                                        text: Binding(
-                                            get: { viewModel.incompleteNotes[task.id] ?? "" },
-                                            set: { viewModel.incompleteNotes[task.id] = $0 }
-                                        ),
-                                        axis: .vertical
-                                    )
-                                    .textFieldStyle(.plain)
-                                    .lineLimit(2...4)
-                                    .font(.system(size: 12))
-                                    .padding(8)
-                                    .background(Color(nsColor: .textBackgroundColor))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                }
-                                .padding(10)
-                                .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            ForEach(viewModel.tasks, id: \.id) { task in
+                                SettlementTaskRow(
+                                    task: task,
+                                    elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0,
+                                    noteText: Binding(
+                                        get: { viewModel.taskNotes[task.id] ?? "" },
+                                        set: { viewModel.taskNotes[task.id] = $0 }
+                                    ),
+                                    isNoteExpanded: viewModel.expandedNoteTaskIds.contains(task.id),
+                                    isNoteRequired: task.taskStatus != .done,
+                                    onToggleNote: { viewModel.toggleNoteExpanded(taskId: task.id) }
+                                )
                             }
                         }
                         .padding(12)
-                        .background(Color.orange.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .background(ScrollViewScrollerHider())
                     }
+                    .scrollIndicators(.never)
 
                     Button {
                         viewModel.endDay()
                     } label: {
-                        Image(systemName: "power")
-                            .font(.system(size: 28, weight: .medium))
+                        Text("结束今天")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 64, height: 64)
-                            .background(Circle().fill(Color.red.opacity(0.85)))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(viewModel.canSettle ? 0.85 : 0.4)))
                     }
                     .buttonStyle(.plain)
                     .disabled(!viewModel.canSettle)
-                    .opacity(viewModel.canSettle ? 1 : 0.45)
-                    .help("确认结算")
-                }
-                    .padding(16)
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                    .padding(.top, 8)
                 }
             }
 
@@ -299,5 +275,81 @@ struct StatCard: View {
         .padding(.vertical, 10)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
         .cornerRadius(8)
+    }
+}
+
+/// 结算任务行
+struct SettlementTaskRow: View {
+    let task: DailyTaskEntity
+    let elapsedSeconds: Int
+    @Binding var noteText: String
+    let isNoteExpanded: Bool
+    let isNoteRequired: Bool
+    let onToggleNote: () -> Void
+
+    private var isCompleted: Bool { task.taskStatus == .done }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isCompleted ? .green : .orange)
+
+                Text(task.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if elapsedSeconds > 0 {
+                    Text(elapsedSeconds / 60 * 60 == 0
+                         ? "\(elapsedSeconds / 60)分钟"
+                         : String(format: "%.0f小时%.0f分钟", Double(elapsedSeconds) / 3600, Double(elapsedSeconds % 3600) / 60))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+
+                if isNoteRequired {
+                    Text("需要备注")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.orange)
+                }
+
+                Spacer()
+
+                Button {
+                    onToggleNote()
+                } label: {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if isNoteExpanded || isNoteRequired {
+                TextField(
+                    isNoteRequired ? "补充原因和后续安排..." : "添加备注（可选）...",
+                    text: $noteText,
+                    axis: .vertical
+                )
+                .textFieldStyle(.plain)
+                .lineLimit(2...4)
+                .font(.system(size: 12))
+                .padding(8)
+                .background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(10)
+        .background(isCompleted
+            ? Color.green.opacity(0.06)
+            : Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

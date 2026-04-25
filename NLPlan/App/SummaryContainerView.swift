@@ -32,8 +32,17 @@ struct SummaryContainerView: View {
                     timerEngine: appState.timerEngine,
                     aiService: aiService
                 )
+                let taskMgr = TaskManager(
+                    ideaRepo: ideaRepo,
+                    dailyTaskRepo: dailyTaskRepo,
+                    thoughtRepo: ThoughtRepository(modelContext: context),
+                    sessionLogRepo: sessionLogRepo,
+                    aiService: aiService,
+                    timerEngine: appState.timerEngine
+                )
                 appState.summaryViewModel = SummaryViewModel(
                     dayManager: dayMgr,
+                    taskManager: taskMgr,
                     settlementDate: appState.settlementDate
                 )
             }
