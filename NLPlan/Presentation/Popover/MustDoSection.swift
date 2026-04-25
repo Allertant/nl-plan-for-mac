@@ -117,7 +117,11 @@ struct MustDoSection: View {
             }
         }
         .padding(8)
-        .background(Color.green.opacity(0.06))
+        .background(
+            Color.green.opacity(0.06)
+                .contentShape(Rectangle())
+                .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
+        )
         .cornerRadius(8)
     }
 }
@@ -358,6 +362,8 @@ struct MustDoTaskRow: View {
     @State private var showCompleteConfirm = false
     @State private var isEditingNote = false
     @State private var draftNote = ""
+    @FocusState private var focusedField: NoteField?
+    private enum NoteField: Hashable { case note }
 
     private var isRunning: Bool { task.taskStatus == .running }
     private var sourceIdea: IdeaEntity? {
@@ -395,9 +401,12 @@ struct MustDoTaskRow: View {
             }
         }
         .padding(8)
-        .background(rowBackground)
+        .background { rowBackground.contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
         .overlay(rowBorder)
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil, isEditingNote { commitNoteEdit() }
+        }
     }
 
     // MARK: - Subviews
@@ -533,24 +542,20 @@ struct MustDoTaskRow: View {
     private var noteArea: some View {
         Group {
             if isEditingNote {
-                TextField("添加备注...", text: $draftNote, axis: .vertical)
+                TextField("添加备注...", text: $draftNote)
                     .textFieldStyle(.plain)
-                    .lineLimit(1...3)
-                    .font(.system(size: 10))
-                    .padding(6)
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .onSubmit { commitNoteEdit() }
-            } else if let note = task.note, !note.isEmpty {
-                Text(note)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .onTapGesture { startEditingNote() }
-            } else if onUpdateNote != nil {
-                Text("添加备注...")
+                    .focused($focusedField, equals: .note)
+                    .onSubmit { commitNoteEdit() }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.1))
+                    .cornerRadius(3)
+            } else {
+                Text(task.note?.isEmpty ?? true ? "添加备注..." : task.note ?? "")
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle((task.note?.isEmpty ?? true) ? .tertiary : .secondary)
                     .onTapGesture { startEditingNote() }
             }
         }
@@ -560,13 +565,26 @@ struct MustDoTaskRow: View {
         guard onUpdateNote != nil else { return }
         draftNote = task.note ?? ""
         isEditingNote = true
+        focusedField = .note
+        moveInsertionPointToEnd()
     }
 
     private func commitNoteEdit() {
         isEditingNote = false
         let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed != (task.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines) {
+        if trimmed != (task.note ?? "") {
             onUpdateNote?(trimmed.isEmpty ? "" : trimmed)
+        }
+    }
+
+    private func moveInsertionPointToEnd(retryCount: Int = 3) {
+        DispatchQueue.main.async {
+            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else {
+                if retryCount > 0 { self.moveInsertionPointToEnd(retryCount: retryCount - 1) }
+                return
+            }
+            let endLocation = textView.string.count
+            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
         }
     }
 }

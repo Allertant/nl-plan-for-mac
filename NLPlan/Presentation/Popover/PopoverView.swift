@@ -51,6 +51,11 @@ struct PopoverView: View {
                     }
                     .padding(12)
                     .background(ScrollViewScrollerHider())
+                    .background(
+                        Color(nsColor: .windowBackgroundColor)
+                            .contentShape(Rectangle())
+                            .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
+                    )
                 }
                 .scrollIndicators(.hidden)
 

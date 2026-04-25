@@ -48,6 +48,11 @@ struct IdeaPoolPageView: View {
                             .padding(12)
                             .padding(.bottom, 40)
                     }
+                    .background(
+                        Color(nsColor: .windowBackgroundColor)
+                            .contentShape(Rectangle())
+                            .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
+                    )
                 }
                 .scrollIndicators(.never)
             }
