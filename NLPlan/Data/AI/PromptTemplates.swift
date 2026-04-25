@@ -20,6 +20,7 @@ enum PromptTemplates {
         5. 如果任务是普通单次事项，estimated_minutes 必须给出分钟数。
         6. 如果任务明显是长期项目、系列计划、学习路线或无法整体一次完成的目标，不要给整项预估时长，estimated_minutes 设为 null。
         7. 推荐最应该今天完成的任务（recommended = true）
+        8. 如果用户输入中的某个事项与已有任务语义相同或高度相似（用词不同但指同一件事），直接跳过，不要生成。例如已有「搭建个人博客」时，用户再说「开始写技术博客」应跳过。
 
         示例输入：「今天要把项目报告初稿写完，顺便整理工位，下午产品评审会」
         正确输出：3 个任务 — 「完成项目报告初稿」「整理工位」「产品评审会」
@@ -41,7 +42,7 @@ enum PromptTemplates {
 
         if !existingTaskTitles.isEmpty {
             let titles = existingTaskTitles.map { "- \($0)" }.joined(separator: "\n")
-            prompt += "\n\n用户已有的任务列表（请避免生成重复任务）：\n\(titles)"
+            prompt += "\n\n以下是用户已有的任务，无论措辞如何，与这些任务语义重复的一律跳过：\n\(titles)"
         }
 
         prompt += "\n\n用户的输入：\n\(input)"
