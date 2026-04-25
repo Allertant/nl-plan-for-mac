@@ -160,6 +160,13 @@ private struct AIRecommendPanel: View {
                     Text("AI 正在分析...")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("取消") {
+                        viewModel.dismissRecommendations()
+                    }
+                    .font(.system(size: 11))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)

@@ -96,6 +96,7 @@ final class MustDoViewModel {
     private let taskManager: TaskManager
     private let projectSummaryPreparationConcurrencyLimit = 2
     private let aiExecutionCoordinator = AIExecutionCoordinator()
+    private var recommendationTask: Task<Void, Never>?
 
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
@@ -267,7 +268,8 @@ final class MustDoViewModel {
         ideaPoolIdeas: [IdeaEntity],
         remainingHours: Double,
         extraContext: String? = nil
-    ) async {
+    ) {
+        recommendationTask?.cancel()
         recommendationState = .loading
         errorMessage = nil
         acceptedRecommendationIds = []
@@ -278,91 +280,101 @@ final class MustDoViewModel {
             idea.ideaStatus != .completed &&
             idea.ideaStatus != .archived
         }
+        let strategy = recommendationStrategy
+        let currentTasks = tasks
 
-        let recommendationCandidates: [IdeaEntity]
-        switch recommendationStrategy {
-        case .quick:
-            let nonProjectCandidates = allCandidates.filter { !$0.isProject }
-            recommendationCandidates = nonProjectCandidates.isEmpty ? allCandidates : nonProjectCandidates
-        case .comprehensive:
-            do {
-                recommendationCandidates = try await prepareComprehensiveCandidates(from: allCandidates)
-            } catch {
-                recommendationState = .error(error.localizedDescription)
-                return
+        recommendationTask = Task {
+            let recommendationCandidates: [IdeaEntity]
+            switch strategy {
+            case .quick:
+                let nonProjectCandidates = allCandidates.filter { !$0.isProject }
+                recommendationCandidates = nonProjectCandidates.isEmpty ? allCandidates : nonProjectCandidates
+            case .comprehensive:
+                do {
+                    recommendationCandidates = try await prepareComprehensiveCandidates(from: allCandidates)
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    recommendationState = .error(error.localizedDescription)
+                    return
+                }
             }
-        }
+            guard !Task.isCancelled else { return }
 
-        let ideaInputs = recommendationCandidates.map { idea in
-            TaskRecommendationInput(
-                id: idea.id,
-                title: idea.title,
-                category: idea.category,
-                estimatedMinutes: idea.estimatedMinutes,
-                attempted: idea.attempted,
-                status: idea.status,
-                isProject: idea.isProject,
-                projectDescription: idea.projectDescription,
-                planningBackground: idea.planningBackground,
-                projectRecommendationSummary: idea.projectRecommendationSummary
-            )
-        }
-
-        let mustDoInputs = tasks.map { task in
-            TaskRecommendationInput(
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                estimatedMinutes: task.estimatedMinutes,
-                attempted: task.attempted,
-                status: task.status,
-                isProject: false,
-                projectDescription: nil,
-                planningBackground: nil,
-                projectRecommendationSummary: nil
-            )
-        }
-
-        do {
-            let aiService = await makeAIService()
-            let result = try await aiExecutionCoordinator.run {
-                try await aiService.recommendTasks(
-                ideaPoolTasks: ideaInputs,
-                mustDoTasks: mustDoInputs,
-                remainingHours: remainingHours,
-                strategy: recommendationStrategy,
-                extraContext: extraContext
+            let ideaInputs = recommendationCandidates.map { idea in
+                TaskRecommendationInput(
+                    id: idea.id,
+                    title: idea.title,
+                    category: idea.category,
+                    estimatedMinutes: idea.estimatedMinutes,
+                    attempted: idea.attempted,
+                    status: idea.status,
+                    isProject: idea.isProject,
+                    projectDescription: idea.projectDescription,
+                    planningBackground: idea.planningBackground,
+                    projectRecommendationSummary: idea.projectRecommendationSummary
                 )
             }
 
-            let ideaIds = Set(recommendationCandidates.map { $0.id })
-            let validRecs = result.recommendations.filter { recommendation in
-                if let taskId = recommendation.taskId {
-                    return ideaIds.contains(taskId)
-                }
-                if let sourceIdeaId = recommendation.sourceIdeaId {
-                    return ideaIds.contains(sourceIdeaId)
-                }
-                return false
-            }
-            let filteredResult = RecommendationResult(
-                recommendations: validRecs,
-                overallReason: result.overallReason
-            )
-
-            for (index, rec) in validRecs.enumerated() {
-                let priority: TaskPriority
-                switch index {
-                case 0: priority = .high
-                case 1: priority = .medium
-                default: priority = .low
-                }
-                selectedPriorities[rec.id] = priority
+            let mustDoInputs = currentTasks.map { task in
+                TaskRecommendationInput(
+                    id: task.id,
+                    title: task.title,
+                    category: task.category,
+                    estimatedMinutes: task.estimatedMinutes,
+                    attempted: task.attempted,
+                    status: task.status,
+                    isProject: false,
+                    projectDescription: nil,
+                    planningBackground: nil,
+                    projectRecommendationSummary: nil
+                )
             }
 
-            recommendationState = .loaded(filteredResult)
-        } catch {
-            recommendationState = .error(error.localizedDescription)
+            do {
+                let aiService = await makeAIService()
+                let result = try await aiExecutionCoordinator.run {
+                    try await aiService.recommendTasks(
+                    ideaPoolTasks: ideaInputs,
+                    mustDoTasks: mustDoInputs,
+                    remainingHours: remainingHours,
+                    strategy: strategy,
+                    extraContext: extraContext
+                    )
+                }
+                guard !Task.isCancelled else { return }
+
+                let ideaIds = Set(recommendationCandidates.map { $0.id })
+                let validRecs = result.recommendations.filter { recommendation in
+                    if let taskId = recommendation.taskId {
+                        return ideaIds.contains(taskId)
+                    }
+                    if let sourceIdeaId = recommendation.sourceIdeaId {
+                        return ideaIds.contains(sourceIdeaId)
+                    }
+                    return false
+                }
+                let filteredResult = RecommendationResult(
+                    recommendations: validRecs,
+                    overallReason: result.overallReason
+                )
+
+                for (index, rec) in validRecs.enumerated() {
+                    let priority: TaskPriority
+                    switch index {
+                    case 0: priority = .high
+                    case 1: priority = .medium
+                    default: priority = .low
+                    }
+                    selectedPriorities[rec.id] = priority
+                }
+
+                recommendationState = .loaded(filteredResult)
+            } catch is CancellationError {
+                // Silently ignore
+            } catch {
+                guard !Task.isCancelled else { return }
+                recommendationState = .error(error.localizedDescription)
+            }
         }
     }
 
@@ -402,6 +414,8 @@ final class MustDoViewModel {
     }
 
     func dismissRecommendations() {
+        recommendationTask?.cancel()
+        recommendationTask = nil
         recommendationState = .idle
         acceptedRecommendationIds = []
     }

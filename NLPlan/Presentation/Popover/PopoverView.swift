@@ -194,16 +194,19 @@ private struct AIRecommendFloatingButton: View {
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // 策略小球（从底部向上弹出）
+        VStack(alignment: .trailing, spacing: 8) {
+            // 策略小球
             if isExpanded {
-                ForEach(Array(MustDoViewModel.RecommendationStrategy.allCases.enumerated()), id: \.element) { index, strategy in
-                    strategyBall(strategy, offsetIndex: MustDoViewModel.RecommendationStrategy.allCases.count - 1 - index)
+                VStack(spacing: 6) {
+                    ForEach(MustDoViewModel.RecommendationStrategy.allCases, id: \.self) { strategy in
+                        strategyBall(strategy)
+                    }
                 }
+                .transition(.scale(scale: 0.5).combined(with: .opacity))
             }
 
             // 输入框 + 主按钮
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 if isExpanded {
                     TextField("额外要求（可选）", text: $extraContext, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -218,7 +221,6 @@ private struct AIRecommendFloatingButton: View {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
 
-                // 主按钮
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         isExpanded.toggle()
@@ -243,7 +245,7 @@ private struct AIRecommendFloatingButton: View {
         }
     }
 
-    private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy, offsetIndex: Int) -> some View {
+    private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy) -> some View {
         Button {
             let context = extraContext.trimmingCharacters(in: .whitespacesAndNewlines)
             viewModel.recommendationStrategy = strategy
@@ -252,13 +254,11 @@ private struct AIRecommendFloatingButton: View {
             }
             extraContext = ""
             isInputFocused = false
-            Task {
-                await viewModel.fetchRecommendations(
-                    ideaPoolIdeas: ideaPoolIdeas,
-                    remainingHours: remainingWorkHours,
-                    extraContext: context.isEmpty ? nil : context
-                )
-            }
+            viewModel.fetchRecommendations(
+                ideaPoolIdeas: ideaPoolIdeas,
+                remainingHours: remainingWorkHours,
+                extraContext: context.isEmpty ? nil : context
+            )
         } label: {
             Text(strategy.shortName)
                 .font(.system(size: 10, weight: .medium))
@@ -270,7 +270,6 @@ private struct AIRecommendFloatingButton: View {
         }
         .buttonStyle(.plain)
         .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-        .offset(y: CGFloat(offsetIndex + 1) * -40)
         .transition(.scale(scale: 0.5).combined(with: .opacity))
     }
 }
