@@ -252,7 +252,7 @@ final class DayManager {
                     completed: task.taskStatus == .done,
                     priority: task.priority,
                     sourceType: summarySourceType(for: task),
-                    note: summaryNote(for: task, incompleteNotes: incompleteNotes)
+                    note: combinedNote(for: task, incompleteNotes: incompleteNotes)
                 )
             }
         )
@@ -329,6 +329,12 @@ final class DayManager {
     }
 
     private func summaryNote(for task: DailyTaskEntity, incompleteNotes: [UUID: String]) -> String? {
+        let note = incompleteNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let note, !note.isEmpty else { return nil }
+        return note
+    }
+
+    private func combinedNote(for task: DailyTaskEntity, incompleteNotes: [UUID: String]) -> String? {
         var parts: [String] = []
         if let note = task.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
             parts.append(note)
@@ -336,7 +342,7 @@ final class DayManager {
         if let note = incompleteNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
             parts.append(note)
         }
-        return parts.isEmpty ? nil : parts.joined(separator: "\n结算备注：")
+        return parts.isEmpty ? nil : parts.joined(separator: "；")
     }
 
     private func archiveAndClearSettledTasks(

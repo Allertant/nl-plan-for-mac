@@ -76,6 +76,9 @@ struct MustDoSection: View {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     viewModel.moveDown(at: index)
                                 }
+                            },
+                            onUpdateNote: { note in
+                                Task { await viewModel.updateTaskNote(taskId: task.id, note: note) }
                             }
                         )
                     }
@@ -350,8 +353,11 @@ struct MustDoTaskRow: View {
     let onBindSource: (UUID?) -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
+    var onUpdateNote: ((String) -> Void)? = nil
 
     @State private var showCompleteConfirm = false
+    @State private var isEditingNote = false
+    @State private var draftNote = ""
 
     private var isRunning: Bool { task.taskStatus == .running }
     private var sourceIdea: IdeaEntity? {
@@ -376,6 +382,8 @@ struct MustDoTaskRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+
+                noteArea
             }
 
             Spacer()
@@ -518,6 +526,48 @@ struct MustDoTaskRow: View {
     private var rowBorder: some View {
         RoundedRectangle(cornerRadius: 6)
             .stroke(isRunning ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
+    }
+
+    // MARK: - Note
+
+    private var noteArea: some View {
+        Group {
+            if isEditingNote {
+                TextField("添加备注...", text: $draftNote, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...3)
+                    .font(.system(size: 10))
+                    .padding(6)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .onSubmit { commitNoteEdit() }
+            } else if let note = task.note, !note.isEmpty {
+                Text(note)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .onTapGesture { startEditingNote() }
+            } else if onUpdateNote != nil {
+                Text("添加备注...")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .onTapGesture { startEditingNote() }
+            }
+        }
+    }
+
+    private func startEditingNote() {
+        guard onUpdateNote != nil else { return }
+        draftNote = task.note ?? ""
+        isEditingNote = true
+    }
+
+    private func commitNoteEdit() {
+        isEditingNote = false
+        let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != (task.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines) {
+            onUpdateNote?(trimmed.isEmpty ? "" : trimmed)
+        }
     }
 }
 

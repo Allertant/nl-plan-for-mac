@@ -528,4 +528,14 @@ final class MustDoViewModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    func updateTaskNote(taskId: UUID, note: String) async {
+        do {
+            guard let task = try await taskManager.fetchMustDo(date: .now).first(where: { $0.id == taskId }) else { return }
+            task.note = note.isEmpty ? nil : note
+            try await taskManager.updateDailyTask(task)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
