@@ -142,14 +142,16 @@ private struct AIRecommendPanel: View {
                 Text("AI 推荐")
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
-                Button {
-                    viewModel.dismissRecommendations()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                if viewModel.recommendationState != .loading {
+                    Button {
+                        viewModel.dismissRecommendations()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
             switch viewModel.recommendationState {
