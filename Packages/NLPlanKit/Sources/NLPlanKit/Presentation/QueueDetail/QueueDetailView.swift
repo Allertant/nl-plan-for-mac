@@ -86,6 +86,22 @@ struct QueueDetailView: View {
                             }
                     }
 
+                    // 追问处理中状态
+                    if isLocked {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("AI 正在处理你的调整...")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.accentColor.opacity(0.08))
+                        .cornerRadius(6)
+                        .transition(.opacity)
+                    }
+
                     // AI 对话输入区
                     HStack(alignment: .top) {
                         TextField("告诉 AI 你想怎么调整...", text: $viewModel.chatInput, axis: .vertical)
