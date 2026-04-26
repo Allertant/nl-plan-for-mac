@@ -360,7 +360,7 @@ final class DayManager {
             task.isSettled = true
             task.settledAt = settlementDate
             task.actualMinutes = actualMinutes
-            task.settlementNote = note
+            task.incompletionReason = note
             try dailyTaskRepo.update(task)
 
             if let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {

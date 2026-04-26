@@ -1,7 +1,9 @@
 import Foundation
 import SwiftData
 
-/// 某一天用户确认执行的必做项。只表达“当天计划”，长期想法信息通过 sourceIdeaId 引用。
+/// 某一天用户确认执行的必做项。只表达”当天计划”，长期想法信息通过 sourceIdeaId 引用。
+/// - note: 任务备注（用户在添加/编辑必做项时填写）
+/// - incompletionReason: 未完成原因说明（日终结算时填写，原字段名 settlementNote）
 @Model
 final class DailyTaskEntity {
     @Attribute(.unique) var id: UUID
@@ -18,7 +20,7 @@ final class DailyTaskEntity {
     var updatedAt: Date
     var attempted: Bool
     var note: String?
-    var settlementNote: String?
+    @Attribute(originalName: "settlementNote") var incompletionReason: String?
     var sourceIdeaId: UUID?
     var sourceType: String
     var isSettled: Bool = false
@@ -52,7 +54,7 @@ final class DailyTaskEntity {
         updatedAt: Date = .now,
         attempted: Bool = false,
         note: String? = nil,
-        settlementNote: String? = nil,
+        incompletionReason: String? = nil,
         sourceIdeaId: UUID? = nil,
         sourceType: String = DailyTaskSourceType.none.rawValue,
         isSettled: Bool = false,
@@ -73,7 +75,7 @@ final class DailyTaskEntity {
         self.updatedAt = updatedAt
         self.attempted = attempted
         self.note = note
-        self.settlementNote = settlementNote
+        self.incompletionReason = incompletionReason
         self.sourceIdeaId = sourceIdeaId
         self.sourceType = sourceType
         self.isSettled = isSettled

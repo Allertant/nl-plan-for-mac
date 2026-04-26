@@ -30,41 +30,50 @@ private struct HistoryDetailPageView: View {
     @State private var showingIdeaPopover: IdeaEntity?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                BackButton(action: onDismiss).help("返回历史记录")
-                Image(systemName: "clock.fill").font(.system(size: 12)).foregroundStyle(.blue)
-                Text("历史详情").font(.system(size: 13, weight: .semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            if isLoading {
-                ProgressView("加载中...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let summary {
-                            gradeCard(summary)
-                            evaluationCard(summary)
-                        }
-                        tasksCard
-                    }
-                    .padding(12)
+        ZStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    BackButton(action: onDismiss).help("返回历史记录")
+                    Image(systemName: "clock.fill").font(.system(size: 12)).foregroundStyle(.blue)
+                    Text("历史详情").font(.system(size: 13, weight: .semibold))
+                    Spacer()
                 }
-                .scrollIndicators(.never)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                Divider()
+
+                if isLoading {
+                    ProgressView("加载中...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let summary {
+                                gradeCard(summary)
+                                evaluationCard(summary)
+                            }
+                            tasksCard
+                        }
+                        .padding(12)
+                    }
+                    .scrollIndicators(.never)
+                }
+            }
+            .frame(width: 360, height: 520)
+            .background(Color(nsColor: .windowBackgroundColor))
+
+            // 想法弹窗覆盖层
+            if let idea = showingIdeaPopover {
+                Color.black.opacity(0.18)
+                    .ignoresSafeArea()
+                    .onTapGesture { showingIdeaPopover = nil }
+
+                ideaPopupCard(idea)
+                    .zIndex(1)
             }
         }
-        .frame(width: 360, height: 520)
-        .background(Color(nsColor: .windowBackgroundColor))
         .task { await loadData() }
-        .popover(item: $showingIdeaPopover) { idea in
-            ideaPopoverContent(idea)
-        }
     }
 
     private func loadData() async {
@@ -228,15 +237,8 @@ private struct HistoryDetailPageView: View {
                 }
             }
 
-            if let note = task.note, !note.isEmpty {
-                Text("备注：\(note)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let settlementNote = task.settlementNote, !settlementNote.isEmpty {
-                Text(task.taskStatus == .done ? "备注：\(settlementNote)" : "未完成原因：\(settlementNote)")
+            if let incompletionReason = task.incompletionReason, !incompletionReason.isEmpty {
+                Text("未完成原因：\(incompletionReason)")
                     .font(.system(size: 10))
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -269,20 +271,33 @@ private struct HistoryDetailPageView: View {
             }
         }
         .padding(8)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(task.taskStatus == .done
+            ? Color.green.opacity(0.06)
+            : Color.orange.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
-    // MARK: - Idea Popover
+    // MARK: - Idea Popup Card
 
-    private func ideaPopoverContent(_ idea: IdeaEntity) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func ideaPopupCard(_ idea: IdeaEntity) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(idea.title)
+                Text("想法详情")
                     .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(3)
                 Spacer()
+                Button {
+                    showingIdeaPopover = nil
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
+
+            Text(idea.title)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(3)
 
             HStack(spacing: 8) {
                 TagChip(text: idea.category)
@@ -292,14 +307,26 @@ private struct HistoryDetailPageView: View {
             }
 
             if let note = idea.note, !note.isEmpty {
+                Divider()
                 Text(note)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer()
         }
-        .padding(12)
-        .frame(width: 240)
+        .padding(16)
+        .frame(width: 260, height: 220)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 14, x: 0, y: 5)
     }
 
     // MARK: - Helpers

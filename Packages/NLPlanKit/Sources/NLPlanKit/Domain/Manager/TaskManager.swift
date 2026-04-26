@@ -342,9 +342,9 @@ final class TaskManager {
                     return "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟\(noteText)"
                 },
                 settledTasks: settledTasks.map { task in
-                    let note = task.settlementNote?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let noteText = (note?.isEmpty == false) ? " - 备注：\(note!)" : ""
-                    return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 实际\(task.actualMinutes ?? 0)分钟\(noteText)"
+                    let reason = task.incompletionReason?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let reasonText = (reason?.isEmpty == false) ? " - 未完成原因：\(reason!)" : ""
+                    return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 实际\(task.actualMinutes ?? 0)分钟\(reasonText)"
                 }
             ),
             contextUpdatedAt: contextUpdatedAt
