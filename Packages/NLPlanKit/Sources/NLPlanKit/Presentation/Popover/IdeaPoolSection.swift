@@ -455,7 +455,7 @@ struct IdeaPoolTaskRow: View {
                             Image(systemName: "chevron.down.circle").font(.system(size: 10)).foregroundStyle(.tertiary)
                         }
                     }.menuStyle(.borderlessButton).menuIndicator(.hidden)
-                    if idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
+                    if !idea.isProject && idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
                     if isInProgress { Text("进行中").font(.system(size: 9, weight: .medium)).foregroundStyle(.green).padding(.horizontal, 4).padding(.vertical, 1).background(Color.green.opacity(0.14)).cornerRadius(3) }
                 }
                 HStack(spacing: 8) {

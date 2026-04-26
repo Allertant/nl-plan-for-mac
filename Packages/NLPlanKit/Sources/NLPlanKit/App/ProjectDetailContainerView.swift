@@ -100,10 +100,6 @@ private struct ProjectDetailPageView: View {
                     TagChip(text: project.category)
                     Text(project.createdDate.shortDateTimeString).font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
-                if project.attempted {
-                    Text("已尝试").font(.system(size: 9, weight: .medium)).foregroundStyle(.orange)
-                        .padding(.horizontal, 6).padding(.vertical, 2).background(Color.orange.opacity(0.12)).clipShape(Capsule())
-                }
 
                 if let progress = project.projectProgress {
                     Divider().padding(.vertical, 2)
@@ -235,7 +231,6 @@ struct ProjectDetailSnapshot {
     let title: String
     let category: String
     let createdDate: Date
-    let attempted: Bool
     let projectProgress: Double?
     let projectProgressSummary: String?
     let projectProgressUpdatedAt: Date?
@@ -247,7 +242,6 @@ struct ProjectDetailSnapshot {
         title = idea.title
         category = idea.category
         createdDate = idea.createdDate
-        attempted = idea.attempted
         projectProgress = idea.projectProgress
         projectProgressSummary = idea.projectProgressSummary
         projectProgressUpdatedAt = idea.projectProgressUpdatedAt
