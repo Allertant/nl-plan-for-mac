@@ -96,12 +96,15 @@ final class AppState {
         case settings
         case queueDetail(UUID)
         case cleanupDetail
+        case projectDetail(UUID)
 
         static func == (lhs: Page, rhs: Page) -> Bool {
             switch (lhs, rhs) {
             case (.main, .main), (.ideaPool, .ideaPool), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail):
                 return true
             case (.queueDetail(let a), .queueDetail(let b)):
+                return a == b
+            case (.projectDetail(let a), .projectDetail(let b)):
                 return a == b
             default:
                 return false
@@ -110,6 +113,11 @@ final class AppState {
 
         var queueItemID: UUID? {
             if case .queueDetail(let id) = self { return id }
+            return nil
+        }
+
+        var projectItemID: UUID? {
+            if case .projectDetail(let id) = self { return id }
             return nil
         }
     }
