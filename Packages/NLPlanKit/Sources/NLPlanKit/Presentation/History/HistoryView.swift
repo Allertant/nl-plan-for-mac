@@ -63,6 +63,10 @@ struct HistoryView: View {
 
                 HistoryDetailView(summary: summary) {
                     viewModel.selectedSummary = nil
+                } onViewDetail: {
+                    let date = summary.date
+                    viewModel.selectedSummary = nil
+                    appState.currentPage = .historyDetail(date)
                 }
                 .zIndex(1)
             }
@@ -312,6 +316,7 @@ struct HistoryCard: View {
 struct HistoryDetailView: View {
     let summary: DailySummaryEntity
     let onClose: () -> Void
+    let onViewDetail: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -319,6 +324,10 @@ struct HistoryDetailView: View {
                 Text(summary.date.dateString)
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
+                Button("查看详情") { onViewDetail() }
+                    .font(.system(size: 11))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle")
                         .font(.system(size: 14))
@@ -408,18 +417,6 @@ private struct HistoryGradeLegend: View {
 }
 
 private extension Grade {
-    var historyColor: Color {
-        switch self {
-        case .S: return .purple
-        case .A: return .blue
-        case .B: return .cyan
-        case .C: return .green
-        case .D: return .yellow
-        case .E: return .orange
-        case .F: return .red
-        }
-    }
-
     var legendTextColor: Color {
         self == .D ? .black.opacity(0.72) : .white
     }

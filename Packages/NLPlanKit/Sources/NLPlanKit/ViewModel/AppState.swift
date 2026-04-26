@@ -65,6 +65,9 @@ final class AppState {
     /// 需要用户补结算的日期。系统只提醒，不自动结算。
     var pendingSettlementDate: Date?
 
+    /// 从二级页面返回时的目标页面（用于跨页面导航后正确返回）
+    var returnPage: Page?
+
     /// 应用外观模式
     var appearanceMode: AppearanceMode = .system
 
@@ -97,6 +100,7 @@ final class AppState {
         case queueDetail(UUID)
         case cleanupDetail
         case projectDetail(UUID)
+        case historyDetail(Date)
 
         static func == (lhs: Page, rhs: Page) -> Bool {
             switch (lhs, rhs) {
@@ -106,6 +110,8 @@ final class AppState {
                 return a == b
             case (.projectDetail(let a), .projectDetail(let b)):
                 return a == b
+            case (.historyDetail(let a), .historyDetail(let b)):
+                return Calendar.current.isDate(a, inSameDayAs: b)
             default:
                 return false
             }
@@ -118,6 +124,11 @@ final class AppState {
 
         var projectItemID: UUID? {
             if case .projectDetail(let id) = self { return id }
+            return nil
+        }
+
+        var historyDetailDate: Date? {
+            if case .historyDetail(let date) = self { return date }
             return nil
         }
     }

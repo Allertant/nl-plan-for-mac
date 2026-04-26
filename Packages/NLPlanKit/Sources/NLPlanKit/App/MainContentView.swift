@@ -34,6 +34,9 @@ struct MainContentView: View {
 
             case .projectDetail:
                 ProjectDetailContainerView()
+
+            case .historyDetail:
+                HistoryDetailContainerView()
             }
         }
         .opacity(appState.currentPage == .main ? 1 : secondaryPageOpacity)

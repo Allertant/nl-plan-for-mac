@@ -71,6 +71,20 @@ final class DailyTaskRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchAllTasks(date: Date) throws -> [DailyTaskEntity] {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                task.date >= startOfDay && task.date < endOfDay
+            },
+            sortBy: [SortDescriptor(\.sortOrder)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func fetchActiveTasks(sourceIdeaId: UUID) throws -> [DailyTaskEntity] {
         let sourceId = sourceIdeaId
         let done = TaskStatus.done.rawValue

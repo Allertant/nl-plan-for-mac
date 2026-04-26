@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// 日终评分等级
 enum Grade: String, Codable, CaseIterable, Sendable {
@@ -12,6 +12,18 @@ enum Grade: String, Codable, CaseIterable, Sendable {
 
     var displayName: String {
         rawValue
+    }
+
+    var historyColor: Color {
+        switch self {
+        case .S: return .purple
+        case .A: return .blue
+        case .B: return .cyan
+        case .C: return .green
+        case .D: return .yellow
+        case .E: return .orange
+        case .F: return .red
+        }
     }
 
     /// 基于完成率的规则化评分（降级方案，AI 不可用时使用）

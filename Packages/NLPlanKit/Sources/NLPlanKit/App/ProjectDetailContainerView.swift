@@ -11,7 +11,11 @@ struct ProjectDetailContainerView: View {
                 ProjectDetailPageView(
                     viewModel: ideaPoolVM,
                     idea: idea,
-                    onDismiss: { appState.currentPage = .ideaPool }
+                    onDismiss: {
+                        let returnTo = appState.returnPage ?? .ideaPool
+                        appState.returnPage = nil
+                        appState.currentPage = returnTo
+                    }
                 )
             } else {
                 ProgressView("加载中...")
