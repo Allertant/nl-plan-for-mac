@@ -288,14 +288,14 @@ private struct ToolbarIconButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label()
-                .font(.system(size: 11))
+                .font(.system(size: 15))
                 .foregroundStyle(.secondary)
-                .padding(6)
+                .padding(8)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
         )
         .onHover { hovering in

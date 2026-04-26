@@ -8,14 +8,14 @@ struct BackButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "chevron.left")
-                .font(.system(size: 12))
+                .font(.system(size: 16))
                 .foregroundStyle(.secondary)
-                .padding(6)
+                .padding(8)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
         )
         .onHover { hovering in

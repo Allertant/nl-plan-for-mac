@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// 想法池 ViewModel
-@Observable
+@MainActor @Observable
 final class IdeaPoolViewModel {
 
     enum ProjectDecisionSource: String {
@@ -170,7 +170,10 @@ final class IdeaPoolViewModel {
                             "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
                         },
                         settledTasks: settledTasks.map { task in
-                            let note = normalizeOptionalText(task.settlementNote) ?? "无备注"
+                            let note = {
+                                let t = task.settlementNote?.trimmingCharacters(in: .whitespacesAndNewlines)
+                                return (t != nil && !t!.isEmpty) ? t! : "无备注"
+                            }()
                             return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 备注：\(note)"
                         }
                     )
