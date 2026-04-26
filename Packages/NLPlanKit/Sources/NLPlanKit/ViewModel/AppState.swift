@@ -119,6 +119,7 @@ final class AppState {
     init(modelContainer: ModelContainer, timerEngine: TimerEngine) {
         self.modelContainer = modelContainer
         self.timerEngine = timerEngine
+        LegacyPreferencesMigrator.migrateIfNeeded()
         loadAppearanceMode()
         checkAPIKey()
     }

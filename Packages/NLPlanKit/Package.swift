@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "NLPlan",
+    name: "NLPlanKit",
     platforms: [
         .macOS(.v14)
     ],
@@ -10,14 +10,11 @@ let package = Package(
         .library(name: "NLPlanKit", targets: ["NLPlanKit"])
     ],
     targets: [
-        .target(
-            name: "NLPlanKit",
-            path: "NLPlan"
-        ),
+        .target(name: "NLPlanKit"),
         .testTarget(
-            name: "NLPlanTests",
+            name: "NLPlanKitTests",
             dependencies: ["NLPlanKit"],
-            path: "NLPlanTests"
+            path: "Tests/NLPlanKitTests"
         )
     ]
 )

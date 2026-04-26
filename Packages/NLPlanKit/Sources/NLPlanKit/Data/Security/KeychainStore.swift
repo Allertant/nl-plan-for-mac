@@ -9,7 +9,7 @@ final class KeychainStore {
     static let shared = KeychainStore()
 
     /// 存储前缀，避免与其它 UserDefaults key 冲突
-    private let prefix = "com.nlplan.mac.secure."
+    private let prefix = AppConstants.secureStoragePrefix
 
     private let defaults = UserDefaults.standard
 
@@ -40,4 +40,3 @@ final class KeychainStore {
         return prefix + key
     }
 }
-

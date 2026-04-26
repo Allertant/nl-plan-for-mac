@@ -5,6 +5,12 @@ enum AppConstants {
     /// 应用标识
     static let appIdentifier = "com.nlplan.mac"
 
+    /// 旧版本使用过的 UserDefaults 偏好域
+    static let legacyPreferencesDomain = "NLPlan"
+
+    /// 伪安全存储前缀（当前使用 UserDefaults + Base64）
+    static let secureStoragePrefix = "com.nlplan.mac.secure."
+
     /// Keychain key for API Key
     static let apiKeyKeychainKey = "nlplan_deepseek_api_key"
 

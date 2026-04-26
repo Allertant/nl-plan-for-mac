@@ -44,9 +44,30 @@
 git clone https://github.com/Allertant/nl-plan-for-mac.git
 cd nl-plan-for-mac
 
-# 在 Xcode 中打开 Package.swift 运行，或
-swift build
+# 运行 package 单元测试
+cd Packages/NLPlanKit
+swift test
+
+# 回到仓库根目录构建 macOS App
+cd ../..
+xcodebuild \
+  -project NLPlan.xcodeproj \
+  -scheme NLPlan \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath .DerivedData/NLPlan \
+  -clonedSourcePackagesDirPath .DerivedData/NLPlan/SourcePackages \
+  build
 ```
+
+构建完成后的应用产物位置：
+
+- `.app` 包：
+  - `.DerivedData/NLPlan/Build/Products/Debug/NLPlan.app`
+- 可执行文件：
+  - `.DerivedData/NLPlan/Build/Products/Debug/NLPlan.app/Contents/MacOS/NLPlan`
+
+如果使用 Xcode，也可以直接打开 `NLPlan.xcodeproj`，选择 `NLPlan` scheme 运行。
 
 ## 配置
 
@@ -80,12 +101,14 @@ swift build
 
 | 文档 | 说明 |
 |------|------|
+| [docs/README.md](docs/README.md) | 文档目录索引 |
 | [docs/spec/PRD.md](docs/spec/PRD.md) | 产品需求文档 |
 | [docs/spec/SAD.md](docs/spec/SAD.md) | 软件架构文档 |
 | [docs/spec/SRS.md](docs/spec/SRS.md) | 软件需求规格说明 |
 | [docs/design/ai-recommendation-upgrade.md](docs/design/ai-recommendation-upgrade.md) | AI 推荐必做项流程升级设计 |
 | [docs/design/settlement-scoring-upgrade.md](docs/design/settlement-scoring-upgrade.md) | 结算评分机制升级设计 |
 | [docs/design/project-and-progress.md](docs/design/project-and-progress.md) | 想法池项目与 AI 进度设计 |
+| [docs/guides/macos-app-local-package-migration-guide.md](docs/guides/macos-app-local-package-migration-guide.md) | macOS App + local package 通用改造指南 |
 
 ## License
 

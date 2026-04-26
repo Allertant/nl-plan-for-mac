@@ -102,7 +102,7 @@
 			);
 			mainGroup = B10000072026042600000001;
 			packageReferences = (
-				B10000122026042600000001 /* XCLocalSwiftPackageReference "." */,
+				B10000122026042600000001 /* XCLocalSwiftPackageReference "Packages/NLPlanKit" */,
 			);
 			productRefGroup = B10000082026042600000001 /* Products */;
 			projectDirPath = "";
@@ -225,16 +225,16 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B10000122026042600000001 /* XCLocalSwiftPackageReference "." */ = {
+		B10000122026042600000001 /* XCLocalSwiftPackageReference "Packages/NLPlanKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = .;
+			relativePath = Packages/NLPlanKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		B10000132026042600000001 /* NLPlanKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B10000122026042600000001 /* XCLocalSwiftPackageReference "." */;
+			package = B10000122026042600000001 /* XCLocalSwiftPackageReference "Packages/NLPlanKit" */;
 			productName = NLPlanKit;
 		};
 /* End XCSwiftPackageProductDependency section */

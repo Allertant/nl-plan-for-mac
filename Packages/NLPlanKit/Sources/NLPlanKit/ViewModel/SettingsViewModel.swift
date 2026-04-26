@@ -109,6 +109,7 @@ final class SettingsViewModel {
     weak var appState: AppState?
 
     init() {
+        LegacyPreferencesMigrator.migrateIfNeeded()
         loadAPIKey()
         loadSelectedModel()
         loadWorkEndTime()
