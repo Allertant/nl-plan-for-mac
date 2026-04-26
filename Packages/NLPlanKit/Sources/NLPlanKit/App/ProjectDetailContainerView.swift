@@ -31,8 +31,7 @@ private struct ProjectDetailPageView: View {
     let onDismiss: () -> Void
 
     @State private var projectDetail: ProjectDetailSnapshot?
-    @State private var activeTasks: [DailyTaskEntity] = []
-    @State private var settledTasks: [DailyTaskEntity] = []
+    @State private var allTasks: [DailyTaskEntity] = []
     @State private var notes: [ProjectNoteEntity] = []
     @State private var isLoading = true
     @State private var isPlanningBackgroundExpanded = false
@@ -77,9 +76,13 @@ private struct ProjectDetailPageView: View {
         async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: ideaId)
         async let settled = viewModel.fetchSettledTasks(sourceIdeaId: ideaId)
         async let projectNotes = viewModel.fetchProjectNotes(ideaId: ideaId)
-        activeTasks = await tasks
-        settledTasks = await settled
+        let active = await tasks
+        let settledList = await settled
         notes = await projectNotes
+
+        // 合并去重
+        let settledIds = Set(settledList.map(\.id))
+        allTasks = active.filter { !settledIds.contains($0.id) } + settledList
 
         if let freshIdea = await viewModel.fetchIdea(ideaId: ideaId) {
             projectDetail = ProjectDetailSnapshot(idea: freshIdea)
@@ -167,34 +170,47 @@ private struct ProjectDetailPageView: View {
     }
 
     private var tasksCard: some View {
-        DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
+        let sorted = allTasks.sorted { taskOrder($0) < taskOrder($1) }
+        return DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 6) {
-                if activeTasks.isEmpty && settledTasks.isEmpty {
+                if sorted.isEmpty {
                     Text("暂无关联必做项").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
-                ForEach(activeTasks, id: \.id) { task in
+                ForEach(sorted, id: \.id) { task in
                     HStack(spacing: 6) {
-                        Image(systemName: task.taskStatus == .done ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 10))
-                            .foregroundStyle(task.taskStatus == .done ? .green : .orange)
+                        Text(taskStatusLabel(task))
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(taskStatusTint(task))
+                            .clipShape(Capsule())
                         Text(task.title).font(.system(size: 11)).lineLimit(1)
                         Spacer()
-                        Text("\(task.estimatedMinutes)分钟").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
                     }
-                }
-                ForEach(settledTasks, id: \.id) { task in
-                    HStack(spacing: 6) {
-                        Image(systemName: task.taskStatus == .done ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 10))
-                            .foregroundStyle(task.taskStatus == .done ? .green : .orange)
-                        Text(task.title).font(.system(size: 11)).lineLimit(1)
-                        Spacer()
-                        Text("\(task.actualMinutes)分钟").font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                    .opacity(0.6)
                 }
             }
         }
+    }
+
+    private func taskOrder(_ task: DailyTaskEntity) -> Int {
+        if !task.isSettled && (task.taskStatus == .running || task.taskStatus == .paused) { return 0 }
+        if task.taskStatus == .done { return 1 }
+        return 2
+    }
+
+    private func taskStatusLabel(_ task: DailyTaskEntity) -> String {
+        if !task.isSettled {
+            return task.taskStatus.displayName
+        }
+        return task.taskStatus == .done ? "已完成" : "未完成"
+    }
+
+    private func taskStatusTint(_ task: DailyTaskEntity) -> Color {
+        if !task.isSettled && (task.taskStatus == .running || task.taskStatus == .paused) { return .blue }
+        if task.taskStatus == .done { return .green }
+        return .orange
     }
 
     private var noteCard: some View {
