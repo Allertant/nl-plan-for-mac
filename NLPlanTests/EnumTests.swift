@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import NLPlan
+@testable import NLPlanKit
 
 // MARK: - Grade Tests
 

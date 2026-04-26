@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import NLPlan
+@testable import NLPlanKit
 
 // MARK: - DeepSeek AI 模型接口稳定性测试
 //

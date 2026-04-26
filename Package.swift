@@ -7,16 +7,16 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "NLPlan", targets: ["NLPlan"])
+        .library(name: "NLPlanKit", targets: ["NLPlanKit"])
     ],
     targets: [
-        .executableTarget(
-            name: "NLPlan",
+        .target(
+            name: "NLPlanKit",
             path: "NLPlan"
         ),
         .testTarget(
             name: "NLPlanTests",
-            dependencies: ["NLPlan"],
+            dependencies: ["NLPlanKit"],
             path: "NLPlanTests"
         )
     ]

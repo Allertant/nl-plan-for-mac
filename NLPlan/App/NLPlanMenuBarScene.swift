@@ -1,8 +1,7 @@
 import SwiftUI
 import SwiftData
 
-@main
-struct NLPlanApp: App {
+public struct NLPlanMenuBarScene: Scene {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
@@ -10,7 +9,7 @@ struct NLPlanApp: App {
 
     let container: ModelContainer
 
-    init() {
+    public init() {
         do {
             let schema = Schema([
                 ThoughtEntity.self,
@@ -32,7 +31,7 @@ struct NLPlanApp: App {
         }
     }
 
-    var body: some Scene {
+    public var body: some Scene {
         MenuBarExtra {
             MainContentView()
                 .modelContainer(container)

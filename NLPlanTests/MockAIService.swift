@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import NLPlan
+@testable import NLPlanKit
 
 /// Mock AI 服务 — 用于测试
 struct MockAIService: AIServiceProtocol {
@@ -60,7 +60,8 @@ struct MockAIService: AIServiceProtocol {
         ideaPoolTasks: [TaskRecommendationInput],
         mustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
-        strategy: MustDoViewModel.RecommendationStrategy
+        strategy: MustDoViewModel.RecommendationStrategy,
+        extraContext: String?
     ) async throws -> RecommendationResult {
         if shouldFail {
             throw NLPlanError.aiServiceUnavailable

@@ -1,36 +1,33 @@
-# Swift Package Manager
-.build/
-.swiftpm/
-
-# Xcode / macOS
-.DS_Store
-xcuserdata/
-*.xcuserstate
-*.xcworkspace/
-
-# Environment / secrets
-.env
-
-# Logs
-*.log
-# Xcode
+# Xcode projects
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
+!*.xcodeproj/project.xcworkspace/
+!*.xcodeproj/project.xcworkspace/contents.xcworkspacedata
 !*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcshareddata/**
 *.xcworkspace/*
 !*.xcworkspace/contents.xcworkspacedata
-*.xcuserdata/
+xcuserdata/
+*.xcuserstate
 *.xccheckout
 *.moved-aside
-DerivedData/
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
 
-# Swift Package Manager
+# Build outputs
+.DerivedData/
+DerivedData/
 .build/
 .swiftpm/
+build/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.o
+*.swiftmodule
+*.swiftdoc
+*.abi.json
+
+# Package resolution
 Package.resolved
 
 # macOS
@@ -41,19 +38,11 @@ Package.resolved
 .Spotlight-V100
 .Trashes
 
-# VS Code
+# Editor / tooling
 .vscode/
-
-# 环境变量（包含真实 API Key，不可提交）
-.env
-
-# Claude / AI
 .claude/
 .agents/
 
-# Build artifacts
-build/
-*.o
-*.swiftmodule
-*.swiftdoc
-*.abi.json
+# Environment / logs
+.env
+*.log
