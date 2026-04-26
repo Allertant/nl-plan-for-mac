@@ -56,10 +56,8 @@ private struct ProjectDetailPageView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         summaryCard(project)
-                        titleCard(project)
                         descriptionCard(project)
                         planningBackgroundCard(project)
-                        progressCard(project)
                         tasksCard
                         noteCard
                     }
@@ -101,7 +99,17 @@ private struct ProjectDetailPageView: View {
         DetailSectionCard(title: "项目信息", systemImage: "lightbulb.fill", tint: .yellow, background: Color.yellow.opacity(0.08), border: Color.yellow.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                    if editingTitle {
+                        TextField("项目标题", text: $draftTitle, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 15, weight: .semibold))
+                            .lineLimit(1...3)
+                            .focused($titleFocused)
+                            .onSubmit { commitTitleEdit() }
+                    } else {
+                        Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                            .onTapGesture { draftTitle = project.title; editingTitle = true; DispatchQueue.main.async { titleFocused = true } }
+                    }
                     Button {
                         let pasteboard = NSPasteboard.general
                         pasteboard.clearContents()
@@ -127,49 +135,21 @@ private struct ProjectDetailPageView: View {
                     Text("已尝试").font(.system(size: 9, weight: .medium)).foregroundStyle(.orange)
                         .padding(.horizontal, 6).padding(.vertical, 2).background(Color.orange.opacity(0.12)).clipShape(Capsule())
                 }
-            }
-        }
-    }
 
-    private func titleCard(_ project: ProjectDetailSnapshot) -> some View {
-        DetailSectionCard(title: "标题", systemImage: "pencil", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22)) {
-            VStack(alignment: .leading, spacing: 6) {
-                if editingTitle {
-                    TextField("项目标题", text: $draftTitle, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1...3)
-                        .padding(6)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .focused($titleFocused)
-                        .onSubmit { commitTitleEdit() }
-
-                    HStack {
-                        Spacer()
-                        Button("保存") {
-                            commitTitleEdit()
-                        }
-                        .font(.system(size: 10, weight: .medium))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
+                // 进度（嵌入项目信息卡片下方）
+                if let progress = project.projectProgress {
+                    Divider().padding(.vertical, 2)
+                    HStack(spacing: 6) {
+                        ProgressView(value: progress / 100).progressViewStyle(.linear).tint(.indigo)
+                        Text("\(Int(progress))%").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                     }
-                } else {
-                    HStack {
-                        Text(project.title)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Spacer()
-                        Button("编辑") {
-                            draftTitle = project.title
-                            editingTitle = true
-                            DispatchQueue.main.async { titleFocused = true }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    }
+                }
+                if let summary = project.projectProgressSummary, !summary.isEmpty {
+                    if project.projectProgress == nil { Divider().padding(.vertical, 2) }
+                    Text(summary).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if let updatedAt = project.projectProgressUpdatedAt {
+                    Text("进度更新于 \(updatedAt.relativeTimeString)").font(.system(size: 9)).foregroundStyle(.tertiary)
                 }
             }
         }
@@ -371,25 +351,6 @@ private struct ProjectDetailPageView: View {
         }
     }
 
-    private func progressCard(_ project: ProjectDetailSnapshot) -> some View {
-        DetailSectionCard(title: "进度", systemImage: "chart.bar", tint: .indigo, background: Color.indigo.opacity(0.08), border: Color.indigo.opacity(0.22)) {
-            VStack(alignment: .leading, spacing: 6) {
-                if let progress = project.projectProgress {
-                    HStack(spacing: 6) {
-                        ProgressView(value: progress / 100).progressViewStyle(.linear).tint(.indigo)
-                        Text("\(Int(progress))%").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                    }
-                }
-                if let summary = project.projectProgressSummary, !summary.isEmpty {
-                    Text(summary).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                if let updatedAt = project.projectProgressUpdatedAt {
-                    Text("更新于 \(updatedAt.relativeTimeString)").font(.system(size: 9)).foregroundStyle(.tertiary)
-                }
-            }
-        }
-    }
-
     private var tasksCard: some View {
         DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 6) {
@@ -513,6 +474,7 @@ struct DetailSectionCard<Content: View>: View {
                 .foregroundStyle(tint)
             content()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: 8))
