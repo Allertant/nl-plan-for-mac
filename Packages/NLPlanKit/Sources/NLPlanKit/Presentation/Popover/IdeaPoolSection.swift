@@ -530,8 +530,12 @@ struct IdeaPoolTaskRow: View {
 
     private var rowBackground: Color {
         if flashCount % 2 == 1 { return Color.accentColor.opacity(0.15) }
-        if isInProgress { return Color.green.opacity(0.08) }
-        return Color(nsColor: .textBackgroundColor)
+        if idea.isProject {
+            if isInProgress { return Color.indigo.opacity(0.10) }
+            return Color.indigo.opacity(0.06)
+        }
+        if isInProgress { return Color.green.opacity(0.10) }
+        return Color.blue.opacity(0.05)
     }
 
     private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; moveInsertionPointToEnd() }
