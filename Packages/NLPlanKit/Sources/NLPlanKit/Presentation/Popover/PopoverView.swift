@@ -27,7 +27,6 @@ struct PopoverView: View {
 
                 if let pendingDate = appState.pendingSettlementDate {
                     PendingSettlementBanner(date: pendingDate) {
-                        appState.pendingSettlementDate = nil
                         appState.openSummary(for: pendingDate)
                     }
                 }
@@ -83,7 +82,11 @@ struct PopoverView: View {
                     }
 
                     ToolbarIconButton {
-                        appState.openSummary(for: .now)
+                        if let pendingDate = appState.pendingSettlementDate {
+                            appState.openSummary(for: pendingDate)
+                        } else {
+                            appState.openSummary(for: .now)
+                        }
                     } label: {
                         if let vm = appState.summaryViewModel, vm.isProcessing {
                             ProgressView()
@@ -115,7 +118,7 @@ struct PopoverView: View {
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
                 // AI 推荐浮动按钮
-                if !ideaPoolViewModel.ideas.isEmpty && !mustDoViewModel.showRecommendationPanel {
+                if !ideaPoolViewModel.ideas.isEmpty && !mustDoViewModel.showRecommendationPanel && appState.pendingSettlementDate == nil {
                     AIRecommendFloatingButton(
                         viewModel: mustDoViewModel,
                         ideaPoolIdeas: ideaPoolViewModel.ideas,

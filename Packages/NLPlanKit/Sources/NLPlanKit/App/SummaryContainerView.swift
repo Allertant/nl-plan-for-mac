@@ -8,6 +8,12 @@ struct SummaryContainerView: View {
         Group {
             if let summaryVM = appState.summaryViewModel {
                 SummaryView(viewModel: summaryVM) {
+                    // 结算完成后清除待结算日期
+                    if summaryVM.summary != nil,
+                       let pendingDate = appState.pendingSettlementDate,
+                       Calendar.current.isDate(summaryVM.settlementDate, inSameDayAs: pendingDate) {
+                        appState.pendingSettlementDate = nil
+                    }
                     appState.currentPage = .main
                 }
             } else {
