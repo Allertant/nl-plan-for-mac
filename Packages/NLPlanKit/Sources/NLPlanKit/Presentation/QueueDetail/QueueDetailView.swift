@@ -8,6 +8,7 @@ struct QueueDetailView: View {
 
     @State private var editedRawText: String = ""
     @State private var didInitRawText = false
+    @State private var cachedTasks: [ParsedTask] = []
 
     private var isLocked: Bool {
         viewModel.isItemChatProcessing(id: queueItem.id)
@@ -44,6 +45,7 @@ struct QueueDetailView: View {
                             .scrollContentBackground(.hidden)
                             .frame(minHeight: 40, maxHeight: 120)
                             .onChange(of: editedRawText) { _, newValue in
+                                guard didInitRawText else { return }
                                 let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
                                 if !trimmed.isEmpty {
                                     viewModel.updateRawText(queueItemID: queueItem.id, newText: newValue)
@@ -63,12 +65,12 @@ struct QueueDetailView: View {
                     Divider()
 
                     // 解析结果列表
-                    if let parsedTasks = queueItem.parsedTasks {
-                        Text("AI 解析结果（\(parsedTasks.count) 个任务）")
+                    if !cachedTasks.isEmpty {
+                        Text("AI 解析结果（\(cachedTasks.count) 个任务）")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
 
-                        ForEach(parsedTasks, id: \.id) { task in
+                        ForEach(cachedTasks, id: \.id) { task in
                             ParsedTaskRow(
                                 task: task,
                                 isLocked: isLocked,
@@ -198,5 +200,11 @@ struct QueueDetailView: View {
             }
         }
         .frame(width: 360, height: 520)
+        .onAppear {
+            cachedTasks = queueItem.parsedTasks ?? []
+        }
+        .onChange(of: queueItem.parsedTasksData) { _, _ in
+            cachedTasks = queueItem.parsedTasks ?? []
+        }
     }
 }

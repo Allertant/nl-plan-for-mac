@@ -6,7 +6,6 @@ struct MainContentView: View {
     @Environment(AppState.self) private var appState
 
     @State private var didInitialize = false
-    @State private var secondaryPageOpacity: Double = 1
 
     var body: some View {
         Group {
@@ -37,15 +36,6 @@ struct MainContentView: View {
 
             case .historyDetail:
                 HistoryDetailContainerView()
-            }
-        }
-        .opacity(appState.currentPage == .main ? 1 : secondaryPageOpacity)
-        .onChange(of: appState.currentPage) { _, newPage in
-            if newPage != .main {
-                secondaryPageOpacity = 0
-                withAnimation(.easeIn(duration: 0.15)) {
-                    secondaryPageOpacity = 1
-                }
             }
         }
         .task {
