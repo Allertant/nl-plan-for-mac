@@ -11,18 +11,8 @@ struct IdeaPoolSection: View {
     @State private var didAutoFocusSearchField = false
     @FocusState private var isSearchFieldFocused: Bool
 
-    private var filteredIdeas: [IdeaEntity] {
-        let keyword = plainSearchKeyword
-        let hasKeyword = !keyword.isEmpty
-        let hasTags = !selectedSearchTags.isEmpty
-        guard hasKeyword || hasTags else { return viewModel.ideas }
-
-        return viewModel.ideas.filter { idea in
-            let matchesKeyword = !hasKeyword || idea.title.localizedCaseInsensitiveContains(keyword)
-            let matchesTag = !hasTags || selectedSearchTags.contains(idea.category)
-            return matchesKeyword && matchesTag
-        }
-    }
+    /// 过滤结果缓存（由 updateFilteredIdeas 更新）
+    @State private var filteredIdeas: [IdeaEntity] = []
 
     private var availableTags: [String] {
         UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
@@ -56,11 +46,6 @@ struct IdeaPoolSection: View {
 
     private var hasSearchTokens: Bool {
         !selectedSearchTags.isEmpty || !(activeTagQuery?.isEmpty ?? true)
-    }
-
-    private var plainSearchKeyword: String {
-        removeActiveTagQuery(from: searchText)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     @Environment(AppState.self) private var appState
@@ -236,7 +221,7 @@ struct IdeaPoolSection: View {
                     .padding(.horizontal, 8)
                     .padding(.top, 6)
 
-                    if filteredIdeas.isEmpty {
+                    if filteredIdeas.isEmpty && hasSearchTokens {
                         Text("未找到匹配的计划")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
@@ -278,19 +263,30 @@ struct IdeaPoolSection: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onChange(of: searchText) { _, _ in updateFilteredIdeas() }
+        .onChange(of: selectedSearchTags) { _, _ in updateFilteredIdeas() }
+        .onChange(of: viewModel.ideas) { _, _ in updateFilteredIdeas() }
+        .onAppear { updateFilteredIdeas() }
+    }
+
+    // MARK: - Filter
+
+    private func updateFilteredIdeas() {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasKeyword = !keyword.isEmpty
+        let hasTags = !selectedSearchTags.isEmpty
+        guard hasKeyword || hasTags else {
+            filteredIdeas = viewModel.ideas
+            return
+        }
+        filteredIdeas = viewModel.ideas.filter { idea in
+            let matchesKeyword = !hasKeyword || idea.title.localizedCaseInsensitiveContains(keyword)
+            let matchesTag = !hasTags || selectedSearchTags.contains(idea.category)
+            return matchesKeyword && matchesTag
+        }
     }
 
     // MARK: - Search helpers
-
-    private func removeActiveTagQuery(from text: String) -> String {
-        guard let percentIndex = text.lastIndex(of: "%") else { return text }
-        let prefix = text[..<percentIndex]
-        if let lastPrefix = prefix.last, !lastPrefix.isWhitespace { return text }
-        let suffixStart = text.index(after: percentIndex)
-        let suffix = String(text[suffixStart...])
-        if suffix.contains(where: \.isWhitespace) { return text }
-        return String(prefix)
-    }
 
     private func syncHighlightedCandidateTag() {
         guard isCandidateTagNavigationEnabled else { highlightedCandidateTag = nil; return }
@@ -356,6 +352,16 @@ struct IdeaPoolSection: View {
         case .delete: return removeHighlightedSearchTag()
         case .blockTextInput: return true
         }
+    }
+
+    private func removeActiveTagQuery(from text: String) -> String {
+        guard let percentIndex = text.lastIndex(of: "%") else { return text }
+        let prefix = text[..<percentIndex]
+        if let lastPrefix = prefix.last, !lastPrefix.isWhitespace { return text }
+        let suffixStart = text.index(after: percentIndex)
+        let suffix = String(text[suffixStart...])
+        if suffix.contains(where: \.isWhitespace) { return text }
+        return String(prefix)
     }
 
     // MARK: - 清理按钮
