@@ -83,35 +83,34 @@ final class InputViewModel {
 
     // MARK: - 串行处理
 
-    /// 串行处理队列中下一个 waiting 项
+    /// 串行处理队列（迭代，避免递归栈溢出）
     private func processNextInQueue() async {
-        // 已有正在处理的项则跳过
-        guard !queueItems.contains(where: { $0.parseStatus == .processing }) else { return }
+        while true {
+            // 已有正在处理的项则跳过
+            guard !queueItems.contains(where: { $0.parseStatus == .processing }) else { return }
 
-        // 取第一个 waiting 项
-        guard let item = queueItems.first(where: { $0.parseStatus == .waiting }) else { return }
+            // 取第一个 waiting 项
+            guard let item = queueItems.first(where: { $0.parseStatus == .waiting }) else { return }
 
-        item.parseStatus = .processing
+            item.parseStatus = .processing
 
-        do {
-            let existingIdeas = try await taskManager.fetchIdeaPool()
-            let existingTitles = existingIdeas.map { $0.title }
-            let parsedTasks = try await taskManager.parseThoughts(
-                rawText: item.rawText,
-                existingTaskTitles: existingTitles
-            )
-            item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks, force: true)
-            item.parseStatus = .completed
-        } catch {
-            item.errorMessage = error.localizedDescription
-            item.parseStatus = .failed
+            do {
+                let existingIdeas = try await taskManager.fetchIdeaPool()
+                let existingTitles = existingIdeas.map { $0.title }
+                let parsedTasks = try await taskManager.parseThoughts(
+                    rawText: item.rawText,
+                    existingTaskTitles: existingTitles
+                )
+                item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks, force: true)
+                item.parseStatus = .completed
+            } catch {
+                item.errorMessage = error.localizedDescription
+                item.parseStatus = .failed
+            }
+
+            // 持久化状态变更
+            try? parseQueueRepo.update(item)
         }
-
-        // 持久化状态变更
-        try? parseQueueRepo.update(item)
-
-        // 递归处理下一个
-        await processNextInQueue()
     }
 
     // MARK: - 队列操作
