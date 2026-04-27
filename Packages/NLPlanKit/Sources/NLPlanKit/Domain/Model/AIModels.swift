@@ -15,8 +15,8 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         title: String,
         category: String,
         estimatedMinutes: Int? = nil,
-        recommended: Bool,
-        reason: String,
+        recommended: Bool = false,
+        reason: String = "",
         isProject: Bool? = nil
     ) {
         self.id = id

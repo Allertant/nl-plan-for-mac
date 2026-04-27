@@ -100,21 +100,9 @@ struct ParsedTaskRow: View {
                 if task.isProject == true {
                     Label("项目", systemImage: "square.stack")
                 }
-                if task.recommended {
-                    Label("AI 推荐", systemImage: "star.fill")
-                        .foregroundStyle(.yellow)
-                }
             }
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
-
-            if !task.reason.isEmpty {
-                Text(task.reason)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary.opacity(0.8))
-                    .lineLimit(2)
-                    .padding(.leading, 2)
-            }
         }
     }
 

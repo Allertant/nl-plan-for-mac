@@ -472,7 +472,7 @@ struct IdeaPoolTaskRow: View {
                     }
                     Text(idea.createdDate.relativeTimeString()).font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
-                if idea.aiRecommended, let reason = idea.recommendationReason { TooltipText(text: "💡 \(reason)", tooltip: reason) }
+                if idea.aiRecommended, let reason = idea.recommendationReason, !reason.isEmpty { TooltipText(text: "💡 \(reason)", tooltip: reason) }
                 if idea.isProject {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
