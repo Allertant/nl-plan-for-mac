@@ -35,7 +35,7 @@ struct QueueDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     // 用户原始输入（直接可编辑）
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("你的输入", systemImage: "text.bubble")
+                        Label("我的输入", systemImage: "text.bubble")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
 
