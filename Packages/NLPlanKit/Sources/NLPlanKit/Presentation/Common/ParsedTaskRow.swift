@@ -21,10 +21,6 @@ struct ParsedTaskRow: View {
 
     private enum Field: Hashable { case title, minutes, note }
 
-    private var availableTags: [String] {
-        UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -76,7 +72,12 @@ struct ParsedTaskRow: View {
                     }
                     .buttonStyle(.plain)
                     .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                        categoryMenu
+                        CategoryPickerMenu(currentCategory: task.category) { tag in
+                            showingCategoryMenu = false
+                            if tag != task.category {
+                                onEdit(task.title, tag, task.estimatedMinutes, task.note)
+                            }
+                        }
                     }
 
                     if task.isProject != true {
@@ -184,7 +185,7 @@ struct ParsedTaskRow: View {
         draftTitle = task.title
         editingTitle = true
         focusedField = .title
-        moveInsertionPointToEnd()
+        CursorHelper.moveInsertionPointToEnd()
     }
 
     private func commitTitleEdit() {
@@ -200,7 +201,7 @@ struct ParsedTaskRow: View {
         draftMinutes = (task.estimatedMinutes ?? 30).hourMinuteString
         editingMinutes = true
         focusedField = .minutes
-        moveInsertionPointToEnd()
+        CursorHelper.moveInsertionPointToEnd()
     }
 
     private func commitMinutesEdit() {
@@ -216,7 +217,7 @@ struct ParsedTaskRow: View {
         draftNote = task.note ?? ""
         editingNote = true
         focusedField = .note
-        moveInsertionPointToEnd()
+        CursorHelper.moveInsertionPointToEnd()
     }
 
     private func commitNoteEdit() {
@@ -227,44 +228,4 @@ struct ParsedTaskRow: View {
         }
     }
 
-    // MARK: - 分类菜单
-
-    private var categoryMenu: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(availableTags, id: \.self) { tag in
-                Button {
-                    showingCategoryMenu = false
-                    if tag != task.category {
-                        onEdit(task.title, tag, task.estimatedMinutes, task.note)
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if tag == task.category {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                        } else {
-                            Color.clear.frame(width: 10, height: 10)
-                        }
-                        TagChip(text: tag)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(6)
-        .frame(width: 180)
-    }
-
-    private func moveInsertionPointToEnd(retryCount: Int = 3) {
-        DispatchQueue.main.async {
-            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else { if retryCount > 0 { moveInsertionPointToEnd(retryCount: retryCount - 1) }; return }
-            let endLocation = textView.string.count
-            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
-        }
-    }
 }

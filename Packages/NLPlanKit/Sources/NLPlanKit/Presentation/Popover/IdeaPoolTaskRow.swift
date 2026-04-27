@@ -53,7 +53,12 @@ struct IdeaPoolTaskRow: View {
                 }
                 HStack(spacing: 8) {
                     Button { showingCategoryMenu.toggle() } label: { TagChip(text: idea.category) }.buttonStyle(.plain)
-                        .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) { categoryMenu }
+                        .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                            CategoryPickerMenu(currentCategory: idea.category) { tag in
+                                showingCategoryMenu = false
+                                if tag != idea.category { onUpdate(nil, tag, nil, nil) }
+                            }
+                        }
                     if idea.isProject { EmptyView() }
                     else if editingMinutes {
                         HStack(spacing: 4) { Image(systemName: "clock"); TextField("1h30m", text: $draftMinutes).textFieldStyle(.plain).frame(width: 52).focused($focusedField, equals: .minutes).onSubmit { commitMinutesEdit() } }
@@ -131,33 +136,10 @@ struct IdeaPoolTaskRow: View {
         return Color.blue.opacity(0.05)
     }
 
-    private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; moveInsertionPointToEnd() }
+    private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; CursorHelper.moveInsertionPointToEnd() }
     private func commitTitleEdit() { editingTitle = false; let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty, trimmed != idea.title else { return }; onUpdate(trimmed, nil, nil, nil) }
-    private func startEditingMinutes() { if editingTitle { commitTitleEdit() }; if editingNote { commitNoteEdit() }; draftMinutes = (idea.estimatedMinutes ?? 30).hourMinuteString; editingMinutes = true; focusedField = .minutes; moveInsertionPointToEnd() }
+    private func startEditingMinutes() { if editingTitle { commitTitleEdit() }; if editingNote { commitNoteEdit() }; draftMinutes = (idea.estimatedMinutes ?? 30).hourMinuteString; editingMinutes = true; focusedField = .minutes; CursorHelper.moveInsertionPointToEnd() }
     private func commitMinutesEdit() { editingMinutes = false; let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines); guard let minutes = trimmed.parsedHourMinuteDuration, minutes != idea.estimatedMinutes else { return }; onUpdate(nil, nil, minutes, nil) }
-    private func startEditingNote() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; draftNote = idea.note ?? ""; editingNote = true; focusedField = .note; moveInsertionPointToEnd() }
+    private func startEditingNote() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; draftNote = idea.note ?? ""; editingNote = true; focusedField = .note; CursorHelper.moveInsertionPointToEnd() }
     private func commitNoteEdit() { editingNote = false; let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines); if trimmed != (idea.note ?? "") { onUpdate(nil, nil, nil, trimmed) } }
-
-    private var availableTags: [String] { UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags }
-    private var categoryMenu: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(availableTags, id: \.self) { tag in
-                Button { showingCategoryMenu = false; if tag != idea.category { onUpdate(nil, tag, nil, nil) } } label: {
-                    HStack(spacing: 6) {
-                        if tag == idea.category { Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.accentColor) }
-                        else { Color.clear.frame(width: 10, height: 10) }
-                        TagChip(text: tag); Spacer(minLength: 0)
-                    }.padding(.horizontal, 8).padding(.vertical, 6).contentShape(Rectangle())
-                }.buttonStyle(.plain)
-            }
-        }.padding(6).frame(width: 180)
-    }
-
-    private func moveInsertionPointToEnd(retryCount: Int = 3) {
-        DispatchQueue.main.async {
-            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else { if retryCount > 0 { moveInsertionPointToEnd(retryCount: retryCount - 1) }; return }
-            let endLocation = textView.string.count
-            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
-        }
-    }
 }
