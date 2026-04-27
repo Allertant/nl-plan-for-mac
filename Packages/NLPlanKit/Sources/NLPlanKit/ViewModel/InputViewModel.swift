@@ -180,6 +180,22 @@ final class InputViewModel {
         try? parseQueueRepo.update(item)
     }
 
+    /// 切换任务的项目/普通想法状态
+    func toggleProjectState(queueItemID: UUID, taskID: UUID) {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }),
+              var tasks = item.parsedTasks,
+              let idx = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        let isProject = !(tasks[idx].isProject ?? false)
+        tasks[idx].isProject = isProject
+        if isProject {
+            tasks[idx].estimatedMinutes = nil
+        } else if tasks[idx].estimatedMinutes == nil {
+            tasks[idx].estimatedMinutes = 30
+        }
+        item.parsedTasks = tasks
+        try? parseQueueRepo.update(item)
+    }
+
     /// 删除队列项中的某个任务（按 ID 查找）
     @discardableResult
     func removeParsedTask(queueItemID: UUID, taskID: UUID) -> Bool {

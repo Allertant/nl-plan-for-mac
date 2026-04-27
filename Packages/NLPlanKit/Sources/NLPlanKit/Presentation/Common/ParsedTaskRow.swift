@@ -7,6 +7,7 @@ struct ParsedTaskRow: View {
     let onEdit: (_ title: String, _ category: String, _ minutes: Int?, _ note: String?) -> Void
     let onDelete: () -> Void
     let onApprove: () -> Void
+    let onToggleProject: () -> Void
 
     @State private var editingTitle = false
     @State private var editingMinutes = false
@@ -47,15 +48,25 @@ struct ParsedTaskRow: View {
                             .onTapGesture { startEditingTitle() }
                     }
 
-                    if task.isProject == true {
-                        Text("项目")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.indigo)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.indigo.opacity(0.12))
-                            .cornerRadius(4)
+                    Menu {
+                        Button(task.isProject == true ? "设为普通想法" : "设为项目") { onToggleProject() }
+                    } label: {
+                        if task.isProject == true {
+                            Text("项目")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.indigo)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.indigo.opacity(0.12))
+                                .cornerRadius(4)
+                        } else {
+                            Image(systemName: "chevron.down.circle")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
                 }
 
                 // 分类 + 时长

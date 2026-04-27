@@ -97,6 +97,12 @@ struct QueueDetailView: View {
                                         )
                                         if cleared { appState.currentPage = .main }
                                     }
+                                },
+                                onToggleProject: {
+                                    viewModel.toggleProjectState(
+                                        queueItemID: queueItem.id,
+                                        taskID: task.id
+                                    )
                                 }
                             )
                         }
