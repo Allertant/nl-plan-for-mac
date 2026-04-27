@@ -39,6 +39,9 @@ final class IdeaPoolViewModel {
     /// 撤销栈
     private var undoStack: [UUID] = []
 
+    /// 高亮清除 Task（持有引用，新调用时取消旧的）
+    private var highlightClearTask: Task<Void, Never>?
+
     /// 是否可以撤销
     var canUndoCleanup: Bool { !undoStack.isEmpty }
 
@@ -72,8 +75,10 @@ final class IdeaPoolViewModel {
             ideas = try await taskManager.fetchIdeaPool()
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds
-                Task { @MainActor [weak self] in
+                highlightClearTask?.cancel()
+                highlightClearTask = Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
                     self?.newlyAddedIdeaIds.removeAll()
                 }
             }
