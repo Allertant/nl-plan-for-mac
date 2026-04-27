@@ -150,7 +150,7 @@ struct ParsedTaskRow: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background { Color(nsColor: .textBackgroundColor).contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
@@ -173,6 +173,7 @@ struct ParsedTaskRow: View {
         draftTitle = task.title
         editingTitle = true
         focusedField = .title
+        moveInsertionPointToEnd()
     }
 
     private func commitTitleEdit() {
@@ -188,6 +189,7 @@ struct ParsedTaskRow: View {
         draftMinutes = (task.estimatedMinutes ?? 30).hourMinuteString
         editingMinutes = true
         focusedField = .minutes
+        moveInsertionPointToEnd()
     }
 
     private func commitMinutesEdit() {
@@ -203,6 +205,7 @@ struct ParsedTaskRow: View {
         draftNote = task.note ?? ""
         editingNote = true
         focusedField = .note
+        moveInsertionPointToEnd()
     }
 
     private func commitNoteEdit() {
@@ -244,5 +247,13 @@ struct ParsedTaskRow: View {
         }
         .padding(6)
         .frame(width: 180)
+    }
+
+    private func moveInsertionPointToEnd(retryCount: Int = 3) {
+        DispatchQueue.main.async {
+            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else { if retryCount > 0 { moveInsertionPointToEnd(retryCount: retryCount - 1) }; return }
+            let endLocation = textView.string.count
+            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
+        }
     }
 }
