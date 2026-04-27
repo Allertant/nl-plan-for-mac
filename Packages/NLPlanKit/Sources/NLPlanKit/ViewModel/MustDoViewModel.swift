@@ -270,7 +270,7 @@ final class MustDoViewModel {
         extraContext: String? = nil
     ) {
         recommendationTask?.cancel()
-        recommendationState = .loading
+        let previousTask = recommendationTask
         errorMessage = nil
         acceptedRecommendationIds = []
         selectedPriorities = [:]
@@ -284,6 +284,11 @@ final class MustDoViewModel {
         let currentTasks = tasks
 
         recommendationTask = Task {
+            // 等待上一个 Task 完成，避免并发修改状态
+            _ = await previousTask?.result
+            guard !Task.isCancelled else { return }
+
+            recommendationState = .loading
             let recommendationCandidates: [IdeaEntity]
             switch strategy {
             case .quick:
