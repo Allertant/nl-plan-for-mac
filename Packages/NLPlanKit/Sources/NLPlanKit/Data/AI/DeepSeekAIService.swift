@@ -328,8 +328,11 @@ final class DeepSeekAIService: AIServiceProtocol {
                 let result: (Data, URLResponse) = try await withTaskCancellationHandler {
                     try await urlSession.data(for: urlRequest)
                 } onCancel: {
-                    // Swift Task 取消时不会自动取消 URLSession 请求，
-                    // 但 withTaskCancellationHandler 会让 CancellationError 抛出
+                    // Task 取消时，URLSession data task 不会被自动取消。
+                    // 通过取消当前请求来释放网络资源。
+                    urlSession.getAllTasks { tasks in
+                        tasks.forEach { $0.cancel() }
+                    }
                 }
 
                 let (data, response) = result
