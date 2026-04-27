@@ -175,7 +175,7 @@ final class InputViewModel {
         tasks[idx].title = title
         tasks[idx].category = category
         tasks[idx].estimatedMinutes = estimatedMinutes
-        if let note { tasks[idx].note = note.isEmpty ? nil : note }
+        tasks[idx].note = (note?.isEmpty ?? true) ? nil : note
         item.parsedTasks = tasks
         try? parseQueueRepo.update(item)
     }
