@@ -9,6 +9,7 @@ struct ParsedTask: Sendable, Identifiable, Codable {
     let recommended: Bool
     let reason: String
     var isProject: Bool?
+    var note: String?
 
     init(
         id: UUID = UUID(),
@@ -17,7 +18,8 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         estimatedMinutes: Int? = nil,
         recommended: Bool = false,
         reason: String = "",
-        isProject: Bool? = nil
+        isProject: Bool? = nil,
+        note: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -26,6 +28,7 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         self.recommended = recommended
         self.reason = reason
         self.isProject = isProject
+        self.note = note
     }
 }
 

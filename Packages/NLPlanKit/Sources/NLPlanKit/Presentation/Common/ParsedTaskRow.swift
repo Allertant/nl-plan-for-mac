@@ -1,17 +1,19 @@
 import SwiftUI
 
-/// 单个解析任务行（含编辑/删除），供 QueueDetailView 和 InputSection 复用
+/// 单个解析任务行（含编辑/删除/单独通过），供 QueueDetailView 复用
 struct ParsedTaskRow: View {
     let task: ParsedTask
     var isLocked: Bool = false
-    let onEdit: (_ title: String, _ category: String, _ minutes: Int?) -> Void
+    let onEdit: (_ title: String, _ category: String, _ minutes: Int?, _ note: String?) -> Void
     let onDelete: () -> Void
+    let onApprove: () -> Void
 
     @State private var isEditing = false
     @State private var showDeleteConfirm = false
     @State private var editTitle: String = ""
     @State private var editCategory: String = ""
     @State private var editMinutes: String = ""
+    @State private var editNote: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -47,6 +49,7 @@ struct ParsedTaskRow: View {
                         editTitle = task.title
                         editCategory = task.category
                         editMinutes = task.estimatedMinutes.map(String.init) ?? ""
+                        editNote = task.note ?? ""
                         isEditing = true
                     } label: {
                         Image(systemName: "pencil")
@@ -103,6 +106,27 @@ struct ParsedTaskRow: View {
             }
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
+
+            if let note = task.note, !note.isEmpty {
+                Text(note)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            // 单个通过按钮
+            HStack {
+                Spacer()
+                Button {
+                    onApprove()
+                } label: {
+                    Text("通过")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .disabled(isLocked)
+            }
         }
     }
 
@@ -128,6 +152,10 @@ struct ParsedTaskRow: View {
                 }
             }
 
+            TextField("备注", text: $editNote)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+
             HStack {
                 Button("取消") {
                     isEditing = false
@@ -139,7 +167,7 @@ struct ParsedTaskRow: View {
 
                 Button("保存") {
                     let minutes = task.isProject == true ? nil : (Int(editMinutes) ?? task.estimatedMinutes ?? 30)
-                    onEdit(editTitle, editCategory, minutes)
+                    onEdit(editTitle, editCategory, minutes, editNote)
                     isEditing = false
                 }
                 .buttonStyle(.borderless)

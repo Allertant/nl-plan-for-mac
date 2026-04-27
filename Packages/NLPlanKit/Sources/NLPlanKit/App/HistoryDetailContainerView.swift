@@ -248,15 +248,7 @@ private struct HistoryDetailPageView: View {
                 HStack {
                     Spacer()
                     if idea.isProject {
-                        Button {
-                            appState.returnPage = .historyDetail(date)
-                            appState.currentPage = .projectDetail(ideaId)
-                        } label: {
-                            Label("查看项目", systemImage: "folder.fill")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.indigo)
-                        }
-                        .buttonStyle(.plain)
+                        ProjectNavLink(ideaId: ideaId, returnTo: .historyDetail(date))
                     } else {
                         Button {
                             showingIdeaPopover = idea

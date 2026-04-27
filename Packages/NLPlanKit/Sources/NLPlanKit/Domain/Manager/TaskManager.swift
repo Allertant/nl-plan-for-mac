@@ -79,6 +79,7 @@ final class TaskManager {
                 aiRecommended: parsed.recommended,
                 recommendationReason: parsed.reason,
                 sortOrder: index,
+                note: parsed.note,
                 isProject: isProject,
                 projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
                 projectProgress: isProject ? 0 : nil
@@ -90,6 +91,22 @@ final class TaskManager {
         try thoughtRepo.markProcessed(thought)
 
         return createdIdeas
+    }
+
+    /// 将单个已解析任务保存到想法池
+    func saveSingleParsedTask(_ parsed: ParsedTask, rawText: String) async throws -> IdeaEntity {
+        let isProject = parsed.isProject ?? false
+        return try ideaRepo.create(
+            title: parsed.title,
+            category: parsed.category,
+            estimatedMinutes: isProject ? nil : parsed.estimatedMinutes,
+            aiRecommended: parsed.recommended,
+            recommendationReason: parsed.reason,
+            note: parsed.note,
+            isProject: isProject,
+            projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
+            projectProgress: isProject ? 0 : nil
+        )
     }
 
     /// 提交自然语言 → AI 解析 → 进入想法池（一步到位）

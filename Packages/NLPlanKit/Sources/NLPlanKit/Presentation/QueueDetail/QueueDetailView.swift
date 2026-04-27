@@ -6,36 +6,74 @@ struct QueueDetailView: View {
     @Bindable var viewModel: InputViewModel
     let queueItem: ParseQueueItemEntity
 
+    @State private var isEditingInput = false
+    @State private var editedRawText: String = ""
+
     private var isLocked: Bool {
         viewModel.isItemChatProcessing(id: queueItem.id)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部栏：返回按钮
-            HStack {
+            // 顶部栏
+            HStack(spacing: 8) {
                 BackButton { appState.currentPage = .main }
-
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.green)
+                Text("想法审核")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
 
             Divider()
 
             // 内容区
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    // 用户原始输入
+                    // 用户原始输入（可编辑）
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("你的输入", systemImage: "text.bubble")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Text(queueItem.rawText)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.primary)
-                            .lineLimit(3...8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack {
+                            Label("你的输入", systemImage: "text.bubble")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Button {
+                                if isEditingInput {
+                                    let trimmed = editedRawText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    if !trimmed.isEmpty {
+                                        viewModel.updateRawText(queueItemID: queueItem.id, newText: trimmed)
+                                    }
+                                    isEditingInput = false
+                                } else {
+                                    editedRawText = queueItem.rawText
+                                    isEditingInput = true
+                                }
+                            } label: {
+                                Text(isEditingInput ? "保存" : "编辑")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isLocked)
+                        }
+
+                        if isEditingInput {
+                            TextField("输入内容", text: $editedRawText, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .lineLimit(3...8)
+                        } else {
+                            Text(queueItem.rawText)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.primary)
+                                .lineLimit(3...8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .padding(8)
                     .background(Color(nsColor: .textBackgroundColor))
@@ -49,24 +87,35 @@ struct QueueDetailView: View {
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
 
-                        ForEach(Array(parsedTasks.enumerated()), id: \.element.id) { index, task in
+                        ForEach(parsedTasks, id: \.id) { task in
                             ParsedTaskRow(
                                 task: task,
                                 isLocked: isLocked,
-                                onEdit: { title, category, minutes in
+                                onEdit: { title, category, minutes, note in
                                     viewModel.updateParsedTask(
                                         queueItemID: queueItem.id,
-                                        taskIndex: index,
+                                        taskID: task.id,
                                         title: title,
                                         category: category,
-                                        estimatedMinutes: minutes
+                                        estimatedMinutes: minutes,
+                                        note: note
                                     )
                                 },
                                 onDelete: {
-                                    viewModel.removeParsedTask(
+                                    let cleared = viewModel.removeParsedTask(
                                         queueItemID: queueItem.id,
-                                        taskIndex: index
+                                        taskID: task.id
                                     )
+                                    if cleared { appState.currentPage = .main }
+                                },
+                                onApprove: {
+                                    Task {
+                                        let cleared = await viewModel.approveSingleTask(
+                                            queueItemID: queueItem.id,
+                                            taskID: task.id
+                                        )
+                                        if cleared { appState.currentPage = .main }
+                                    }
                                 }
                             )
                         }
@@ -150,7 +199,7 @@ struct QueueDetailView: View {
                                 appState.currentPage = .main
                             }
                         } label: {
-                            Text("确认添加")
+                            Text("全部确认添加")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .buttonStyle(.borderless)

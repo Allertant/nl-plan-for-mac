@@ -167,25 +167,72 @@ final class InputViewModel {
 
     // MARK: - 详情页操作
 
-    /// 编辑队列项中的某个任务
-    func updateParsedTask(queueItemID: UUID, taskIndex: Int, title: String, category: String, estimatedMinutes: Int?) {
+    /// 编辑队列项中的某个任务（按 ID 查找，避免 index 错位）
+    func updateParsedTask(queueItemID: UUID, taskID: UUID, title: String, category: String, estimatedMinutes: Int?, note: String?) {
         guard let item = queueItems.first(where: { $0.id == queueItemID }),
               var tasks = item.parsedTasks,
-              taskIndex >= 0, taskIndex < tasks.count else { return }
-        tasks[taskIndex].title = title
-        tasks[taskIndex].category = category
-        tasks[taskIndex].estimatedMinutes = estimatedMinutes
+              let idx = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        tasks[idx].title = title
+        tasks[idx].category = category
+        tasks[idx].estimatedMinutes = estimatedMinutes
+        if let note { tasks[idx].note = note.isEmpty ? nil : note }
         item.parsedTasks = tasks
         try? parseQueueRepo.update(item)
     }
 
-    /// 删除队列项中的某个任务
-    func removeParsedTask(queueItemID: UUID, taskIndex: Int) {
+    /// 删除队列项中的某个任务（按 ID 查找）
+    @discardableResult
+    func removeParsedTask(queueItemID: UUID, taskID: UUID) -> Bool {
         guard let item = queueItems.first(where: { $0.id == queueItemID }),
               var tasks = item.parsedTasks,
-              taskIndex >= 0, taskIndex < tasks.count else { return }
-        tasks.remove(at: taskIndex)
+              let idx = tasks.firstIndex(where: { $0.id == taskID }) else { return false }
+        tasks.remove(at: idx)
         item.parsedTasks = tasks
+        try? parseQueueRepo.update(item)
+
+        if tasks.isEmpty {
+            try? parseQueueRepo.delete(item)
+            queueItems.removeAll { $0.id == queueItemID }
+            return true // 表示队列项已清空
+        }
+        return false
+    }
+
+    /// 单个 approve：将指定任务加入想法池，从当前列表中移除（按 ID 查找）
+    /// 返回 true 表示队列项已清空（需要返回主页）
+    func approveSingleTask(queueItemID: UUID, taskID: UUID) async -> Bool {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }),
+              var tasks = item.parsedTasks,
+              let idx = tasks.firstIndex(where: { $0.id == taskID }) else { return false }
+
+        let task = tasks[idx]
+        do {
+            let classified = try await classifyParsedTasksIfNeeded([task], force: task.isProject == nil)
+            let idea = try await taskManager.saveSingleParsedTask(classified[0], rawText: item.rawText)
+            await onSubmitSuccess?([idea.id])
+
+            tasks.remove(at: idx)
+            item.parsedTasks = tasks
+
+            if tasks.isEmpty {
+                try? parseQueueRepo.delete(item)
+                queueItems.removeAll { $0.id == queueItemID }
+                return true
+            } else {
+                try? parseQueueRepo.update(item)
+                successMessage = "✅ 已添加到想法池"
+                return false
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// 更新队列项的原始输入文本
+    func updateRawText(queueItemID: UUID, newText: String) {
+        guard let item = queueItems.first(where: { $0.id == queueItemID }) else { return }
+        item.rawText = newText
         try? parseQueueRepo.update(item)
     }
 
