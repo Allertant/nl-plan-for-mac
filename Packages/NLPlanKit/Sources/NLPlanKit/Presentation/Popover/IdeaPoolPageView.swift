@@ -54,7 +54,7 @@ struct IdeaPoolPageView: View {
                             .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
                     )
                 }
-                .scrollIndicators(.never)
+                .scrollIndicators(.automatic)
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {
