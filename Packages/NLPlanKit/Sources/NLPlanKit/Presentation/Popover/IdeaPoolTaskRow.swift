@@ -8,7 +8,7 @@ struct IdeaPoolTaskRow: View {
     var isRefreshingProject: Bool = false
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
-    let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?) -> Void
+    let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?, _ deadline: Date?) -> Void
     let onRefreshProject: () -> Void
     let onUpdateProjectState: (Bool) -> Void
     let onOpenProject: () -> Void
@@ -22,10 +22,14 @@ struct IdeaPoolTaskRow: View {
     @State private var draftTitle: String = ""
     @State private var draftMinutes: String = ""
     @State private var draftNote: String = ""
+    @State private var editingDeadline = false
+    @State private var draftDeadline: String = ""
     @FocusState private var focusedField: Field?
+    @State private var cachedRelativeTime: String = ""
+    @State private var cachedDeadlineDisplay: String?
     private var isInProgress: Bool { idea.ideaStatus == .inProgress }
 
-    private enum Field: Hashable { case title, minutes, note }
+    private enum Field: Hashable { case title, minutes, note, deadline }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -56,7 +60,7 @@ struct IdeaPoolTaskRow: View {
                         .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                             CategoryPickerMenu(currentCategory: idea.category) { tag in
                                 showingCategoryMenu = false
-                                if tag != idea.category { onUpdate(nil, tag, nil, nil) }
+                                if tag != idea.category { onUpdate(nil, tag, nil, nil, nil) }
                             }
                         }
                     if idea.isProject { EmptyView() }
@@ -68,12 +72,25 @@ struct IdeaPoolTaskRow: View {
                             Label(estimatedMinutes.hourMinuteString, systemImage: "clock").font(.system(size: 10)).foregroundStyle(.secondary).onTapGesture { startEditingMinutes() }
                         }
                     }
-                    Text(idea.createdDate.relativeTimeString()).font(.system(size: 10)).foregroundStyle(.tertiary)
-                    if let deadlineDisplay = idea.deadlineDisplayString {
-                        Label(deadlineDisplay, systemImage: "calendar").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(cachedRelativeTime).font(.system(size: 10)).foregroundStyle(.tertiary)
+                    if editingDeadline {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                            TextField("M-d", text: $draftDeadline)
+                                .textFieldStyle(.plain)
+                                .frame(width: 72)
+                                .focused($focusedField, equals: .deadline)
+                                .onSubmit { commitDeadlineEdit() }
+                        }
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .padding(.horizontal, 4).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                    } else if let deadlineDisplay = cachedDeadlineDisplay {
+                        Label(deadlineDisplay, systemImage: "calendar")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                            .onTapGesture { startEditingDeadline() }
                     }
                 }
-                if idea.aiRecommended, let reason = idea.recommendationReason, !reason.isEmpty { TooltipText(text: "💡 \(reason)", tooltip: reason) }
                 if idea.isProject {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
@@ -117,9 +134,11 @@ struct IdeaPoolTaskRow: View {
         .background { rowBackground.contentShape(Rectangle()).onTapGesture { focusedField = nil; if idea.isProject { onOpenProject() } } }
         .cornerRadius(6)
         .onChange(of: focusedField) { _, newValue in
-            if newValue == nil { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingNote { commitNoteEdit() } }
+            if newValue == nil { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingNote { commitNoteEdit() }; if editingDeadline { commitDeadlineEdit() } }
         }
         .onAppear {
+            cachedRelativeTime = idea.createdDate.relativeTimeString()
+            cachedDeadlineDisplay = idea.deadlineDisplayString
             if isNew {
                 withAnimation(.easeInOut(duration: 0.3)) { flashCount = 1 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { withAnimation(.easeInOut(duration: 0.3)) { flashCount = 0 } }
@@ -139,10 +158,19 @@ struct IdeaPoolTaskRow: View {
         return Color.blue.opacity(0.05)
     }
 
-    private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; CursorHelper.moveInsertionPointToEnd() }
-    private func commitTitleEdit() { editingTitle = false; let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty, trimmed != idea.title else { return }; onUpdate(trimmed, nil, nil, nil) }
-    private func startEditingMinutes() { if editingTitle { commitTitleEdit() }; if editingNote { commitNoteEdit() }; draftMinutes = (idea.estimatedMinutes ?? 30).hourMinuteString; editingMinutes = true; focusedField = .minutes; CursorHelper.moveInsertionPointToEnd() }
-    private func commitMinutesEdit() { editingMinutes = false; let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines); guard let minutes = trimmed.parsedHourMinuteDuration, minutes != idea.estimatedMinutes else { return }; onUpdate(nil, nil, minutes, nil) }
-    private func startEditingNote() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; draftNote = idea.note ?? ""; editingNote = true; focusedField = .note; CursorHelper.moveInsertionPointToEnd() }
-    private func commitNoteEdit() { editingNote = false; let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines); if trimmed != (idea.note ?? "") { onUpdate(nil, nil, nil, trimmed) } }
+    private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; if editingDeadline { commitDeadlineEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; CursorHelper.moveInsertionPointToEnd() }
+    private func commitTitleEdit() { editingTitle = false; let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty, trimmed != idea.title else { return }; onUpdate(trimmed, nil, nil, nil, nil) }
+    private func startEditingMinutes() { if editingTitle { commitTitleEdit() }; if editingNote { commitNoteEdit() }; if editingDeadline { commitDeadlineEdit() }; draftMinutes = (idea.estimatedMinutes ?? 30).hourMinuteString; editingMinutes = true; focusedField = .minutes; CursorHelper.moveInsertionPointToEnd() }
+    private func commitMinutesEdit() { editingMinutes = false; let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines); guard let minutes = trimmed.parsedHourMinuteDuration, minutes != idea.estimatedMinutes else { return }; onUpdate(nil, nil, minutes, nil, nil) }
+    private func startEditingNote() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingDeadline { commitDeadlineEdit() }; draftNote = idea.note ?? ""; editingNote = true; focusedField = .note; CursorHelper.moveInsertionPointToEnd() }
+    private func commitNoteEdit() { editingNote = false; let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines); if trimmed != (idea.note ?? "") { onUpdate(nil, nil, nil, trimmed, nil) } }
+    private func startEditingDeadline() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingNote { commitNoteEdit() }; draftDeadline = idea.deadlineDisplayString ?? ""; editingDeadline = true; focusedField = .deadline; CursorHelper.moveInsertionPointToEnd() }
+    private func commitDeadlineEdit() {
+        editingDeadline = false
+        let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        let (parsed, _, _) = DeepSeekAIService.parseDeadlineString(trimmed.isEmpty ? nil : trimmed)
+        if parsed != idea.deadline {
+            onUpdate(nil, nil, nil, nil, parsed)
+        }
+    }
 }

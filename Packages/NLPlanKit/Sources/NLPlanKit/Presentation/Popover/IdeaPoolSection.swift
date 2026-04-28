@@ -237,14 +237,15 @@ struct IdeaPoolSection: View {
                                     Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
                                 } onDelete: {
                                     Task { await viewModel.deleteIdea(ideaId: idea.id) }
-                                } onUpdate: { title, category, estimatedMinutes, note in
+                                } onUpdate: { title, category, estimatedMinutes, note, deadline in
                                     Task {
                                         await viewModel.updateIdea(
                                             ideaId: idea.id,
                                             title: title,
                                             category: category,
                                             estimatedMinutes: estimatedMinutes,
-                                            note: note
+                                            note: note,
+                                            deadline: deadline
                                         )
                                     }
                                 } onRefreshProject: {

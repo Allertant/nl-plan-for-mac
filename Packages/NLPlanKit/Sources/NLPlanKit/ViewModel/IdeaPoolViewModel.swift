@@ -109,7 +109,7 @@ final class IdeaPoolViewModel {
     }
 
     /// 更新想法字段
-    func updateIdea(ideaId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil) async {
+    func updateIdea(ideaId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil, deadline: Date? = nil) async {
         do {
             if let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) {
                 let shouldTouchRecommendationContext = idea.isProject && (title != nil || category != nil || note != nil)
@@ -117,6 +117,7 @@ final class IdeaPoolViewModel {
                 if let category { idea.category = category }
                 if let estimatedMinutes, !idea.isProject { idea.estimatedMinutes = estimatedMinutes }
                 if let note { idea.note = note }
+                if let deadline { idea.deadline = deadline }
                 try await taskManager.updateIdea(idea)
                 if shouldTouchRecommendationContext {
                     try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
