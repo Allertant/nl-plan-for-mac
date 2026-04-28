@@ -27,6 +27,11 @@ struct IdeaPoolTaskRow: View {
     @FocusState private var focusedField: Field?
     @State private var cachedRelativeTime: String = ""
     @State private var cachedDeadlineDisplay: String?
+
+    // 烟雾提示
+    @State private var minutesErrorHint: String?
+    @State private var deadlineErrorHint: String?
+
     private var isInProgress: Bool { idea.ideaStatus == .inProgress }
 
     private enum Field: Hashable { case title, minutes, note, deadline }
@@ -76,9 +81,15 @@ struct IdeaPoolTaskRow: View {
                 else if editingMinutes {
                     HStack(spacing: 4) { Image(systemName: "clock"); TextField("1h30m", text: $draftMinutes).textFieldStyle(.plain).frame(width: 52).focused($focusedField, equals: .minutes).onSubmit { commitMinutesEdit() } }
                         .font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                        .overlay(alignment: .top) {
+                            if let hint = minutesErrorHint { SmokeHint(text: hint) }
+                        }
                 } else {
                     if let estimatedMinutes = idea.estimatedMinutes {
                         Label(estimatedMinutes.hourMinuteString, systemImage: "clock").font(.system(size: 10)).foregroundStyle(.secondary).onTapGesture { startEditingMinutes() }
+                            .overlay(alignment: .top) {
+                                if let hint = minutesErrorHint { SmokeHint(text: hint) }
+                            }
                     }
                 }
                 Text(cachedRelativeTime).font(.system(size: 10)).foregroundStyle(.tertiary)
@@ -94,10 +105,16 @@ struct IdeaPoolTaskRow: View {
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                    .overlay(alignment: .top) {
+                        if let hint = deadlineErrorHint { SmokeHint(text: hint) }
+                    }
                 } else if let deadlineDisplay = cachedDeadlineDisplay {
                     Label(deadlineDisplay, systemImage: "calendar")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                         .onTapGesture { startEditingDeadline() }
+                        .overlay(alignment: .top) {
+                            if let hint = deadlineErrorHint { SmokeHint(text: hint) }
+                        }
                 }
                 Spacer(minLength: 8)
                 if showDeleteConfirm {
@@ -162,6 +179,49 @@ struct IdeaPoolTaskRow: View {
         }
     }
 
+    // MARK: - Smoke Hint
+
+    /// 烟雾状飘浮提示（从字段位置往上飘 1s 后消失）
+    private struct SmokeHint: View {
+        let text: String
+        @State private var opacity = 1.0
+        @State private var yOffset: CGFloat = 0
+
+        var body: some View {
+            Text(text)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .fixedSize()
+                .background(Capsule().fill(Color.red.opacity(0.8)))
+                .offset(y: yOffset)
+                .opacity(opacity)
+                .onAppear {
+                    withAnimation(.easeOut(duration: 1.2)) {
+                        yOffset = -26
+                    }
+                    withAnimation(.easeOut(duration: 0.8).delay(0.7)) {
+                        opacity = 0
+                    }
+                }
+        }
+    }
+
+    private func showHint(field: Field, message: String) {
+        switch field {
+        case .minutes:
+            minutesErrorHint = message
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { minutesErrorHint = nil }
+        case .deadline:
+            deadlineErrorHint = message
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { deadlineErrorHint = nil }
+        default: break
+        }
+    }
+
+    // MARK: - Background
+
     private var rowBackground: Color {
         if flashCount % 2 == 1 { return Color.accentColor.opacity(0.15) }
         if idea.isProject {
@@ -172,19 +232,64 @@ struct IdeaPoolTaskRow: View {
         return Color.blue.opacity(0.05)
     }
 
+    // MARK: - Edit Helpers
+
     private func startEditingTitle() { if editingNote { commitNoteEdit() }; if editingMinutes { commitMinutesEdit() }; if editingDeadline { commitDeadlineEdit() }; draftTitle = idea.title; editingTitle = true; focusedField = .title; CursorHelper.moveInsertionPointToEnd() }
     private func commitTitleEdit() { editingTitle = false; let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty, trimmed != idea.title else { return }; onUpdate(trimmed, nil, nil, nil, nil) }
     private func startEditingMinutes() { if editingTitle { commitTitleEdit() }; if editingNote { commitNoteEdit() }; if editingDeadline { commitDeadlineEdit() }; draftMinutes = (idea.estimatedMinutes ?? 30).hourMinuteString; editingMinutes = true; focusedField = .minutes; CursorHelper.moveInsertionPointToEnd() }
-    private func commitMinutesEdit() { editingMinutes = false; let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines); guard let minutes = trimmed.parsedHourMinuteDuration, minutes != idea.estimatedMinutes else { return }; onUpdate(nil, nil, minutes, nil, nil) }
+    private func commitMinutesEdit() {
+        editingMinutes = false
+        let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let minutes = trimmed.parsedHourMinuteDuration else {
+            showHint(field: .minutes, message: "格式不合法")
+            return
+        }
+        guard minutes != idea.estimatedMinutes else { return }
+        onUpdate(nil, nil, minutes, nil, nil)
+    }
     private func startEditingNote() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingDeadline { commitDeadlineEdit() }; draftNote = idea.note ?? ""; editingNote = true; focusedField = .note; CursorHelper.moveInsertionPointToEnd() }
     private func commitNoteEdit() { editingNote = false; let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines); if trimmed != (idea.note ?? "") { onUpdate(nil, nil, nil, trimmed, nil) } }
     private func startEditingDeadline() { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingNote { commitNoteEdit() }; draftDeadline = idea.deadlineDisplayString ?? ""; editingDeadline = true; focusedField = .deadline; CursorHelper.moveInsertionPointToEnd() }
     private func commitDeadlineEdit() {
         editingDeadline = false
         let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty || isValidDeadlineFormat(trimmed) else {
+            showHint(field: .deadline, message: "格式不合法")
+            return
+        }
         let (parsed, _, _) = DeepSeekAIService.parseDeadlineString(trimmed.isEmpty ? nil : trimmed)
         if parsed != idea.deadline {
             onUpdate(nil, nil, nil, nil, parsed)
         }
+    }
+
+    // MARK: - Validation
+
+    private func isValidDeadlineFormat(_ string: String) -> Bool {
+        let parts = string.split(separator: " ", omittingEmptySubsequences: true)
+        guard let datePart = parts.first else { return false }
+
+        let dateComps = datePart.split(separator: "-").compactMap { Int($0) }
+        guard dateComps.count == 2 || dateComps.count == 3 else { return false }
+
+        if dateComps.count == 2 {
+            guard dateComps[0] >= 1 && dateComps[0] <= 12,
+                  dateComps[1] >= 1 && dateComps[1] <= 31 else { return false }
+        } else {
+            guard dateComps[0] >= 1,
+                  dateComps[1] >= 1 && dateComps[1] <= 12,
+                  dateComps[2] >= 1 && dateComps[2] <= 31 else { return false }
+        }
+
+        if parts.count > 1 {
+            let timeComps = String(parts[1]).split(separator: ":").compactMap { Int($0) }
+            guard timeComps.count >= 1 && timeComps.count <= 2 else { return false }
+            guard timeComps[0] >= 0 && timeComps[0] <= 23 else { return false }
+            if timeComps.count == 2 {
+                guard timeComps[1] >= 0 && timeComps[1] <= 59 else { return false }
+            }
+        }
+
+        return true
     }
 }
