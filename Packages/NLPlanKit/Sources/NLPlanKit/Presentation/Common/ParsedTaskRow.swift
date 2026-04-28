@@ -240,7 +240,8 @@ struct ParsedTaskRow: View {
     private func commitMinutesEdit() {
         editingMinutes = false
         let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let minutes = trimmed.parsedHourMinuteDuration, minutes != task.estimatedMinutes else { return }
+        guard let minutes = trimmed.parsedHourMinuteDuration else { return }
+        guard minutes != task.estimatedMinutes else { return }
         onEdit(task.title, task.category, minutes, task.note, task.deadline, task.deadlineHasExplicitYear, task.deadlineHasTime)
     }
 
@@ -276,16 +277,44 @@ struct ParsedTaskRow: View {
         editingDeadline = false
         let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            // 清空截止时间
             if task.deadline != nil {
                 onEdit(task.title, task.category, task.estimatedMinutes, task.note, nil, false, false)
             }
             return
         }
+        guard isValidDeadlineFormat(trimmed) else { return }
         let (parsed, hasExplicitYear, hasTime) = DeepSeekAIService.parseDeadlineString(trimmed)
         guard let parsed else { return }
         if parsed != task.deadline || hasExplicitYear != task.deadlineHasExplicitYear || hasTime != task.deadlineHasTime {
             onEdit(task.title, task.category, task.estimatedMinutes, task.note, parsed, hasExplicitYear, hasTime)
         }
+    }
+
+    private func isValidDeadlineFormat(_ string: String) -> Bool {
+        let parts = string.split(separator: " ", omittingEmptySubsequences: true)
+        guard let datePart = parts.first else { return false }
+
+        let dateComps = datePart.split(separator: "-").compactMap { Int($0) }
+        guard dateComps.count == 2 || dateComps.count == 3 else { return false }
+
+        if dateComps.count == 2 {
+            guard dateComps[0] >= 1 && dateComps[0] <= 12,
+                  dateComps[1] >= 1 && dateComps[1] <= 31 else { return false }
+        } else {
+            guard dateComps[0] >= 1,
+                  dateComps[1] >= 1 && dateComps[1] <= 12,
+                  dateComps[2] >= 1 && dateComps[2] <= 31 else { return false }
+        }
+
+        if parts.count > 1 {
+            let timeComps = String(parts[1]).split(separator: ":").compactMap { Int($0) }
+            guard timeComps.count >= 1 && timeComps.count <= 2 else { return false }
+            guard timeComps[0] >= 0 && timeComps[0] <= 23 else { return false }
+            if timeComps.count == 2 {
+                guard timeComps[1] >= 0 && timeComps[1] <= 59 else { return false }
+            }
+        }
+
+        return true
     }
 }

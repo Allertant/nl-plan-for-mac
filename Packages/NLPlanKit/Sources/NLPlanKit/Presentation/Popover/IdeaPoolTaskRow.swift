@@ -28,10 +28,6 @@ struct IdeaPoolTaskRow: View {
     @State private var cachedRelativeTime: String = ""
     @State private var cachedDeadlineDisplay: String?
 
-    // 烟雾提示
-    @State private var minutesErrorHint: String?
-    @State private var deadlineErrorHint: String?
-
     private var isInProgress: Bool { idea.ideaStatus == .inProgress }
 
     private enum Field: Hashable { case title, minutes, note, deadline }
@@ -81,15 +77,9 @@ struct IdeaPoolTaskRow: View {
                 else if editingMinutes {
                     HStack(spacing: 4) { Image(systemName: "clock"); TextField("1h30m", text: $draftMinutes).textFieldStyle(.plain).frame(width: 52).focused($focusedField, equals: .minutes).onSubmit { commitMinutesEdit() } }
                         .font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                        .overlay(alignment: .top) {
-                            if let hint = minutesErrorHint { SmokeHint(text: hint) }
-                        }
                 } else {
                     if let estimatedMinutes = idea.estimatedMinutes {
                         Label(estimatedMinutes.hourMinuteString, systemImage: "clock").font(.system(size: 10)).foregroundStyle(.secondary).onTapGesture { startEditingMinutes() }
-                            .overlay(alignment: .top) {
-                                if let hint = minutesErrorHint { SmokeHint(text: hint) }
-                            }
                     }
                 }
                 Text(cachedRelativeTime).font(.system(size: 10)).foregroundStyle(.tertiary)
@@ -105,16 +95,10 @@ struct IdeaPoolTaskRow: View {
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                    .overlay(alignment: .top) {
-                        if let hint = deadlineErrorHint { SmokeHint(text: hint) }
-                    }
                 } else if let deadlineDisplay = cachedDeadlineDisplay {
                     Label(deadlineDisplay, systemImage: "calendar")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                         .onTapGesture { startEditingDeadline() }
-                        .overlay(alignment: .top) {
-                            if let hint = deadlineErrorHint { SmokeHint(text: hint) }
-                        }
                 }
                 Spacer(minLength: 8)
                 if showDeleteConfirm {
@@ -179,47 +163,6 @@ struct IdeaPoolTaskRow: View {
         }
     }
 
-    // MARK: - Smoke Hint
-
-    /// 烟雾状飘浮提示（从字段位置往上飘 1s 后消失）
-    private struct SmokeHint: View {
-        let text: String
-        @State private var opacity = 1.0
-        @State private var yOffset: CGFloat = 0
-
-        var body: some View {
-            Text(text)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .fixedSize()
-                .background(Capsule().fill(Color.red.opacity(0.8)))
-                .offset(y: yOffset)
-                .opacity(opacity)
-                .onAppear {
-                    withAnimation(.easeOut(duration: 1.2)) {
-                        yOffset = -26
-                    }
-                    withAnimation(.easeOut(duration: 0.8).delay(0.7)) {
-                        opacity = 0
-                    }
-                }
-        }
-    }
-
-    private func showHint(field: Field, message: String) {
-        switch field {
-        case .minutes:
-            minutesErrorHint = message
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { minutesErrorHint = nil }
-        case .deadline:
-            deadlineErrorHint = message
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { deadlineErrorHint = nil }
-        default: break
-        }
-    }
-
     // MARK: - Background
 
     private var rowBackground: Color {
@@ -240,10 +183,7 @@ struct IdeaPoolTaskRow: View {
     private func commitMinutesEdit() {
         editingMinutes = false
         let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let minutes = trimmed.parsedHourMinuteDuration else {
-            showHint(field: .minutes, message: "格式不合法")
-            return
-        }
+        guard let minutes = trimmed.parsedHourMinuteDuration else { return }
         guard minutes != idea.estimatedMinutes else { return }
         onUpdate(nil, nil, minutes, nil, nil)
     }
@@ -253,10 +193,7 @@ struct IdeaPoolTaskRow: View {
     private func commitDeadlineEdit() {
         editingDeadline = false
         let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty || isValidDeadlineFormat(trimmed) else {
-            showHint(field: .deadline, message: "格式不合法")
-            return
-        }
+        guard trimmed.isEmpty || isValidDeadlineFormat(trimmed) else { return }
         let (parsed, _, _) = DeepSeekAIService.parseDeadlineString(trimmed.isEmpty ? nil : trimmed)
         if parsed != idea.deadline {
             onUpdate(nil, nil, nil, nil, parsed)
