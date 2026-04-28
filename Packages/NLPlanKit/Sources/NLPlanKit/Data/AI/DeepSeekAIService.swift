@@ -48,12 +48,16 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
 
         return parsedResponse.tasks.map { dto in
-            ParsedTask(
+            let (deadline, hasExplicitYear, hasTime) = Self.parseDeadlineString(dto.deadline)
+            return ParsedTask(
                 title: dto.title,
                 category: dto.category,
                 estimatedMinutes: dto.estimatedMinutes,
                 recommended: dto.recommended ?? false,
-                reason: dto.reason ?? ""
+                reason: dto.reason ?? "",
+                deadline: deadline,
+                deadlineHasExplicitYear: hasExplicitYear,
+                deadlineHasTime: hasTime
             )
         }
     }
@@ -77,12 +81,16 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
 
         return parsedResponse.tasks.map { dto in
-            ParsedTask(
+            let (deadline, hasExplicitYear, hasTime) = Self.parseDeadlineString(dto.deadline)
+            return ParsedTask(
                 title: dto.title,
                 category: dto.category,
                 estimatedMinutes: dto.estimatedMinutes,
                 recommended: dto.recommended ?? false,
-                reason: dto.reason ?? ""
+                reason: dto.reason ?? "",
+                deadline: deadline,
+                deadlineHasExplicitYear: hasExplicitYear,
+                deadlineHasTime: hasTime
             )
         }
     }
@@ -258,6 +266,72 @@ final class DeepSeekAIService: AIServiceProtocol {
             reason: response.reason,
             researchPrompt: response.researchPrompt
         )
+    }
+
+    // MARK: - Deadline Parsing
+
+    /// 解析 AI 返回的截止时间字符串
+    /// 格式: "M-d" | "M-d HH:mm" | "yyyy-M-d" | "yyyy-M-d HH:mm"
+    /// 返回: (date, hasExplicitYear, hasTime)
+    static func parseDeadlineString(_ string: String?) -> (Date?, Bool, Bool) {
+        guard let string, !string.trimmingCharacters(in: .whitespaces).isEmpty else {
+            // 无截止时间 → 默认今天
+            return (Calendar.current.startOfDay(for: .now), false, false)
+        }
+
+        let trimmed = string.trimmingCharacters(in: .whitespaces)
+        let parts = trimmed.split(separator: " ", omittingEmptySubsequences: true)
+        let datePart = String(parts[0])
+        let timePart = parts.count > 1 ? String(parts[1]) : nil
+
+        let dateComponents = datePart.split(separator: "-", omittingEmptySubsequences: true).compactMap { Int($0) }
+        let cal = Calendar.current
+        let now = Date()
+
+        var year: Int, month: Int, day: Int
+        let hasExplicitYear: Bool
+
+        if dateComponents.count >= 3 {
+            year = dateComponents[0]
+            month = dateComponents[1]
+            day = dateComponents[2]
+            hasExplicitYear = true
+        } else if dateComponents.count == 2 {
+            year = cal.component(.year, from: now)
+            month = dateComponents[0]
+            day = dateComponents[1]
+            hasExplicitYear = false
+        } else {
+            return (cal.startOfDay(for: now), false, false)
+        }
+
+        var hour = 0, minute = 0
+        let hasTime: Bool
+        if let timePart {
+            let timeComponents = timePart.split(separator: ":").compactMap { Int($0) }
+            if timeComponents.count >= 2 {
+                hour = timeComponents[0]
+                minute = timeComponents[1]
+                hasTime = true
+            } else if timeComponents.count == 1 {
+                hour = timeComponents[0]
+                hasTime = true
+            } else {
+                hasTime = false
+            }
+        } else {
+            hasTime = false
+        }
+
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+
+        let date = cal.date(from: components) ?? cal.startOfDay(for: now)
+        return (date, hasExplicitYear, hasTime)
     }
 
     // MARK: - Private

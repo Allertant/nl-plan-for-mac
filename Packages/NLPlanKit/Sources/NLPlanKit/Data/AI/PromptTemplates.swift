@@ -20,6 +20,13 @@ enum PromptTemplates {
         5. 如果任务是普通单次事项，estimated_minutes 必须给出分钟数。
         6. 如果任务明显是长期项目、系列计划、学习路线或无法整体一次完成的目标，不要给整项预估时长，estimated_minutes 设为 null。
         7. 如果用户输入中的某个事项与已有任务语义相同或高度相似（用词不同但指同一件事），直接跳过，不要生成。例如已有「搭建个人博客」时，用户再说「开始写技术博客」应跳过。
+        8. 截止时间（deadline）：从用户输入中提取时间信息，格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"。
+           - 如果用户提到具体日期或时间（如"今天23:30前"、"明天下午3点"、"周五前"、"4月15号之前"），提取为对应的截止时间。
+           - 年份由系统自动补充为当前年份，除非用户明确指定了年份。
+           - 如果只提到时间没提到日期（如"下午3点前"），视为今天。
+           - 如果用户没有提及任何时间信息，deadline 设为 null（系统会自动设为今天）。
+           - 如果只有日期没有具体时间，只输出日期部分（如 "4-1"），不要编造时间。
+           - 如果同时有日期和时间，输出日期和时间（如 "4-1 15:00"）。
 
         示例输入：「今天要把项目报告初稿写完，顺便整理工位，下午产品评审会」
         正确输出：3 个任务 — 「完成项目报告初稿」「整理工位」「产品评审会」
@@ -31,7 +38,8 @@ enum PromptTemplates {
             {
               "title": "任务名称",
               "category": "分类",
-              "estimated_minutes": 60
+              "estimated_minutes": 60,
+              "deadline": "M-d" 或 "M-d HH:mm" 或 null
             }
           ]
         }
@@ -56,7 +64,8 @@ enum PromptTemplates {
     ) -> String {
         let taskList = currentTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
-            return "\(i + 1). 「\(t.title)」(\(t.category)，\(durationText))"
+            let deadlineText = t.deadlineDisplayString.map { "，截止:\($0)" } ?? ""
+            return "\(i + 1). 「\(t.title)」(\(t.category)，\(durationText)\(deadlineText))"
         }.joined(separator: "\n")
 
         return """
@@ -77,6 +86,7 @@ enum PromptTemplates {
 
         分类必须从以下列表中选择：\(availableTags.joined(separator: "/"))，不得自创分类。
         普通单次事项必须填写 estimated_minutes；长期项目、系列计划、学习路线等整体不可一次完成的条目，estimated_minutes 设为 null。
+        deadline 格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"，无截止时间则设为 null。如果用户修改要求中提到时间调整，相应更新 deadline。
 
         输出严格的 JSON：
         {
@@ -84,7 +94,8 @@ enum PromptTemplates {
             {
               "title": "任务名称",
               "category": "分类",
-              "estimated_minutes": 60
+              "estimated_minutes": 60,
+              "deadline": "M-d" 或 "M-d HH:mm" 或 null
             }
           ]
         }
@@ -251,7 +262,8 @@ enum PromptTemplates {
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
-            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")"
+            let deadlineText = t.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
+            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")\(deadlineText)"
             if let summary = t.projectRecommendationSummary, !summary.isEmpty {
                 return "\(base)\n   项目状态摘要：\(summary)"
             }
@@ -311,6 +323,7 @@ enum PromptTemplates {
         5. 若候选中包含项目型想法，优先推荐一个今天可执行的小切片任务，而不是直接推荐整个项目标题
         6. 快速模式下应明显偏向普通想法的清理与消化；综合模式下允许普通想法和项目同时竞争
         7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
+        8. 有截止时间（deadline）的任务应优先考虑，截止时间越紧迫优先级越高
 
         输出严格的 JSON 格式：
         {

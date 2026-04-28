@@ -377,7 +377,8 @@ final class IdeaPoolViewModel {
                 isProject: idea.isProject,
                 projectDescription: idea.projectDescription,
                 planningBackground: idea.planningBackground,
-                projectRecommendationSummary: idea.projectRecommendationSummary
+                projectRecommendationSummary: idea.projectRecommendationSummary,
+                deadlineDisplay: idea.deadlineDisplayString
             )
         }
 

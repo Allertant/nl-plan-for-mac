@@ -316,7 +316,8 @@ final class MustDoViewModel {
                     isProject: idea.isProject,
                     projectDescription: idea.projectDescription,
                     planningBackground: idea.planningBackground,
-                    projectRecommendationSummary: idea.projectRecommendationSummary
+                    projectRecommendationSummary: idea.projectRecommendationSummary,
+                    deadlineDisplay: idea.deadlineDisplayString
                 )
             }
 
@@ -331,7 +332,8 @@ final class MustDoViewModel {
                     isProject: false,
                     projectDescription: nil,
                     planningBackground: nil,
-                    projectRecommendationSummary: nil
+                    projectRecommendationSummary: nil,
+                    deadlineDisplay: nil
                 )
             }
 

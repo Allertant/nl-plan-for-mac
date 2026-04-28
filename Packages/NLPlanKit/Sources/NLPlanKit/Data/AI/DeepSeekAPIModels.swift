@@ -57,9 +57,10 @@ struct ParsedTaskDTO: Decodable {
     let estimatedMinutes: Int?
     let recommended: Bool?
     let reason: String?
+    let deadline: String?
 
     enum CodingKeys: String, CodingKey {
-        case title, category, recommended, reason
+        case title, category, recommended, reason, deadline
         case estimatedMinutes = "estimated_minutes"
     }
 }

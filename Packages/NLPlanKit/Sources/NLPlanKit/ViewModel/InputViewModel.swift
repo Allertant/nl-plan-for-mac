@@ -167,7 +167,7 @@ final class InputViewModel {
     // MARK: - 详情页操作
 
     /// 编辑队列项中的某个任务（按 ID 查找，避免 index 错位）
-    func updateParsedTask(queueItemID: UUID, taskID: UUID, title: String, category: String, estimatedMinutes: Int?, note: String?) {
+    func updateParsedTask(queueItemID: UUID, taskID: UUID, title: String, category: String, estimatedMinutes: Int?, note: String?, deadline: Date? = nil, deadlineHasExplicitYear: Bool = false, deadlineHasTime: Bool = false) {
         guard let item = queueItems.first(where: { $0.id == queueItemID }),
               var tasks = item.parsedTasks,
               let idx = tasks.firstIndex(where: { $0.id == taskID }) else { return }
@@ -175,6 +175,9 @@ final class InputViewModel {
         tasks[idx].category = category
         tasks[idx].estimatedMinutes = estimatedMinutes
         tasks[idx].note = (note?.isEmpty ?? true) ? nil : note
+        tasks[idx].deadline = deadline
+        tasks[idx].deadlineHasExplicitYear = deadlineHasExplicitYear
+        tasks[idx].deadlineHasTime = deadlineHasTime
         item.parsedTasks = tasks
         try? parseQueueRepo.update(item)
     }

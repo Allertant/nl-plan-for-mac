@@ -69,6 +69,9 @@ struct IdeaPoolTaskRow: View {
                         }
                     }
                     Text(idea.createdDate.relativeTimeString()).font(.system(size: 10)).foregroundStyle(.tertiary)
+                    if let deadlineDisplay = idea.deadlineDisplayString {
+                        Label(deadlineDisplay, systemImage: "calendar").font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
                 }
                 if idea.aiRecommended, let reason = idea.recommendationReason, !reason.isEmpty { TooltipText(text: "💡 \(reason)", tooltip: reason) }
                 if idea.isProject {

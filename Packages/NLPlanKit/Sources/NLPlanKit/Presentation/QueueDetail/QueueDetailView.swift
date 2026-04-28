@@ -74,14 +74,17 @@ struct QueueDetailView: View {
                             ParsedTaskRow(
                                 task: task,
                                 isLocked: isLocked,
-                                onEdit: { title, category, minutes, note in
+                                onEdit: { title, category, minutes, note, deadline, deadlineHasExplicitYear, deadlineHasTime in
                                     viewModel.updateParsedTask(
                                         queueItemID: queueItem.id,
                                         taskID: task.id,
                                         title: title,
                                         category: category,
                                         estimatedMinutes: minutes,
-                                        note: note
+                                        note: note,
+                                        deadline: deadline,
+                                        deadlineHasExplicitYear: deadlineHasExplicitYear,
+                                        deadlineHasTime: deadlineHasTime
                                     )
                                 },
                                 onDelete: {

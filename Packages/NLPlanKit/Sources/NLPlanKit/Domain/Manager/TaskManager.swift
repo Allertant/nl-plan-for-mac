@@ -82,7 +82,8 @@ final class TaskManager {
                 note: parsed.note,
                 isProject: isProject,
                 projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
-                projectProgress: isProject ? 0 : nil
+                projectProgress: isProject ? 0 : nil,
+                deadline: parsed.deadline
             )
             createdIdeas.append(idea)
         }
@@ -105,7 +106,8 @@ final class TaskManager {
             note: parsed.note,
             isProject: isProject,
             projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
-            projectProgress: isProject ? 0 : nil
+            projectProgress: isProject ? 0 : nil,
+            deadline: parsed.deadline
         )
     }
 

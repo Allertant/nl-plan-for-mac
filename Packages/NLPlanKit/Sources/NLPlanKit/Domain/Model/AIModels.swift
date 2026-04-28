@@ -10,6 +10,9 @@ struct ParsedTask: Sendable, Identifiable, Codable {
     let reason: String
     var isProject: Bool?
     var note: String?
+    var deadline: Date?
+    var deadlineHasExplicitYear: Bool
+    var deadlineHasTime: Bool
 
     init(
         id: UUID = UUID(),
@@ -19,7 +22,10 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         recommended: Bool = false,
         reason: String = "",
         isProject: Bool? = nil,
-        note: String? = nil
+        note: String? = nil,
+        deadline: Date? = nil,
+        deadlineHasExplicitYear: Bool = false,
+        deadlineHasTime: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -29,6 +35,34 @@ struct ParsedTask: Sendable, Identifiable, Codable {
         self.reason = reason
         self.isProject = isProject
         self.note = note
+        self.deadline = deadline
+        self.deadlineHasExplicitYear = deadlineHasExplicitYear
+        self.deadlineHasTime = deadlineHasTime
+    }
+
+    /// 显示用截止时间字符串（同年省略年份，无时间省略时间）
+    var deadlineDisplayString: String? {
+        guard let deadline else { return nil }
+        let cal = Calendar.current
+        let now = Date()
+        let showYear = deadlineHasExplicitYear || cal.component(.year, from: deadline) != cal.component(.year, from: now)
+        let month = cal.component(.month, from: deadline)
+        let day = cal.component(.day, from: deadline)
+
+        var parts: [String] = []
+        if showYear {
+            parts.append("\(cal.component(.year, from: deadline))")
+        }
+        parts.append("\(month)-\(day)")
+
+        var datePart = parts.joined(separator: "-")
+
+        if deadlineHasTime {
+            let hour = cal.component(.hour, from: deadline)
+            let minute = cal.component(.minute, from: deadline)
+            datePart += String(format: " %02d:%02d", hour, minute)
+        }
+        return datePart
     }
 }
 
@@ -44,6 +78,7 @@ struct TaskRecommendationInput: Sendable {
     let projectDescription: String?
     let planningBackground: String?
     let projectRecommendationSummary: String?
+    let deadlineDisplay: String?
 }
 
 struct PlanningBackgroundPromptInput: Sendable {

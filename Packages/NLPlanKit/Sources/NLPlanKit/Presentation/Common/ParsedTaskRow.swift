@@ -4,7 +4,7 @@ import SwiftUI
 struct ParsedTaskRow: View {
     let task: ParsedTask
     var isLocked: Bool = false
-    let onEdit: (_ title: String, _ category: String, _ minutes: Int?, _ note: String?) -> Void
+    let onEdit: (_ title: String, _ category: String, _ minutes: Int?, _ note: String?, _ deadline: Date?, _ deadlineHasExplicitYear: Bool, _ deadlineHasTime: Bool) -> Void
     let onDelete: () -> Void
     let onApprove: () -> Void
     let onToggleProject: () -> Void
@@ -12,14 +12,16 @@ struct ParsedTaskRow: View {
     @State private var editingTitle = false
     @State private var editingMinutes = false
     @State private var editingNote = false
+    @State private var editingDeadline = false
     @State private var showingCategoryMenu = false
     @State private var showDeleteConfirm = false
     @State private var draftTitle: String = ""
     @State private var draftMinutes: String = ""
     @State private var draftNote: String = ""
+    @State private var draftDeadline: String = ""
     @FocusState private var focusedField: Field?
 
-    private enum Field: Hashable { case title, minutes, note }
+    private enum Field: Hashable { case title, minutes, note, deadline }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -65,7 +67,7 @@ struct ParsedTaskRow: View {
                     .menuIndicator(.hidden)
                 }
 
-                // 分类 + 时长
+                // 分类 + 时长 + 截止
                 HStack(spacing: 8) {
                     Button { showingCategoryMenu.toggle() } label: {
                         TagChip(text: task.category)
@@ -75,7 +77,7 @@ struct ParsedTaskRow: View {
                         CategoryPickerMenu(currentCategory: task.category) { tag in
                             showingCategoryMenu = false
                             if tag != task.category {
-                                onEdit(task.title, tag, task.estimatedMinutes, task.note)
+                                onEdit(task.title, tag, task.estimatedMinutes, task.note, task.deadline, task.deadlineHasExplicitYear, task.deadlineHasTime)
                             }
                         }
                     }
@@ -102,6 +104,34 @@ struct ParsedTaskRow: View {
                                 .foregroundStyle(.secondary)
                                 .onTapGesture { startEditingMinutes() }
                         }
+                    }
+
+                    // 截止时间
+                    if editingDeadline {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                            TextField("4-1 或 4-1 23:30", text: $draftDeadline)
+                                .textFieldStyle(.plain)
+                                .frame(width: 90)
+                                .focused($focusedField, equals: .deadline)
+                                .onSubmit { commitDeadlineEdit() }
+                        }
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                    } else if let display = task.deadlineDisplayString {
+                        Label(display, systemImage: "calendar")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .onTapGesture { startEditingDeadline() }
+                    } else {
+                        Label("添加截止...", systemImage: "calendar")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .onTapGesture { startEditingDeadline() }
                     }
                 }
 
@@ -173,6 +203,7 @@ struct ParsedTaskRow: View {
                 if editingTitle { commitTitleEdit() }
                 if editingMinutes { commitMinutesEdit() }
                 if editingNote { commitNoteEdit() }
+                if editingDeadline { commitDeadlineEdit() }
             }
         }
     }
@@ -182,6 +213,7 @@ struct ParsedTaskRow: View {
     private func startEditingTitle() {
         if editingMinutes { commitMinutesEdit() }
         if editingNote { commitNoteEdit() }
+        if editingDeadline { commitDeadlineEdit() }
         draftTitle = task.title
         editingTitle = true
         focusedField = .title
@@ -192,12 +224,13 @@ struct ParsedTaskRow: View {
         editingTitle = false
         let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != task.title else { return }
-        onEdit(trimmed, task.category, task.estimatedMinutes, task.note)
+        onEdit(trimmed, task.category, task.estimatedMinutes, task.note, task.deadline, task.deadlineHasExplicitYear, task.deadlineHasTime)
     }
 
     private func startEditingMinutes() {
         if editingTitle { commitTitleEdit() }
         if editingNote { commitNoteEdit() }
+        if editingDeadline { commitDeadlineEdit() }
         draftMinutes = (task.estimatedMinutes ?? 30).hourMinuteString
         editingMinutes = true
         focusedField = .minutes
@@ -208,12 +241,13 @@ struct ParsedTaskRow: View {
         editingMinutes = false
         let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let minutes = trimmed.parsedHourMinuteDuration, minutes != task.estimatedMinutes else { return }
-        onEdit(task.title, task.category, minutes, task.note)
+        onEdit(task.title, task.category, minutes, task.note, task.deadline, task.deadlineHasExplicitYear, task.deadlineHasTime)
     }
 
     private func startEditingNote() {
         if editingTitle { commitTitleEdit() }
         if editingMinutes { commitMinutesEdit() }
+        if editingDeadline { commitDeadlineEdit() }
         draftNote = task.note ?? ""
         editingNote = true
         focusedField = .note
@@ -224,8 +258,34 @@ struct ParsedTaskRow: View {
         editingNote = false
         let trimmed = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed != (task.note ?? "") {
-            onEdit(task.title, task.category, task.estimatedMinutes, trimmed)
+            onEdit(task.title, task.category, task.estimatedMinutes, trimmed, task.deadline, task.deadlineHasExplicitYear, task.deadlineHasTime)
         }
     }
 
+    private func startEditingDeadline() {
+        if editingTitle { commitTitleEdit() }
+        if editingMinutes { commitMinutesEdit() }
+        if editingNote { commitNoteEdit() }
+        draftDeadline = task.deadlineDisplayString ?? ""
+        editingDeadline = true
+        focusedField = .deadline
+        CursorHelper.moveInsertionPointToEnd()
+    }
+
+    private func commitDeadlineEdit() {
+        editingDeadline = false
+        let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            // 清空截止时间
+            if task.deadline != nil {
+                onEdit(task.title, task.category, task.estimatedMinutes, task.note, nil, false, false)
+            }
+            return
+        }
+        let (parsed, hasExplicitYear, hasTime) = DeepSeekAIService.parseDeadlineString(trimmed)
+        guard let parsed else { return }
+        if parsed != task.deadline || hasExplicitYear != task.deadlineHasExplicitYear || hasTime != task.deadlineHasTime {
+            onEdit(task.title, task.category, task.estimatedMinutes, task.note, parsed, hasExplicitYear, hasTime)
+        }
+    }
 }

@@ -30,6 +30,7 @@ final class IdeaEntity {
     var projectRecommendationSummary: String?
     var projectRecommendationSummaryGeneratedAt: Date?
     var projectRecommendationSummarySourceUpdatedAt: Date?
+    var deadline: Date?
     @Transient
     var ideaStatus: IdeaStatus {
         get { IdeaStatus(rawValue: status) ?? .pending }
@@ -40,6 +41,33 @@ final class IdeaEntity {
     var taskPriority: TaskPriority {
         get { TaskPriority(rawValue: priority) ?? .medium }
         set { priority = newValue.rawValue }
+    }
+
+    /// 显示用截止时间字符串（同年省略年份）
+    @Transient
+    var deadlineDisplayString: String? {
+        guard let deadline else { return nil }
+        let cal = Calendar.current
+        let now = Date()
+        let showYear = cal.component(.year, from: deadline) != cal.component(.year, from: now)
+        let month = cal.component(.month, from: deadline)
+        let day = cal.component(.day, from: deadline)
+        let hour = cal.component(.hour, from: deadline)
+        let minute = cal.component(.minute, from: deadline)
+        let hasTime = !(hour == 0 && minute == 0)
+
+        if showYear {
+            let year = cal.component(.year, from: deadline)
+            if hasTime {
+                return String(format: "%d-%d-%d %02d:%02d", year, month, day, hour, minute)
+            }
+            return "\(year)-\(month)-\(day)"
+        } else {
+            if hasTime {
+                return String(format: "%d-%d %02d:%02d", month, day, hour, minute)
+            }
+            return "\(month)-\(day)"
+        }
     }
 
     init(
@@ -68,7 +96,8 @@ final class IdeaEntity {
         projectRecommendationContextUpdatedAt: Date? = nil,
         projectRecommendationSummary: String? = nil,
         projectRecommendationSummaryGeneratedAt: Date? = nil,
-        projectRecommendationSummarySourceUpdatedAt: Date? = nil
+        projectRecommendationSummarySourceUpdatedAt: Date? = nil,
+        deadline: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -96,6 +125,7 @@ final class IdeaEntity {
         self.projectRecommendationSummary = projectRecommendationSummary
         self.projectRecommendationSummaryGeneratedAt = projectRecommendationSummaryGeneratedAt
         self.projectRecommendationSummarySourceUpdatedAt = projectRecommendationSummarySourceUpdatedAt
+        self.deadline = deadline
     }
 }
 
