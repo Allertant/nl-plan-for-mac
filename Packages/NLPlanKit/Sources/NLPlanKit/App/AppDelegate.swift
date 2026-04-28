@@ -12,19 +12,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 延迟执行，等待 SwiftUI 创建完 MenuBarExtra 对应的 NSStatusItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.setupRightClickMenu()
+        attemptSetup(retry: 0)
+    }
+
+    // MARK: - Setup with Retry
+
+    private func attemptSetup(retry: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self else { return }
+            if let button = self.findMenuBarButton() {
+                self.setupRightClickMenu(for: button)
+            } else if retry < 5 {
+                self.attemptSetup(retry: retry + 1)
+            }
         }
     }
 
     // MARK: - Right-Click Context Menu
 
-    private func setupRightClickMenu() {
-        guard let button = findMenuBarButton() else { return }
-
+    private func setupRightClickMenu(for button: NSStatusBarButton) {
         let menu = NSMenu()
         let quitItem = NSMenuItem(
-            title: "退出 NL Plan",
+            title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
@@ -32,22 +41,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
             if self?.showMenuIfRightClicked(on: button, menu: menu, event: event) == true {
-                return nil // 消费事件，阻止传播
+                return nil
             }
             return event
         }
     }
 
-    /// 查找 SwiftUI MenuBarExtra 创建的 NSStatusItem 的 button
+    /// 通过窗口层级查找 MenuBarExtra 创建的 NSStatusBarButton
     private func findMenuBarButton() -> NSStatusBarButton? {
-        let statusBar = NSStatusBar.system
-        guard let items = statusBar.value(forKey: "statusItems") as? [NSObject] else {
-            return nil
-        }
-        // MenuBarExtra 通常是最后注册的 statusItem，逆序查找
-        for item in items.reversed() {
-            if let button = item.value(forKey: "button") as? NSStatusBarButton {
+        for window in NSApp.windows {
+            let className = String(describing: type(of: window))
+            // MenuBarExtra 的窗口类名包含 "StatusBar"
+            guard className.contains("StatusBar") else { continue }
+            if let button = findStatusBarButton(in: window.contentView) {
                 return button
+            }
+        }
+        return nil
+    }
+
+    /// 递归搜索视图层级中的 NSStatusBarButton
+    private func findStatusBarButton(in view: NSView?) -> NSStatusBarButton? {
+        guard let view else { return nil }
+        if let button = view as? NSStatusBarButton {
+            return button
+        }
+        for subview in view.subviews {
+            if let found = findStatusBarButton(in: subview) {
+                return found
             }
         }
         return nil
@@ -63,14 +84,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mouseLocation = NSEvent.mouseLocation
         guard let buttonWindow = button.window else { return false }
 
-        // 将按钮 frame 转换到屏幕坐标系
         let buttonFrameInScreen = buttonWindow.convertToScreen(
             button.convert(button.bounds, to: nil)
         )
 
         guard buttonFrameInScreen.contains(mouseLocation) else { return false }
 
-        // 在按钮左下角弹出菜单
         let menuOrigin = NSPoint(x: buttonFrameInScreen.minX, y: buttonFrameInScreen.minY)
         menu.popUp(positioning: nil, at: menuOrigin, in: nil)
         return true
