@@ -32,7 +32,7 @@ struct IdeaPoolTaskRow: View {
     private enum Field: Hashable { case title, minutes, note, deadline }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             // 行 1：标题 + 加入必做项按钮
             HStack(spacing: 4) {
                 if !idea.isProject && editingTitle {
@@ -139,7 +139,7 @@ struct IdeaPoolTaskRow: View {
                 }
             }
         }
-        .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
         .background { rowBackground.contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
         .onChange(of: focusedField) { _, newValue in
