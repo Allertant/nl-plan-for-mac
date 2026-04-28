@@ -111,6 +111,12 @@ struct QueueDetailView: View {
                                 }
                             )
                         }
+                    } else if queueItem.parseStatus == .completed {
+                        Text("所有想法与已有想法重复，已跳过")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
                     }
 
                     // AI 调整成功提示
@@ -195,17 +201,19 @@ struct QueueDetailView: View {
 
                         Spacer()
 
-                        Button {
-                            Task {
-                                await viewModel.confirmQueueItem(id: queueItem.id)
-                                appState.currentPage = .main
+                        if !cachedTasks.isEmpty {
+                            Button {
+                                Task {
+                                    await viewModel.confirmQueueItem(id: queueItem.id)
+                                    appState.currentPage = .main
+                                }
+                            } label: {
+                                Text("全部确认添加")
+                                    .font(.system(size: 11, weight: .medium))
                             }
-                        } label: {
-                            Text("全部确认添加")
-                                .font(.system(size: 11, weight: .medium))
+                            .buttonStyle(.borderless)
+                            .disabled(isLocked)
                         }
-                        .buttonStyle(.borderless)
-                        .disabled(isLocked)
                     }
                     .padding(.top, 2)
                 }
