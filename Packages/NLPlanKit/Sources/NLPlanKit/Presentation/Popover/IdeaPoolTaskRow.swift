@@ -148,6 +148,11 @@ struct IdeaPoolTaskRow: View {
         .onAppear {
             cachedRelativeTime = idea.createdDate.relativeTimeString()
             cachedDeadlineDisplay = idea.deadlineDisplayString
+        }
+        .onChange(of: idea.deadline) { _, _ in
+            cachedDeadlineDisplay = idea.deadlineDisplayString
+        }
+        .onAppear {
             if isNew {
                 withAnimation(.easeInOut(duration: 0.3)) { flashCount = 1 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { withAnimation(.easeInOut(duration: 0.3)) { flashCount = 0 } }
