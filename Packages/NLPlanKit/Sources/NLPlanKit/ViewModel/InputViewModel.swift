@@ -1,7 +1,7 @@
 import Foundation
 
 /// 输入区 ViewModel（队列模式）
-@Observable
+@MainActor @Observable
 final class InputViewModel {
 
     var inputText: String = ""
