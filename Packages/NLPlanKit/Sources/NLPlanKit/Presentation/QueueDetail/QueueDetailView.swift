@@ -171,6 +171,16 @@ struct QueueDetailView: View {
                     .background(Color(nsColor: .textBackgroundColor))
                     .cornerRadius(6)
 
+                    // Token 用量
+                    if let input = queueItem.cumulativeInputTokens, let output = queueItem.cumulativeOutputTokens, input > 0 || output > 0 {
+                        HStack {
+                            Spacer()
+                            Text("输入: \(formatTokenCount(input)), 输出: \(formatTokenCount(output))")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     // 操作按钮
                     HStack {
                         Button {
@@ -209,5 +219,12 @@ struct QueueDetailView: View {
         .onChange(of: queueItem.parsedTasksData) { _, _ in
             cachedTasks = queueItem.parsedTasks ?? []
         }
+    }
+
+    private func formatTokenCount(_ count: Int) -> String {
+        if count >= 1000 {
+            return "\(count / 1000)k"
+        }
+        return "\(count)"
     }
 }

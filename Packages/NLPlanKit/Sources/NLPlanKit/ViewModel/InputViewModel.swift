@@ -101,7 +101,9 @@ final class InputViewModel {
                     rawText: item.rawText,
                     existingTaskTitles: existingTitles
                 )
+                accumulateTokenUsage(for: item.id)
                 item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks, force: true)
+                accumulateTokenUsage(for: item.id)
                 item.parseStatus = .completed
             } catch {
                 item.errorMessage = error.localizedDescription
@@ -123,6 +125,7 @@ final class InputViewModel {
 
         do {
             let finalParsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks)
+            accumulateTokenUsage(for: id)
             let createdIdeas = try await taskManager.saveParsedTasks(
                 parsedTasks: finalParsedTasks,
                 rawText: item.rawText
@@ -226,6 +229,7 @@ final class InputViewModel {
         let task = tasks[idx]
         do {
             let classified = try await classifyParsedTasksIfNeeded([task], force: task.isProject == nil)
+            accumulateTokenUsage(for: queueItemID)
             let idea = try await taskManager.saveSingleParsedTask(classified[0], rawText: item.rawText)
             await onSubmitSuccess?([idea.id])
 
@@ -273,7 +277,9 @@ final class InputViewModel {
                 currentTasks: currentTasks,
                 userInstruction: instruction
             )
+            accumulateTokenUsage(for: queueItemID)
             item.parsedTasks = try await classifyParsedTasksIfNeeded(newTasks, force: true)
+            accumulateTokenUsage(for: queueItemID)
             try? parseQueueRepo.update(item)
             successMessage = "✅ 已调整"
         } catch {
@@ -289,6 +295,14 @@ final class InputViewModel {
     }
 
     // MARK: - Private
+
+    private func accumulateTokenUsage(for queueItemID: UUID) {
+        guard let usage = taskManager.lastTokenUsage else { return }
+        guard let item = queueItems.first(where: { $0.id == queueItemID }) else { return }
+        item.cumulativeInputTokens = (item.cumulativeInputTokens ?? 0) + usage.inputTokens
+        item.cumulativeOutputTokens = (item.cumulativeOutputTokens ?? 0) + usage.outputTokens
+        try? parseQueueRepo.update(item)
+    }
 
     private func classifyParsedTasksIfNeeded(
         _ tasks: [ParsedTask],

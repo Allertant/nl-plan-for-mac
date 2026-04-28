@@ -1,7 +1,16 @@
 import Foundation
 
+/// 单次 AI 请求的 token 用量
+struct TokenUsage: Sendable {
+    let inputTokens: Int
+    let outputTokens: Int
+}
+
 /// AI 服务抽象协议 — 所有 AI 实现必须遵循
 protocol AIServiceProtocol: Sendable {
+    /// 最近一次请求的 token 用量
+    var lastTokenUsage: TokenUsage? { get }
+
     /// 解析自然语言为结构化任务列表
     /// - Parameters:
     ///   - input: 用户原始输入文本

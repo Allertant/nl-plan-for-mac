@@ -13,6 +13,9 @@ final class TaskManager {
     private let timerEngine: TimerEngine
     private let aiExecutionCoordinator = AIExecutionCoordinator()
 
+    /// 最近一次 AI 请求的 token 用量
+    var lastTokenUsage: TokenUsage? { aiService.lastTokenUsage }
+
     init(
         ideaRepo: IdeaRepository,
         dailyTaskRepo: DailyTaskRepository,

@@ -60,6 +60,10 @@ final class MustDoViewModel {
     var recommendationState: RecommendationState = .idle
     var recommendationStrategy: RecommendationStrategy = .quick
 
+    /// 推荐面板累计 token 用量
+    var cumulativeTokenInput: Int = 0
+    var cumulativeTokenOutput: Int = 0
+
     /// 已加入的推荐项 id
     var acceptedRecommendationIds: Set<UUID> = []
 
@@ -274,6 +278,8 @@ final class MustDoViewModel {
         errorMessage = nil
         acceptedRecommendationIds = []
         selectedPriorities = [:]
+        cumulativeTokenInput = 0
+        cumulativeTokenOutput = 0
 
         let allCandidates = ideaPoolIdeas.filter { idea in
             idea.ideaStatus != .inProgress &&
@@ -349,6 +355,12 @@ final class MustDoViewModel {
                     )
                 }
                 guard !Task.isCancelled else { return }
+
+                // 累计 token（推荐调用）
+                if let usage = aiService.lastTokenUsage {
+                    cumulativeTokenInput += usage.inputTokens
+                    cumulativeTokenOutput += usage.outputTokens
+                }
 
                 let ideaIds = Set(recommendationCandidates.map { $0.id })
                 let validRecs = result.recommendations.filter { recommendation in
@@ -508,6 +520,11 @@ final class MustDoViewModel {
             }
 
             while let outcome = try await group.next() {
+                // 累计 token（项目摘要生成）
+                if let usage = aiService.lastTokenUsage {
+                    cumulativeTokenInput += usage.inputTokens
+                    cumulativeTokenOutput += usage.outputTokens
+                }
                 if let summary = outcome.summary,
                    let refreshedIdea = try await taskManager.saveProjectRecommendationSummary(
                     ideaId: outcome.ideaId,

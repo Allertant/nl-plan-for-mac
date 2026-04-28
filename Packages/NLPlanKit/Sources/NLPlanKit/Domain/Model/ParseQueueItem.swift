@@ -20,6 +20,8 @@ final class ParseQueueItemEntity {
     var parsedTasksData: Data?   // JSON 编码的 [ParsedTask]
     var errorMessage: String?
     var createdAt: Date
+    var cumulativeInputTokens: Int?
+    var cumulativeOutputTokens: Int?
 
     init(rawText: String) {
         self.id = UUID()
@@ -28,6 +30,8 @@ final class ParseQueueItemEntity {
         self.parsedTasksData = nil
         self.errorMessage = nil
         self.createdAt = .now
+        self.cumulativeInputTokens = 0
+        self.cumulativeOutputTokens = 0
     }
 
     // MARK: - 计算属性

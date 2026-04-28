@@ -12,6 +12,7 @@ final class DeepSeekAIService: AIServiceProtocol {
     private let endpoint: URL
     private let urlSession: URLSession
     private let model: String
+    private(set) var lastTokenUsage: TokenUsage?
 
     init(
         apiKey: String,
@@ -418,6 +419,12 @@ final class DeepSeekAIService: AIServiceProtocol {
                 switch httpResponse.statusCode {
                 case 200..<300:
                     let apiResponse = try JSONDecoder().decode(DeepSeekAPIResponse.self, from: data)
+                    if let usage = apiResponse.usage {
+                        lastTokenUsage = TokenUsage(
+                            inputTokens: usage.promptTokens ?? 0,
+                            outputTokens: usage.completionTokens ?? 0
+                        )
+                    }
                     guard let content = apiResponse.choices.first?.message.content else {
                         throw NLPlanError.aiResponseParseError
                     }

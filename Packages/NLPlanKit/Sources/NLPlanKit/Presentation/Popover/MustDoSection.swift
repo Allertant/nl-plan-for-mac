@@ -128,6 +128,12 @@ struct MustDoSection: View {
 
 // MARK: - AI 推荐面板
 
+private func formatTokenCount(_ count: Int) -> String {
+    if count >= 1000 {
+        return "\(count / 1000)k"
+    }
+    return "\(count)"
+}
 private struct AIRecommendPanel: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
@@ -199,6 +205,16 @@ private struct AIRecommendPanel: View {
                                 Task { await viewModel.acceptRecommendation(recommendationId: rec.id) }
                             }
                         )
+                    }
+
+                    // Token 用量
+                    if viewModel.cumulativeTokenInput > 0 || viewModel.cumulativeTokenOutput > 0 {
+                        HStack {
+                            Spacer()
+                            Text("输入: \(formatTokenCount(viewModel.cumulativeTokenInput)), 输出: \(formatTokenCount(viewModel.cumulativeTokenOutput))")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     // 全部加入 / 完成 按钮
