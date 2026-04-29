@@ -346,7 +346,7 @@ struct SettlementTaskRow: View {
 
             if isNoteExpanded || isNoteRequired {
                 TextField(
-                    isNoteRequired ? "补充原因和后续安排..." : "添加备注（可选）...",
+                    isNoteRequired ? "补充原因和后续安排..." : "结算备注（可选）...",
                     text: $noteText,
                     axis: .vertical
                 )
