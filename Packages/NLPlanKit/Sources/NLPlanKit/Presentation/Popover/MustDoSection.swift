@@ -408,7 +408,7 @@ struct MustDoTaskRow: View {
                 Spacer(minLength: 4)
 
                 if isRunning || task.taskStatus == .paused {
-                    RunningTimerView(elapsedSeconds: task.liveElapsedSeconds, isPaused: task.taskStatus == .paused)
+                    RunningTimerView(initialSeconds: task.liveElapsedSeconds, isPaused: task.taskStatus == .paused)
                         .fixedSize()
                 }
             }

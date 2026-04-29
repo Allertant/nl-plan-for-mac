@@ -1,29 +1,44 @@
 import SwiftUI
 
-/// 运行中的计时器显示（每秒刷新）
+/// 运行中的计时器显示（本地每秒累加）
 struct RunningTimerView: View {
-    let elapsedSeconds: Int
+    let initialSeconds: Int
     var isPaused: Bool = false
 
-    @State private var tick = 0
+    @State private var addedSeconds: Int = 0
+    @State private var timer: Timer?
+
+    private var totalSeconds: Int {
+        isPaused ? initialSeconds : initialSeconds + addedSeconds
+    }
 
     var body: some View {
-        Text(formatDuration(seconds: elapsedSeconds))
+        Text(formatDuration(seconds: totalSeconds))
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .foregroundStyle(isPaused ? Color.secondary : Color.green)
-            .onAppear { startTimer() }
-            .onDisappear { timer?.invalidate() }
-            .onChange(of: elapsedSeconds) { _, _ in
-                // 外部值变化时触发重绘
-                tick &+= 1
+            .onAppear {
+                addedSeconds = 0
+                guard !isPaused else { return }
+                startTimer()
+            }
+            .onDisappear { timer?.invalidate(); timer = nil }
+            .onChange(of: isPaused) { _, paused in
+                if paused {
+                    timer?.invalidate(); timer = nil
+                } else {
+                    addedSeconds = 0
+                    startTimer()
+                }
+            }
+            .onChange(of: initialSeconds) { _, _ in
+                addedSeconds = 0
             }
     }
 
-    @State private var timer: Timer?
-
     private func startTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            tick &+= 1
+            addedSeconds += 1
         }
     }
 
