@@ -3,6 +3,13 @@ import Foundation
 /// Prompt 模板管理
 enum PromptTemplates {
 
+    private static func formatToday() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "M月d日"
+        return f.string(from: Date())
+    }
+
     // MARK: - 想法解析
 
     static func parseThought(input: String, existingTaskTitles: [String], availableTags: [String] = AppConstants.defaultTags) -> String {
@@ -312,7 +319,7 @@ enum PromptTemplates {
         \(strategyHint)
         \(extraSection)
         ## 当前时间
-        剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
+        今天是 \(formatToday())，剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
 
         ## 今日必做项（已有）
         \(mustDoTasks.isEmpty ? "（无）" : mustDoList)
