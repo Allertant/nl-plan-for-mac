@@ -6,7 +6,7 @@ struct InputSection: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(alignment: .top) {
+            HStack(alignment: .bottom) {
                 TextField("输入你的想法和计划...", text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...5)
@@ -27,6 +27,10 @@ struct InputSection: View {
             .padding(10)
             .background(Color(nsColor: .textBackgroundColor))
             .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
 
             if let success = viewModel.successMessage {
                 Text(success)
