@@ -35,12 +35,23 @@ private struct ProjectDetailPageView: View {
     @State private var notes: [ProjectNoteEntity] = []
     @State private var isLoading = true
 
-    // 编辑状态
+    // 项目描述编辑
+    @State private var isEditingDescription = false
+    @State private var draftDescription = ""
+    @FocusState private var descriptionFocused: Bool
+
+    // 规划背景编辑
     @State private var isEditingPlanningBackground = false
     @State private var draftPlanningBackground = ""
+    @FocusState private var planningBackgroundFocused: Bool
+
+    // 研究提示词
     @State private var isGeneratingPlanningPrompt = false
     @State private var showCopyPromptToast = false
+
+    // 笔记
     @State private var newNoteText = ""
+    @FocusState private var newNoteFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,6 +79,11 @@ private struct ProjectDetailPageView: View {
                         noteCard
                     }
                     .padding(12)
+                    .background(
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { dismissAllEditing() }
+                    )
                 }
                 .scrollIndicators(.automatic)
             }
@@ -75,7 +91,21 @@ private struct ProjectDetailPageView: View {
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await loadProjectDetail() }
+        .onChange(of: descriptionFocused) { _, focused in
+            if !focused && isEditingDescription { commitDescriptionEdit() }
+        }
+        .onChange(of: planningBackgroundFocused) { _, focused in
+            if !focused && isEditingPlanningBackground { commitPlanningBackgroundEdit() }
+        }
     }
+
+    private func dismissAllEditing() {
+        if isEditingDescription { descriptionFocused = false }
+        if isEditingPlanningBackground { planningBackgroundFocused = false }
+        newNoteFocused = false
+    }
+
+    // MARK: - Data
 
     private func loadProjectDetail() async {
         let ideaId = idea.id
@@ -130,35 +160,47 @@ private struct ProjectDetailPageView: View {
     }
 
     private func descriptionCard(_ project: ProjectDetailSnapshot) -> some View {
-        DetailSectionCard(title: "项目描述", systemImage: "doc.text", tint: .purple, background: Color.purple.opacity(0.08), border: Color.purple.opacity(0.22)) {
-            if let desc = project.projectDescription, !desc.isEmpty {
-                Text(desc).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        DetailSectionCard(title: "项目描述", systemImage: "doc.text", tint: .purple, background: Color.purple.opacity(0.08), border: Color.purple.opacity(0.22), onBackgroundTap: dismissAllEditing) {
+            if isEditingDescription {
+                TextEditor(text: $draftDescription)
+                    .font(.system(size: 11))
+                    .frame(height: 100)
+                    .padding(6)
+                    .scrollIndicators(.automatic)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .focused($descriptionFocused)
             } else {
-                Text("暂无描述").font(.system(size: 11)).foregroundStyle(.tertiary)
+                Group {
+                    if let desc = project.projectDescription, !desc.isEmpty {
+                        Text(desc).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("点击添加描述...").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    }
+                }
+                .onTapGesture {
+                    draftDescription = project.projectDescription ?? ""
+                    isEditingDescription = true
+                    DispatchQueue.main.async { descriptionFocused = true }
+                }
             }
         }
     }
 
-    private func planningBackgroundCard(_ project: ProjectDetailSnapshot) -> some View {
-        DetailSectionCard(title: "规划背景", systemImage: "map", tint: .cyan, background: Color.cyan.opacity(0.08), border: Color.cyan.opacity(0.22)) {
-            VStack(alignment: .leading, spacing: 6) {
-                // 编辑按钮
-                HStack {
-                    Spacer()
-                    Button(isEditingPlanningBackground ? "取消" : "编辑") {
-                        if isEditingPlanningBackground {
-                            isEditingPlanningBackground = false
-                            draftPlanningBackground = project.planningBackground ?? ""
-                        } else {
-                            draftPlanningBackground = project.planningBackground ?? ""
-                            isEditingPlanningBackground = true
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                }
+    private func commitDescriptionEdit() {
+        isEditingDescription = false
+        let trimmed = draftDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = projectDetail?.projectDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmed != current else { return }
+        Task {
+            await viewModel.updateProjectDescription(ideaId: idea.id, description: trimmed.isEmpty ? nil : trimmed)
+            await reloadDetail()
+        }
+    }
 
+    private func planningBackgroundCard(_ project: ProjectDetailSnapshot) -> some View {
+        DetailSectionCard(title: "规划背景", systemImage: "map", tint: .cyan, background: Color.cyan.opacity(0.08), border: Color.cyan.opacity(0.22), onBackgroundTap: dismissAllEditing) {
+            VStack(alignment: .leading, spacing: 6) {
                 if isEditingPlanningBackground {
                     TextEditor(text: $draftPlanningBackground)
                         .font(.system(size: 11))
@@ -167,25 +209,19 @@ private struct ProjectDetailPageView: View {
                         .scrollIndicators(.automatic)
                         .background(Color(nsColor: .windowBackgroundColor))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    HStack {
-                        Spacer()
-                        Button("保存") {
-                            Task {
-                                await viewModel.updatePlanningBackground(ideaId: idea.id, planningBackground: draftPlanningBackground)
-                                await reloadDetail()
-                            }
-                            isEditingPlanningBackground = false
-                        }
-                        .font(.system(size: 10, weight: .medium))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
-                    }
+                        .focused($planningBackgroundFocused)
                 } else {
-                    if let bg = project.planningBackground, !bg.isEmpty {
-                        Text(bg).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(5).fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text("暂无规划背景").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Group {
+                        if let bg = project.planningBackground, !bg.isEmpty {
+                            Text(bg).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(5).fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text("点击添加规划背景...").font(.system(size: 11)).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .onTapGesture {
+                        draftPlanningBackground = project.planningBackground ?? ""
+                        isEditingPlanningBackground = true
+                        DispatchQueue.main.async { planningBackgroundFocused = true }
                     }
                 }
 
@@ -194,9 +230,6 @@ private struct ProjectDetailPageView: View {
                     Divider().padding(.vertical, 2)
                     HStack(spacing: 4) {
                         Text("研究提示词").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                        if let reason = project.planningResearchPromptReason, !reason.isEmpty {
-                            Text("(\(reason))").font(.system(size: 9)).foregroundStyle(.tertiary).lineLimit(1)
-                        }
                         Spacer()
                         Button {
                             let pasteboard = NSPasteboard.general
@@ -214,7 +247,7 @@ private struct ProjectDetailPageView: View {
                         .buttonStyle(.plain)
                         .animation(.easeInOut(duration: 0.2), value: showCopyPromptToast)
                     }
-                    Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(3)
+                    Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(1)
 
                     HStack {
                         Spacer()
@@ -264,6 +297,17 @@ private struct ProjectDetailPageView: View {
         }
     }
 
+    private func commitPlanningBackgroundEdit() {
+        isEditingPlanningBackground = false
+        let trimmed = draftPlanningBackground.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = projectDetail?.planningBackground?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmed != current else { return }
+        Task {
+            await viewModel.updatePlanningBackground(ideaId: idea.id, planningBackground: trimmed.isEmpty ? nil : trimmed)
+            await reloadDetail()
+        }
+    }
+
     private var tasksCard: some View {
         let sorted = allTasks.sorted { taskOrder($0) < taskOrder($1) }
         return DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
@@ -309,7 +353,7 @@ private struct ProjectDetailPageView: View {
     }
 
     private var noteCard: some View {
-        DetailSectionCard(title: "笔记", systemImage: "note.text", tint: .orange, background: Color.orange.opacity(0.08), border: Color.orange.opacity(0.22)) {
+        DetailSectionCard(title: "笔记", systemImage: "note.text", tint: .orange, background: Color.orange.opacity(0.08), border: Color.orange.opacity(0.22), onBackgroundTap: dismissAllEditing) {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(notes, id: \.id) { note in
                     ProjectNoteRow(
@@ -327,6 +371,7 @@ private struct ProjectDetailPageView: View {
                     TextField("添加笔记...", text: $newNoteText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
+                        .focused($newNoteFocused)
                         .onSubmit { addNote() }
                     Button {
                         addNote()
@@ -391,6 +436,7 @@ struct DetailSectionCard<Content: View>: View {
     let tint: Color
     let background: Color
     let border: Color
+    var onBackgroundTap: (() -> Void)? = nil
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -402,7 +448,11 @@ struct DetailSectionCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(background)
+        .background(
+            background
+                .contentShape(Rectangle())
+                .onTapGesture { onBackgroundTap?() }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(border, lineWidth: 1))
     }
@@ -413,39 +463,37 @@ private struct ProjectNoteRow: View {
     let onUpdate: (String) -> Void
     @State private var isEditing = false
     @State private var draftText = ""
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        if isEditing {
-            VStack(spacing: 4) {
+        Group {
+            if isEditing {
                 TextEditor(text: $draftText)
                     .font(.system(size: 11))
                     .frame(minHeight: 60)
                     .padding(6)
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                HStack {
-                    Spacer()
-                    Button("取消") { isEditing = false; draftText = note.content }
-                        .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
-                    Button("保存") {
-                        onUpdate(draftText)
-                        isEditing = false
-                    }
-                    .buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(Color.accentColor)
-                }
-            }
-        } else {
-            HStack(alignment: .top, spacing: 6) {
+                    .focused($isFocused)
+            } else {
                 Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                    draftText = note.content
-                    isEditing = true
-                } label: {
-                    Image(systemName: "pencil").font(.system(size: 9)).foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
+                    .onTapGesture {
+                        draftText = note.content
+                        isEditing = true
+                        DispatchQueue.main.async { isFocused = true }
+                    }
             }
         }
+        .onChange(of: isFocused) { _, focused in
+            if !focused && isEditing { commitEdit() }
+        }
+    }
+
+    private func commitEdit() {
+        isEditing = false
+        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != note.content.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+        onUpdate(trimmed)
     }
 }
