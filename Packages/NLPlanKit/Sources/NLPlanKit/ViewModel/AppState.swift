@@ -38,17 +38,6 @@ final class AppState {
     /// 计时引擎（全局共享）
     let timerEngine: TimerEngine
 
-    // MARK: - Timer Display
-
-    /// 当前是否有任务在计时
-    var isTimerRunning: Bool = false
-
-    /// 当前计时显示文本
-    var timerDisplayText: String = ""
-
-    /// 当前运行中的任务名称
-    var currentTaskTitle: String = ""
-
     // MARK: - Processing State
 
     /// AI 是否正在处理中
@@ -254,18 +243,6 @@ final class AppState {
         mustDoViewModel?.onProjectLinkChanged = { [weak self] ideaId in
             guard let ideaId else { return }
             await self?.ideaPoolViewModel?.refreshProjectAnalyses(ideaId: ideaId)
-        }
-
-        // 连接回调：任务刷新后更新菜单栏计时状态
-        mustDoViewModel?.onTasksRefreshed = { [weak self] in
-            guard let self, let mustDoVM = self.mustDoViewModel else { return }
-            if let running = mustDoVM.runningTask {
-                self.isTimerRunning = true
-                self.currentTaskTitle = running.title
-            } else {
-                self.isTimerRunning = false
-                self.currentTaskTitle = ""
-            }
         }
     }
 }

@@ -6,7 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Properties
 
-    weak var appState: AppState?
     private var rightClickMonitor: Any?
     private weak var statusBarButton: NSStatusBarButton?
 
@@ -45,31 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
-
-        if let appState, appState.isTimerRunning {
-            let title = truncateTitle(appState.currentTaskTitle)
-            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "进行中")
-            item.image?.size = NSSize(width: 16, height: 16)
-            menu.addItem(item)
-        }
-
-        menu.addItem(NSMenuItem.separator())
-
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
-
         return menu
-    }
-
-    private func truncateTitle(_ title: String) -> String {
-        if title.count > 10 {
-            return String(title.prefix(10)) + "…"
-        }
-        return title
     }
 
     /// 通过窗口层级查找 MenuBarExtra 创建的 NSStatusBarButton

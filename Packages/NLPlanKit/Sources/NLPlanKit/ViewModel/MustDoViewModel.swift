@@ -27,9 +27,6 @@ final class MustDoViewModel {
     /// 项目来源绑定变化后的回调
     var onProjectLinkChanged: ((UUID?) async -> Void)?
 
-    /// 任务状态刷新后的回调（用于更新菜单栏计时状态）
-    var onTasksRefreshed: (() async -> Void)?
-
     // MARK: - AI 推荐
 
     enum RecommendationStrategy: String, CaseIterable, Identifiable {
@@ -123,7 +120,6 @@ final class MustDoViewModel {
             }
             reindexAllPendingSortOrders()
             updateCheckpointTimer()
-            await onTasksRefreshed?()
         } catch {
             errorMessage = error.localizedDescription
         }
