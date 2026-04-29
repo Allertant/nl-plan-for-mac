@@ -69,7 +69,7 @@ private struct ProjectDetailPageView: View {
                     }
                     .padding(12)
                 }
-                .scrollIndicators(.never)
+                .scrollIndicators(.automatic)
             }
         }
         .frame(width: 360, height: 520)
@@ -160,12 +160,16 @@ private struct ProjectDetailPageView: View {
                 }
 
                 if isEditingPlanningBackground {
-                    TextEditor(text: $draftPlanningBackground)
-                        .font(.system(size: 11))
-                        .frame(minHeight: 84)
-                        .padding(6)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    ScrollView {
+                        TextEditor(text: $draftPlanningBackground)
+                            .font(.system(size: 11))
+                            .frame(minHeight: 150)
+                            .padding(6)
+                            .background(Color(nsColor: .windowBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    .frame(maxHeight: 150)
+                    .scrollIndicators(.automatic)
 
                     HStack {
                         Spacer()
@@ -182,7 +186,7 @@ private struct ProjectDetailPageView: View {
                     }
                 } else {
                     if let bg = project.planningBackground, !bg.isEmpty {
-                        Text(bg).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(bg).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(5).fixedSize(horizontal: false, vertical: true)
                     } else {
                         Text("暂无规划背景").font(.system(size: 11)).foregroundStyle(.tertiary)
                     }
@@ -213,7 +217,7 @@ private struct ProjectDetailPageView: View {
                         .buttonStyle(.plain)
                         .animation(.easeInOut(duration: 0.2), value: showCopyPromptToast)
                     }
-                    Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(5...10)
+                    Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(3)
 
                     HStack {
                         Spacer()
