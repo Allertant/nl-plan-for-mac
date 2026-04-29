@@ -160,16 +160,13 @@ private struct ProjectDetailPageView: View {
                 }
 
                 if isEditingPlanningBackground {
-                    ScrollView {
-                        TextEditor(text: $draftPlanningBackground)
-                            .font(.system(size: 11))
-                            .frame(minHeight: 150)
-                            .padding(6)
-                            .background(Color(nsColor: .windowBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .frame(maxHeight: 150)
-                    .scrollIndicators(.automatic)
+                    TextEditor(text: $draftPlanningBackground)
+                        .font(.system(size: 11))
+                        .frame(height: 150)
+                        .padding(6)
+                        .scrollIndicators(.automatic)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     HStack {
                         Spacer()
