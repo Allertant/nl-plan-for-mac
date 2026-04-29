@@ -34,7 +34,13 @@ private struct ProjectDetailPageView: View {
     @State private var allTasks: [DailyTaskEntity] = []
     @State private var notes: [ProjectNoteEntity] = []
     @State private var isLoading = true
-    @State private var isPlanningBackgroundExpanded = false
+
+    // 编辑状态
+    @State private var isEditingPlanningBackground = false
+    @State private var draftPlanningBackground = ""
+    @State private var isGeneratingPlanningPrompt = false
+    @State private var showCopyPromptToast = false
+    @State private var newNoteText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -80,7 +86,6 @@ private struct ProjectDetailPageView: View {
         let settledList = await settled
         notes = await projectNotes
 
-        // 合并去重
         let settledIds = Set(settledList.map(\.id))
         allTasks = active.filter { !settledIds.contains($0.id) } + settledList
 
@@ -88,6 +93,11 @@ private struct ProjectDetailPageView: View {
             projectDetail = ProjectDetailSnapshot(idea: freshIdea)
         }
         isLoading = false
+    }
+
+    private func reloadDetail() async {
+        guard let freshIdea = await viewModel.fetchIdea(ideaId: idea.id) else { return }
+        projectDetail = ProjectDetailSnapshot(idea: freshIdea)
     }
 
     // MARK: - Cards
@@ -130,37 +140,125 @@ private struct ProjectDetailPageView: View {
     }
 
     private func planningBackgroundCard(_ project: ProjectDetailSnapshot) -> some View {
-        let hasBackground = project.planningBackground != nil && !project.planningBackground!.isEmpty
-        return DetailSectionCard(title: "规划背景", systemImage: "map", tint: .cyan, background: Color.cyan.opacity(0.08), border: Color.cyan.opacity(0.22)) {
-            if hasBackground {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.planningBackground!)
+        DetailSectionCard(title: "规划背景", systemImage: "map", tint: .cyan, background: Color.cyan.opacity(0.08), border: Color.cyan.opacity(0.22)) {
+            VStack(alignment: .leading, spacing: 6) {
+                // 编辑按钮
+                HStack {
+                    Spacer()
+                    Button(isEditingPlanningBackground ? "取消" : "编辑") {
+                        if isEditingPlanningBackground {
+                            isEditingPlanningBackground = false
+                            draftPlanningBackground = project.planningBackground ?? ""
+                        } else {
+                            draftPlanningBackground = project.planningBackground ?? ""
+                            isEditingPlanningBackground = true
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                }
+
+                if isEditingPlanningBackground {
+                    TextEditor(text: $draftPlanningBackground)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(isPlanningBackgroundExpanded ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !isPlanningBackgroundExpanded {
-                        Button("展开") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                isPlanningBackgroundExpanded = true
+                        .frame(minHeight: 84)
+                        .padding(6)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    HStack {
+                        Spacer()
+                        Button("保存") {
+                            Task {
+                                await viewModel.updatePlanningBackground(ideaId: idea.id, planningBackground: draftPlanningBackground)
+                                await reloadDetail()
                             }
+                            isEditingPlanningBackground = false
                         }
+                        .font(.system(size: 10, weight: .medium))
                         .buttonStyle(.plain)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                } else {
+                    if let bg = project.planningBackground, !bg.isEmpty {
+                        Text(bg).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Button("收起") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                isPlanningBackgroundExpanded = false
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.cyan)
+                        Text("暂无规划背景").font(.system(size: 11)).foregroundStyle(.tertiary)
                     }
                 }
-            } else {
-                Text("暂无规划背景").font(.system(size: 11)).foregroundStyle(.tertiary)
+
+                // 研究提示词区域
+                if let prompt = project.planningResearchPrompt, !prompt.isEmpty {
+                    Divider().padding(.vertical, 2)
+                    HStack(spacing: 4) {
+                        Text("研究提示词").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                        if let reason = project.planningResearchPromptReason, !reason.isEmpty {
+                            Text("(\(reason))").font(.system(size: 9)).foregroundStyle(.tertiary).lineLimit(1)
+                        }
+                        Spacer()
+                        Button {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(prompt, forType: .string)
+                            showCopyPromptToast = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { showCopyPromptToast = false }
+                        } label: {
+                            if showCopyPromptToast {
+                                Label("已复制", systemImage: "checkmark").font(.system(size: 10)).foregroundStyle(.green)
+                            } else {
+                                Image(systemName: "doc.on.clipboard").font(.system(size: 10)).foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .animation(.easeInOut(duration: 0.2), value: showCopyPromptToast)
+                    }
+                    Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(5...10)
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            guard !isGeneratingPlanningPrompt else { return }
+                            isGeneratingPlanningPrompt = true
+                            Task {
+                                await viewModel.generatePlanningBackgroundPrompt(ideaId: idea.id)
+                                await reloadDetail()
+                                isGeneratingPlanningPrompt = false
+                            }
+                        } label: {
+                            if isGeneratingPlanningPrompt {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text("重新生成").font(.system(size: 10))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .disabled(isGeneratingPlanningPrompt)
+                    }
+                } else {
+                    HStack {
+                        Spacer()
+                        Button {
+                            guard !isGeneratingPlanningPrompt else { return }
+                            isGeneratingPlanningPrompt = true
+                            Task {
+                                await viewModel.generatePlanningBackgroundPrompt(ideaId: idea.id)
+                                await reloadDetail()
+                                isGeneratingPlanningPrompt = false
+                            }
+                        } label: {
+                            if isGeneratingPlanningPrompt {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Label("生成研究提示词", systemImage: "sparkles").font(.system(size: 10))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .disabled(isGeneratingPlanningPrompt)
+                    }
+                }
             }
         }
     }
@@ -211,16 +309,46 @@ private struct ProjectDetailPageView: View {
 
     private var noteCard: some View {
         DetailSectionCard(title: "笔记", systemImage: "note.text", tint: .orange, background: Color.orange.opacity(0.08), border: Color.orange.opacity(0.22)) {
-            VStack(alignment: .leading, spacing: 6) {
-                if notes.isEmpty {
-                    Text("暂无笔记").font(.system(size: 11)).foregroundStyle(.tertiary)
-                }
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(notes, id: \.id) { note in
-                    Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    ProjectNoteRow(
+                        note: note,
+                        onUpdate: { content in
+                            Task {
+                                await viewModel.updateProjectNote(noteId: note.id, content: content)
+                                notes = await viewModel.fetchProjectNotes(ideaId: idea.id)
+                            }
+                        }
+                    )
                 }
+
+                HStack(spacing: 8) {
+                    TextField("添加笔记...", text: $newNoteText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .onSubmit { addNote() }
+                    Button {
+                        addNote()
+                    } label: {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 14)).foregroundStyle(.green)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
+    }
+
+    private func addNote() {
+        let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        Task {
+            await viewModel.addProjectNote(ideaId: idea.id, content: text)
+            notes = await viewModel.fetchProjectNotes(ideaId: idea.id)
+        }
+        newNoteText = ""
     }
 }
 
@@ -236,6 +364,8 @@ struct ProjectDetailSnapshot {
     let projectProgressUpdatedAt: Date?
     var projectDescription: String?
     var planningBackground: String?
+    var planningResearchPrompt: String?
+    var planningResearchPromptReason: String?
 
     init(idea: IdeaEntity) {
         id = idea.id
@@ -247,6 +377,8 @@ struct ProjectDetailSnapshot {
         projectProgressUpdatedAt = idea.projectProgressUpdatedAt
         projectDescription = idea.projectDescription
         planningBackground = idea.planningBackground
+        planningResearchPrompt = idea.planningResearchPrompt
+        planningResearchPromptReason = idea.planningResearchPromptReason
     }
 }
 
@@ -272,5 +404,47 @@ struct DetailSectionCard<Content: View>: View {
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(border, lineWidth: 1))
+    }
+}
+
+private struct ProjectNoteRow: View {
+    let note: ProjectNoteEntity
+    let onUpdate: (String) -> Void
+    @State private var isEditing = false
+    @State private var draftText = ""
+
+    var body: some View {
+        if isEditing {
+            VStack(spacing: 4) {
+                TextEditor(text: $draftText)
+                    .font(.system(size: 11))
+                    .frame(minHeight: 60)
+                    .padding(6)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                HStack {
+                    Spacer()
+                    Button("取消") { isEditing = false; draftText = note.content }
+                        .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
+                    Button("保存") {
+                        onUpdate(draftText)
+                        isEditing = false
+                    }
+                    .buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(Color.accentColor)
+                }
+            }
+        } else {
+            HStack(alignment: .top, spacing: 6) {
+                Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    draftText = note.content
+                    isEditing = true
+                } label: {
+                    Image(systemName: "pencil").font(.system(size: 9)).foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
