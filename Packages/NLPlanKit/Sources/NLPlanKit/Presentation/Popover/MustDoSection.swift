@@ -394,26 +394,39 @@ struct MustDoTaskRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            statusIcon
+        VStack(alignment: .leading, spacing: 4) {
+            // 行 1：状态图标 + 标题 + 计时器
+            HStack(spacing: 4) {
+                statusIcon
 
-            VStack(alignment: .leading, spacing: 3) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
+                    .layoutPriority(1)
 
-                taskInfoLine
+                Spacer(minLength: 4)
 
-                noteArea
+                if isRunning {
+                    RunningTimerView(taskId: task.id, timerEngine: timerEngine)
+                        .fixedSize()
+                }
             }
 
-            Spacer()
+            // 行 2：标签 + 时长 + 操作按钮
+            HStack(spacing: 8) {
+                taskInfoLineContent
 
-            if isEditMode {
-                reorderButtons
-            } else {
-                actionButtons
+                Spacer(minLength: 8)
+
+                if isEditMode {
+                    reorderButtons
+                } else {
+                    actionButtons
+                }
             }
+
+            // 行 3：备注
+            noteArea
         }
         .padding(8)
         .background { rowBackground.contentShape(Rectangle()).onTapGesture { focusedField = nil } }
@@ -443,7 +456,7 @@ struct MustDoTaskRow: View {
             .foregroundStyle(isRunning ? Color.green : Color.secondary)
     }
 
-    private var taskInfoLine: some View {
+    private var taskInfoLineContent: some View {
         HStack(spacing: 8) {
             Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
                 .font(.system(size: 9))
@@ -457,15 +470,11 @@ struct MustDoTaskRow: View {
             Label("预计\(task.estimatedMinutes.hourMinuteString)", systemImage: "clock")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-
-            if isRunning {
-                RunningTimerView(taskId: task.id, timerEngine: timerEngine)
-            }
         }
     }
 
     private var reorderButtons: some View {
-        VStack(spacing: 2) {
+        HStack(spacing: 2) {
             Button(action: onMoveUp) {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 10, weight: .semibold))
