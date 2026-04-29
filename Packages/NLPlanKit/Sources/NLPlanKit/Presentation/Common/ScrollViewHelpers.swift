@@ -4,16 +4,25 @@ import AppKit
 /// 强制隐藏外层面板滚动条，避免滚动条显隐导致布局抖动
 struct ScrollViewScrollerHider: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
-        NSView(frame: .zero)
+        ScrollerHiderView()
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let scrollView = nsView.enclosingScrollView else { return }
-            scrollView.hasVerticalScroller = false
-            scrollView.autohidesScrollers = true
-            scrollView.scrollerStyle = .overlay
-        }
+        (nsView as? ScrollerHiderView)?.configureScrollView()
+    }
+}
+
+private final class ScrollerHiderView: NSView {
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        configureScrollView()
+    }
+
+    func configureScrollView() {
+        guard let scrollView = enclosingScrollView else { return }
+        scrollView.hasVerticalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
     }
 }
 

@@ -54,7 +54,7 @@ struct PopoverView: View {
                             .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
                     )
                 }
-                .scrollIndicators(.hidden)
+                .scrollIndicators(.never)
 
                 Divider()
 
