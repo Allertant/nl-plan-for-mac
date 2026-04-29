@@ -436,11 +436,7 @@ struct MustDoTaskRow: View {
         .onAppear {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
                 if focusedField != nil {
-                    let clickInSelf = NSApp.keyWindow?.contentView?.hitTest(event.locationInWindow)
-                    let textView = NSApp.keyWindow?.firstResponder as? NSTextView
-                    if clickInSelf != nil, textView == nil {
-                        focusedField = nil
-                    }
+                    focusedField = nil
                 }
                 return event
             }

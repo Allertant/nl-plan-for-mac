@@ -48,10 +48,11 @@ struct PopoverView: View {
                             timerEngine: timerEngine
                         )
                     }
+                    .frame(minHeight: 440, alignment: .top)
                     .padding(12)
                     .background(ScrollViewScrollerHider())
                     .background(
-                        Color(nsColor: .windowBackgroundColor)
+                        Color(nsColor: .textBackgroundColor)
                             .contentShape(Rectangle())
                             .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
                     )
