@@ -64,9 +64,6 @@ struct MustDoSection: View {
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
                             onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
-                            onBindSource: { sourceIdeaId in
-                                Task { await viewModel.updateSource(taskId: task.id, sourceIdeaId: sourceIdeaId) }
-                            },
                             onMoveUp: {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     viewModel.moveUp(at: index)
@@ -379,7 +376,6 @@ struct MustDoTaskRow: View {
     let onStart: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
-    let onBindSource: (UUID?) -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     var onUpdateNote: ((String) -> Void)? = nil
@@ -407,13 +403,6 @@ struct MustDoTaskRow: View {
                     .lineLimit(1)
 
                 taskInfoLine
-
-                if let sourceIdea {
-                    Label("来源：\(sourceIdea.title)", systemImage: "link")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
 
                 noteArea
             }
@@ -534,34 +523,17 @@ struct MustDoTaskRow: View {
             .buttonStyle(.plain)
             .help("移回想法池")
 
-            Menu {
-                Button("无来源") {
-                    onBindSource(nil)
+            if let sourceIdea {
+                Menu {
+                    Text(sourceIdea.isProject ? "项目：\(sourceIdea.title)" : "想法：\(sourceIdea.title)")
+                } label: {
+                    Image(systemName: "link")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-
-                if !ideaPoolIdeas.filter(\.isProject).isEmpty {
-                    Divider()
-                }
-
-                ForEach(ideaPoolIdeas.filter(\.isProject), id: \.id) { idea in
-                    Button {
-                        onBindSource(idea.id)
-                    } label: {
-                        if task.sourceIdeaId == idea.id {
-                            Label(idea.title, systemImage: "checkmark")
-                        } else {
-                            Text(idea.title)
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: task.sourceIdeaId == nil ? "link.badge.plus" : "link")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .help("绑定来源")
         }
     }
 
