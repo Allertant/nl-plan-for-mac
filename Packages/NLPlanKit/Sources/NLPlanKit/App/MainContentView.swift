@@ -6,6 +6,7 @@ struct MainContentView: View {
     @Environment(AppState.self) private var appState
 
     @State private var didInitialize = false
+    @State private var midnightTimer: Timer?
 
     var body: some View {
         Group {
@@ -42,25 +43,16 @@ struct MainContentView: View {
             guard !didInitialize else { return }
             didInitialize = true
             await performStartupChecks()
+            scheduleMidnightCheck()
+        }
+        .onDisappear {
+            midnightTimer?.invalidate()
+            midnightTimer = nil
         }
     }
 
     private func performStartupChecks() async {
-        let context = appState.modelContainer.mainContext
-        let ideaRepo = IdeaRepository(modelContext: context)
-        let dailyTaskRepo = DailyTaskRepository(modelContext: context)
-        let sessionLogRepo = SessionLogRepository(modelContext: context)
-        let summaryRepo = SummaryRepository(modelContext: context)
-        let engine = appState.timerEngine
-        let aiService = appState.makeAIService()
-        let dayMgr = DayManager(
-            ideaRepo: ideaRepo,
-            dailyTaskRepo: dailyTaskRepo,
-            summaryRepo: summaryRepo,
-            sessionLogRepo: sessionLogRepo,
-            timerEngine: engine,
-            aiService: aiService
-        )
+        let dayMgr = makeDayManager()
 
         do {
             appState.pendingSettlementDate = try dayMgr.pendingSettlementDate()
@@ -71,6 +63,37 @@ struct MainContentView: View {
             }
         } catch {
             print("启动检查失败：\(error)")
+        }
+    }
+
+    private func makeDayManager() -> DayManager {
+        let context = appState.modelContainer.mainContext
+        return DayManager(
+            ideaRepo: IdeaRepository(modelContext: context),
+            dailyTaskRepo: DailyTaskRepository(modelContext: context),
+            summaryRepo: SummaryRepository(modelContext: context),
+            sessionLogRepo: SessionLogRepository(modelContext: context),
+            timerEngine: appState.timerEngine,
+            aiService: appState.makeAIService()
+        )
+    }
+
+    private func scheduleMidnightCheck() {
+        let calendar = Calendar.current
+        let now = Date()
+        let tomorrow = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now)!)
+        let interval = tomorrow.timeIntervalSince(now) + 1
+
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { _ in
+            Task { @MainActor in
+                let dayMgr = makeDayManager()
+                do {
+                    appState.pendingSettlementDate = try dayMgr.pendingSettlementDate()
+                } catch {
+                    print("午夜结算检查失败：\(error)")
+                }
+                scheduleMidnightCheck()
+            }
         }
     }
 }
