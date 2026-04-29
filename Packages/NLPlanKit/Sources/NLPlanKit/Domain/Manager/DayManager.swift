@@ -46,20 +46,22 @@ final class DayManager {
         let mustDoTasks = try dailyTaskRepo.fetchTasks(date: settlementDate)
         let grade = try await gradeWithFallback(tasks: mustDoTasks, incompleteNotes: incompleteNotes)
 
-        // 2. 今日评分成功后，停止所有运行中任务
+        // 2. 今日评分成功后，暂停所有运行中任务
         if isToday {
-            let stoppedTasks = await timerEngine.stopAll()
-            for stopInfo in stoppedTasks {
-                if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
+            let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+            for task in runningTasks {
+                if let lastStarted = task.timerLastStartedAt {
+                    task.timerAccumulatedSeconds += Int(Date.now.timeIntervalSince(lastStarted))
+                }
+                task.timerLastStartedAt = nil
+                task.taskStatus = .pending
+                try dailyTaskRepo.update(task)
+                if let openLog = try sessionLogRepo.fetchOpenSession(taskId: task.id) {
                     try sessionLogRepo.endSession(openLog)
                 }
-                if let task = try dailyTaskRepo.fetchById(stopInfo.taskId) {
-                    task.taskStatus = .pending
-                    try dailyTaskRepo.update(task)
-                    if let sourceIdeaId = task.sourceIdeaId,
-                       let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                        try ideaRepo.touchProjectRecommendationContext(sourceIdea)
-                    }
+                if let sourceIdeaId = task.sourceIdeaId,
+                   let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
                 }
             }
         }

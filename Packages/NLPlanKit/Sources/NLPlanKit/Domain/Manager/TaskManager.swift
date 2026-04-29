@@ -195,12 +195,9 @@ final class TaskManager {
             throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
 
-        // 停止计时（如果正在运行）
+        // 暂停计时（如果正在运行）
         if dailyTask.taskStatus == .running {
-            _ = await timerEngine.stopTask(taskId)
-            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
-                try sessionLogRepo.endSession(openLog)
-            }
+            try commitRunningTime(dailyTask)
         }
 
         try dailyTaskRepo.deleteById(taskId)
@@ -256,34 +253,64 @@ final class TaskManager {
         }
         guard dailyTask.taskStatus != .done else { return }
 
-        // 1. TimerEngine 处理切换逻辑
-        let stoppedTasks = await timerEngine.startTask(taskId)
-
-        // 2. 持久化被停止任务的 session
-        for stopInfo in stoppedTasks {
-            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: stopInfo.taskId) {
-                try sessionLogRepo.endSession(openLog)
-            }
-            if let stoppedTask = try dailyTaskRepo.fetchById(stopInfo.taskId) {
-                stoppedTask.taskStatus = .pending
-                try dailyTaskRepo.update(stoppedTask)
-                if let sourceIdeaId = stoppedTask.sourceIdeaId,
-                   let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
-                }
+        // 1. 暂停其他运行中的任务（并行控制）
+        let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        let toPause = await timerEngine.tasksToPauseBeforeStart(
+            runningTaskIds: runningTasks.map { $0.id },
+            newTaskId: taskId
+        )
+        for runningId in toPause {
+            if let runningTask = try dailyTaskRepo.fetchById(runningId) {
+                try pauseRunningTask(runningTask)
             }
         }
 
-        // 3. 为新任务创建 open session
-        _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
-
-        // 4. 更新任务状态
+        // 2. 初始化计时状态
+        dailyTask.timerAccumulatedSeconds = 0
+        dailyTask.timerLastStartedAt = .now
         dailyTask.taskStatus = .running
         try dailyTaskRepo.update(dailyTask)
-        if let sourceIdeaId = dailyTask.sourceIdeaId,
-           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+
+        // 3. 创建 session log
+        _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
+
+        touchSourceContext(dailyTask)
+    }
+
+    /// 暂停任务
+    func pauseTask(taskId: UUID) async throws {
+        guard let dailyTask = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
+        guard dailyTask.taskStatus == .running else { return }
+
+        try pauseRunningTask(dailyTask)
+    }
+
+    /// 恢复任务
+    func resumeTask(taskId: UUID) async throws {
+        guard let dailyTask = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
+        }
+        guard dailyTask.taskStatus == .paused else { return }
+
+        // 并行控制：暂停其他运行中的任务
+        let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        let toPause = await timerEngine.tasksToPauseBeforeStart(
+            runningTaskIds: runningTasks.map { $0.id },
+            newTaskId: taskId
+        )
+        for runningId in toPause {
+            if let runningTask = try dailyTaskRepo.fetchById(runningId) {
+                try pauseRunningTask(runningTask)
+            }
+        }
+
+        dailyTask.timerLastStartedAt = .now
+        dailyTask.taskStatus = .running
+        try dailyTaskRepo.update(dailyTask)
+
+        _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
     }
 
     /// 标记任务完成
@@ -292,20 +319,13 @@ final class TaskManager {
             throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
 
-        // 停止计时
         if dailyTask.taskStatus == .running {
-            _ = await timerEngine.stopTask(taskId)
-            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
-                try sessionLogRepo.endSession(openLog)
-            }
+            try commitRunningTime(dailyTask)
         }
 
         dailyTask.taskStatus = .done
         try dailyTaskRepo.update(dailyTask)
-        if let sourceIdeaId = dailyTask.sourceIdeaId,
-           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
-        }
+        touchSourceContext(dailyTask)
     }
 
     // MARK: - 查询
@@ -412,7 +432,8 @@ final class TaskManager {
 
     /// 获取指定任务的总计时秒数
     func totalElapsedSeconds(taskId: UUID) async throws -> Int {
-        try sessionLogRepo.totalElapsedSeconds(taskId: taskId)
+        guard let task = try dailyTaskRepo.fetchById(taskId) else { return 0 }
+        return task.liveElapsedSeconds
     }
 
     /// 更新必做项实体
@@ -457,5 +478,70 @@ final class TaskManager {
         guard let sourceIdeaId else { return .none }
         guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return .idea }
         return idea.isProject ? .project : .idea
+    }
+
+    // MARK: - Timer Helpers
+
+    /// 将运行中任务的已计时时长 commit 到 accumulatedSeconds
+    private func commitRunningTime(_ task: DailyTaskEntity) throws {
+        if let lastStarted = task.timerLastStartedAt {
+            task.timerAccumulatedSeconds += Int(Date.now.timeIntervalSince(lastStarted))
+        }
+        task.timerLastStartedAt = nil
+    }
+
+    /// 暂停一个运行中的任务：commit 时间 + 结束 session + 更新状态
+    private func pauseRunningTask(_ task: DailyTaskEntity) throws {
+        try commitRunningTime(task)
+        task.taskStatus = .paused
+        try dailyTaskRepo.update(task)
+        if let openLog = try sessionLogRepo.fetchOpenSession(taskId: task.id) {
+            try sessionLogRepo.endSession(openLog)
+        }
+        touchSourceContext(task)
+    }
+
+    private func touchSourceContext(_ task: DailyTaskEntity) {
+        if let sourceIdeaId = task.sourceIdeaId,
+           let sourceIdea = try? ideaRepo.fetchById(sourceIdeaId) {
+            try? ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        }
+    }
+
+    // MARK: - Checkpoint & Recovery
+
+    /// 定期保存运行中任务的计时进度（每 60 秒调用一次）
+    func checkpointRunningTasks() async throws {
+        let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        for task in runningTasks {
+            try commitRunningTime(task)
+            task.timerLastStartedAt = .now
+            try dailyTaskRepo.update(task)
+        }
+    }
+
+    /// 启动时恢复：将所有 running 状态的任务转为 paused
+    /// 不计算从崩溃到现在的时长，直接使用最后一次 checkpoint 的值
+    func recoverRunningTasksOnStartup() async throws {
+        let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        for task in runningTasks {
+            // 不 commit，直接使用持久化的 timerAccumulatedSeconds
+            task.timerLastStartedAt = nil
+            task.taskStatus = .paused
+            try dailyTaskRepo.update(task)
+
+            // 结束可能残留的 open session
+            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: task.id) {
+                try sessionLogRepo.endSession(openLog, endedAt: openLog.startedAt.addingTimeInterval(TimeInterval(task.timerAccumulatedSeconds)))
+            }
+        }
+    }
+
+    /// 停止所有运行中的任务（供 DayManager 结算使用）
+    func stopAllRunningTasks() async throws {
+        let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+        for task in runningTasks {
+            try pauseRunningTask(task)
+        }
     }
 }

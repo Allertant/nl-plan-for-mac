@@ -64,6 +64,11 @@ struct MainContentView: View {
 
         do {
             appState.pendingSettlementDate = try dayMgr.pendingSettlementDate()
+
+            // 恢复崩溃/关闭前的运行中任务为暂停状态
+            if let mustDoVM = appState.mustDoViewModel {
+                try await mustDoVM.recoverRunningTasks()
+            }
         } catch {
             print("启动检查失败：\(error)")
         }
@@ -84,8 +89,7 @@ struct PopoverContainerView: View {
                 PopoverView(
                     inputViewModel: inputVM,
                     ideaPoolViewModel: ideaPoolVM,
-                    mustDoViewModel: mustDoVM,
-                    timerEngine: appState.timerEngine
+                    mustDoViewModel: mustDoVM
                 )
             } else {
                 ProgressView("加载中...")

@@ -8,8 +8,6 @@ struct PopoverView: View {
     @Bindable var ideaPoolViewModel: IdeaPoolViewModel
     @Bindable var mustDoViewModel: MustDoViewModel
 
-    let timerEngine: TimerEngine
-
     private var remainingWorkHours: Double {
         let workEndHour = UserDefaults.standard.double(forKey: AppConstants.workEndTimeKey)
         let endHour = workEndHour > 0 ? workEndHour : AppConstants.defaultWorkEndHour
@@ -44,8 +42,7 @@ struct PopoverView: View {
                         // 必做项
                         MustDoSection(
                             viewModel: mustDoViewModel,
-                            ideaPoolIdeas: ideaPoolViewModel.ideas,
-                            timerEngine: timerEngine
+                            ideaPoolIdeas: ideaPoolViewModel.ideas
                         )
                     }
                     .frame(minHeight: 440, alignment: .top)

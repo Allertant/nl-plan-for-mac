@@ -26,6 +26,8 @@ final class DailyTaskEntity {
     var isSettled: Bool = false
     var settledAt: Date?
     var actualMinutes: Int?
+    var timerAccumulatedSeconds: Int = 0
+    var timerLastStartedAt: Date?
 
     @Transient
     var taskStatus: TaskStatus {
@@ -37,6 +39,14 @@ final class DailyTaskEntity {
     var taskPriority: TaskPriority {
         get { TaskPriority(rawValue: priority) ?? .medium }
         set { priority = newValue.rawValue }
+    }
+
+    @Transient
+    var liveElapsedSeconds: Int {
+        if taskStatus == .running, let lastStarted = timerLastStartedAt {
+            return timerAccumulatedSeconds + Int(Date.now.timeIntervalSince(lastStarted))
+        }
+        return timerAccumulatedSeconds
     }
 
     init(

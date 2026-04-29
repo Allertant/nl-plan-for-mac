@@ -4,7 +4,6 @@ import SwiftUI
 struct MustDoSection: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
-    let timerEngine: TimerEngine
 
     var body: some View {
         VStack(spacing: 4) {
@@ -60,8 +59,9 @@ struct MustDoSection: View {
                             isEditMode: viewModel.isEditMode,
                             canMoveUp: viewModel.canMoveUp(at: index),
                             canMoveDown: viewModel.canMoveDown(at: index),
-                            timerEngine: timerEngine,
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
+                            onPause: { Task { await viewModel.pauseTask(taskId: task.id) } },
+                            onResume: { Task { await viewModel.resumeTask(taskId: task.id) } },
                             onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
                             onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
                             onMoveUp: {
@@ -372,8 +372,9 @@ struct MustDoTaskRow: View {
     var isEditMode: Bool = false
     var canMoveUp: Bool = false
     var canMoveDown: Bool = false
-    let timerEngine: TimerEngine
     let onStart: () -> Void
+    let onPause: () -> Void
+    let onResume: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
     let onMoveUp: () -> Void
@@ -406,8 +407,8 @@ struct MustDoTaskRow: View {
 
                 Spacer(minLength: 4)
 
-                if isRunning {
-                    RunningTimerView(taskId: task.id, timerEngine: timerEngine)
+                if isRunning || task.taskStatus == .paused {
+                    RunningTimerView(elapsedSeconds: task.liveElapsedSeconds, isPaused: task.taskStatus == .paused)
                         .fixedSize()
                 }
             }
@@ -495,7 +496,23 @@ struct MustDoTaskRow: View {
 
     private var actionButtons: some View {
         HStack(spacing: 4) {
-            if !isRunning {
+            if isRunning {
+                Button(action: onPause) {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                .help("暂停")
+            } else if task.taskStatus == .paused {
+                Button(action: onResume) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help("继续")
+            } else {
                 Button(action: onStart) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))

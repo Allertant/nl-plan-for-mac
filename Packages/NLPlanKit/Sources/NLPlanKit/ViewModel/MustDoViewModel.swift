@@ -101,6 +101,7 @@ final class MustDoViewModel {
     private let projectSummaryPreparationConcurrencyLimit = 2
     private let aiExecutionCoordinator = AIExecutionCoordinator()
     private var recommendationTask: Task<Void, Never>?
+    private var checkpointTimer: Timer?
 
     init(taskManager: TaskManager) {
         self.taskManager = taskManager
@@ -118,6 +119,7 @@ final class MustDoViewModel {
                 elapsedSecondsCache[task.id] = try await taskManager.totalElapsedSeconds(taskId: task.id)
             }
             reindexAllPendingSortOrders()
+            updateCheckpointTimer()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -127,6 +129,26 @@ final class MustDoViewModel {
     func startTask(taskId: UUID) async {
         do {
             try await taskManager.startTask(taskId: taskId)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 暂停任务
+    func pauseTask(taskId: UUID) async {
+        do {
+            try await taskManager.pauseTask(taskId: taskId)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 恢复任务
+    func resumeTask(taskId: UUID) async {
+        do {
+            try await taskManager.resumeTask(taskId: taskId)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
@@ -577,5 +599,30 @@ final class MustDoViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Checkpoint Timer
+
+    private func updateCheckpointTimer() {
+        let hasRunningTasks = tasks.contains { $0.taskStatus == .running }
+        if hasRunningTasks && checkpointTimer == nil {
+            checkpointTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    try? await self.taskManager.checkpointRunningTasks()
+                }
+            }
+        } else if !hasRunningTasks {
+            checkpointTimer?.invalidate()
+            checkpointTimer = nil
+        }
+    }
+
+    // MARK: - Recovery
+
+    /// 启动时恢复：将 running 状态的任务转为 paused
+    func recoverRunningTasks() async throws {
+        try await taskManager.recoverRunningTasksOnStartup()
+        await refresh()
     }
 }
