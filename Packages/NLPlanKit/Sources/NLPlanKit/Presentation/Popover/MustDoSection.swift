@@ -7,6 +7,21 @@ struct MustDoSection: View {
 
     var body: some View {
         VStack(spacing: 4) {
+            if let confirmAction = viewModel.pendingConfirm {
+                ConfirmActionPage(
+                    title: viewModel.confirmTaskTitle ?? "",
+                    isComplete: confirmAction.isComplete,
+                    onCancel: { viewModel.cancelConfirm() },
+                    onConfirm: { Task { await viewModel.executeConfirm() } }
+                )
+            } else {
+                mustDoListContent
+            }
+        }
+    }
+
+    private var mustDoListContent: some View {
+        VStack(spacing: 4) {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -38,8 +53,8 @@ struct MustDoSection: View {
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onPause: { Task { await viewModel.pauseTask(taskId: task.id) } },
                             onResume: { Task { await viewModel.resumeTask(taskId: task.id) } },
-                            onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
-                            onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
+                            onComplete: { viewModel.requestConfirm(.complete(task.id)) },
+                            onDemote: { viewModel.requestConfirm(.demote(task.id)) },
                             onUpdateNote: { note in
                                 Task { await viewModel.updateTaskNote(taskId: task.id, note: note) }
                             }
@@ -86,6 +101,60 @@ struct MustDoSection: View {
                 .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
         )
         .cornerRadius(8)
+    }
+}
+
+// MARK: - Confirm Action Page
+
+private struct ConfirmActionPage: View {
+    let title: String
+    let isComplete: Bool
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: isComplete ? "checkmark.circle" : "arrow.uturn.backward")
+                .font(.system(size: 28))
+                .foregroundStyle(isComplete ? .green : .orange)
+
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.center)
+
+            Text(isComplete ? "确认标记为已完成？" : "确认移回想法池？")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 16) {
+                Button("取消") {
+                    onCancel()
+                }
+                .font(.system(size: 12))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button(isComplete ? "确认完成" : "确认移回") {
+                    onConfirm()
+                }
+                .font(.system(size: 12))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(20)
+    }
+}
+
+// MARK: - MustDoSection Extension
+
+private extension MustDoViewModel.ConfirmAction {
+    var isComplete: Bool {
+        if case .complete = self { return true }
+        return false
     }
 }
 
@@ -361,7 +430,6 @@ struct MustDoTaskRow: View {
     let onDemote: () -> Void
     var onUpdateNote: ((String) -> Void)? = nil
 
-    @State private var showCompleteConfirm = false
     @State private var isEditingNote = false
     @State private var draftNote = ""
     @FocusState private var focusedField: NoteField?
@@ -478,24 +546,13 @@ struct MustDoTaskRow: View {
                 .help("开始执行")
             }
 
-            Button {
-                if isRunning {
-                    onComplete()
-                } else if showCompleteConfirm {
-                    onComplete()
-                } else {
-                    showCompleteConfirm = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        showCompleteConfirm = false
-                    }
-                }
-            } label: {
-                Image(systemName: showCompleteConfirm ? "checkmark.circle.fill" : "checkmark")
+            Button(action: onComplete) {
+                Image(systemName: "checkmark")
                     .font(.system(size: 12))
-                    .foregroundStyle(showCompleteConfirm ? .red : .blue)
+                    .foregroundStyle(.blue)
             }
             .buttonStyle(.plain)
-            .help(showCompleteConfirm ? "再次点击确认完成" : "标记完成")
+            .help("标记完成")
 
             Button(action: onDemote) {
                 Image(systemName: "arrow.uturn.backward")

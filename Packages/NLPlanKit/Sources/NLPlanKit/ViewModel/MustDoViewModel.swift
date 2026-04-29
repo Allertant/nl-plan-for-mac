@@ -15,6 +15,44 @@ final class MustDoViewModel {
     /// 耗时缓存 [taskId: seconds]
     var elapsedSecondsCache: [UUID: Int] = [:]
 
+    // MARK: - 确认操作
+
+    enum ConfirmAction: Equatable {
+        case complete(UUID)
+        case demote(UUID)
+    }
+
+    var pendingConfirm: ConfirmAction?
+
+    var confirmTaskTitle: String? {
+        guard let pending = pendingConfirm else { return nil }
+        let id: UUID
+        switch pending {
+        case .complete(let taskId): id = taskId
+        case .demote(let taskId): id = taskId
+        }
+        return tasks.first(where: { $0.id == id })?.title
+    }
+
+    func requestConfirm(_ action: ConfirmAction) {
+        pendingConfirm = action
+    }
+
+    func cancelConfirm() {
+        pendingConfirm = nil
+    }
+
+    func executeConfirm() async {
+        guard let action = pendingConfirm else { return }
+        pendingConfirm = nil
+        switch action {
+        case .complete(let taskId):
+            await markComplete(taskId: taskId)
+        case .demote(let taskId):
+            await demoteToIdeaPool(taskId: taskId)
+        }
+    }
+
     /// 移回想法池后的回调（用于通知想法池刷新）
     var onDemotedToIdeaPool: (() async -> Void)?
 
