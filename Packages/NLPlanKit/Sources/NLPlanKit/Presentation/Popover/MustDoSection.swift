@@ -389,6 +389,7 @@ struct MustDoTaskRow: View {
     @State private var draftNote = ""
     @FocusState private var focusedField: NoteField?
     private enum NoteField: Hashable { case note }
+    @State private var monitor: Any?
 
     private var isRunning: Bool { task.taskStatus == .running }
     private var sourceIdea: IdeaEntity? {
@@ -431,6 +432,21 @@ struct MustDoTaskRow: View {
         .overlay(rowBorder)
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil, isEditingNote { commitNoteEdit() }
+        }
+        .onAppear {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+                if focusedField != nil {
+                    let clickInSelf = NSApp.keyWindow?.contentView?.hitTest(event.locationInWindow)
+                    let textView = NSApp.keyWindow?.firstResponder as? NSTextView
+                    if clickInSelf != nil, textView == nil {
+                        focusedField = nil
+                    }
+                }
+                return event
+            }
+        }
+        .onDisappear {
+            if let monitor { NSEvent.removeMonitor(monitor) }
         }
     }
 
