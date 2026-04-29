@@ -333,8 +333,15 @@ final class MustDoViewModel {
             }
             guard !Task.isCancelled else { return }
 
-            let ideaInputs = recommendationCandidates.map { idea in
-                TaskRecommendationInput(
+            var ideaInputs: [TaskRecommendationInput] = []
+            for idea in recommendationCandidates {
+                let projectNotes: [String]
+                if idea.isProject {
+                    projectNotes = (try? await taskManager.fetchProjectNotes(ideaId: idea.id))?.map(\.content) ?? []
+                } else {
+                    projectNotes = []
+                }
+                ideaInputs.append(TaskRecommendationInput(
                     id: idea.id,
                     title: idea.title,
                     category: idea.category,
@@ -345,8 +352,10 @@ final class MustDoViewModel {
                     projectDescription: idea.projectDescription,
                     planningBackground: idea.planningBackground,
                     projectRecommendationSummary: idea.projectRecommendationSummary,
-                    deadlineDisplay: idea.deadlineDisplayString
-                )
+                    deadlineDisplay: idea.deadlineDisplayString,
+                    note: idea.note,
+                    projectNotes: projectNotes
+                ))
             }
 
             let mustDoInputs = currentTasks.map { task in
@@ -361,7 +370,9 @@ final class MustDoViewModel {
                     projectDescription: nil,
                     planningBackground: nil,
                     projectRecommendationSummary: nil,
-                    deadlineDisplay: nil
+                    deadlineDisplay: nil,
+                    note: nil,
+                    projectNotes: []
                 )
             }
 

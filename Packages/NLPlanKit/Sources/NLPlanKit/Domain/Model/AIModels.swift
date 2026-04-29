@@ -79,6 +79,8 @@ struct TaskRecommendationInput: Sendable {
     let planningBackground: String?
     let projectRecommendationSummary: String?
     let deadlineDisplay: String?
+    let note: String?
+    let projectNotes: [String]
 }
 
 struct PlanningBackgroundPromptInput: Sendable {

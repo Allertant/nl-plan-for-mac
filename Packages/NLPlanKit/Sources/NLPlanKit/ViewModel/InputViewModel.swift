@@ -278,7 +278,7 @@ final class InputViewModel {
                 userInstruction: instruction
             )
             accumulateTokenUsage(for: queueItemID)
-            item.parsedTasks = try await classifyParsedTasksIfNeeded(newTasks, force: true)
+            item.parsedTasks = try await classifyParsedTasksIfNeeded(newTasks, force: false)
             accumulateTokenUsage(for: queueItemID)
             try? parseQueueRepo.update(item)
             successMessage = "✅ 已调整"
@@ -309,21 +309,22 @@ final class InputViewModel {
         force: Bool = false
     ) async throws -> [ParsedTask] {
         guard !tasks.isEmpty else { return tasks }
-        if !force && tasks.allSatisfy({ $0.isProject != nil }) {
-            return tasks
-        }
+        let unclassified = tasks.filter { $0.isProject == nil }
+        guard force || !unclassified.isEmpty else { return tasks }
 
-        let inputs = tasks.map {
+        let inputs = unclassified.map {
             ProjectClassificationInput(
                 id: $0.id,
                 title: $0.title,
                 category: $0.category
             )
         }
+        guard !inputs.isEmpty else { return tasks }
         let classifications = try await taskManager.classifyProjects(tasks: inputs)
         let classificationMap = Dictionary(uniqueKeysWithValues: classifications.map { ($0.ideaId, $0) })
 
         return tasks.map { task in
+            guard task.isProject == nil else { return task }
             var updated = task
             if let classification = classificationMap[task.id] {
                 updated.isProject = classification.isProject

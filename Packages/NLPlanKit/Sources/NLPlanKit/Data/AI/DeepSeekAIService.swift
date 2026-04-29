@@ -89,6 +89,7 @@ final class DeepSeekAIService: AIServiceProtocol {
                 estimatedMinutes: dto.estimatedMinutes,
                 recommended: dto.recommended ?? false,
                 reason: dto.reason ?? "",
+                isProject: dto.isProject,
                 deadline: deadline,
                 deadlineHasExplicitYear: hasExplicitYear,
                 deadlineHasTime: hasTime

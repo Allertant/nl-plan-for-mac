@@ -87,6 +87,7 @@ enum PromptTemplates {
         分类必须从以下列表中选择：\(availableTags.joined(separator: "/"))，不得自创分类。
         普通单次事项必须填写 estimated_minutes；长期项目、系列计划、学习路线等整体不可一次完成的条目，estimated_minutes 设为 null。
         deadline 格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"，无截止时间则设为 null。如果用户修改要求中提到时间调整，相应更新 deadline。
+        is_project：如果用户在修改要求中明确要求改变某个任务的项目/普通类型，按用户要求设置 is_project（true=项目，false=普通想法）。如果用户未提及类型变更，设为 null。
 
         输出严格的 JSON：
         {
@@ -95,7 +96,8 @@ enum PromptTemplates {
               "title": "任务名称",
               "category": "分类",
               "estimated_minutes": 60,
-              "deadline": "M-d" 或 "M-d HH:mm" 或 null
+              "deadline": "M-d" 或 "M-d HH:mm" 或 null,
+              "is_project": true 或 false 或 null
             }
           ]
         }
@@ -264,16 +266,23 @@ enum PromptTemplates {
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             let deadlineText = t.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
             let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")\(deadlineText)"
+            var details = ""
+            if let note = t.note, !note.isEmpty {
+                details += "\n   备注：\(note)"
+            }
+            if !t.projectNotes.isEmpty {
+                details += "\n   项目备注：" + t.projectNotes.joined(separator: "；")
+            }
             if let summary = t.projectRecommendationSummary, !summary.isEmpty {
-                return "\(base)\n   项目状态摘要：\(summary)"
+                details += "\n   项目状态摘要：\(summary)"
             }
             if let background = t.planningBackground, !background.isEmpty {
-                return "\(base)\n   规划背景：\(background)"
+                details += "\n   规划背景：\(background)"
             }
             if let desc = t.projectDescription, !desc.isEmpty {
-                return "\(base)\n   项目描述：\(desc)"
+                details += "\n   项目描述：\(desc)"
             }
-            return base
+            return "\(base)\(details)"
         }.joined(separator: "\n")
 
         let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + ($1.estimatedMinutes ?? 0) }
@@ -324,6 +333,7 @@ enum PromptTemplates {
         6. 快速模式下应明显偏向普通想法的清理与消化；综合模式下允许普通想法和项目同时竞争
         7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由
         8. 有截止时间（deadline）的任务应优先考虑，截止时间越紧迫优先级越高
+        9. 会议、活动、约见等事件类想法：重点参考备注和截止时间判断。如果截止时间就是今天，或备注说明需要提前准备，才推荐今天做；如果截止时间在未来且不需要提前准备，不要提前推荐（当天再推荐即可）
 
         输出严格的 JSON 格式：
         {
@@ -392,6 +402,8 @@ enum PromptTemplates {
         - 标题含”了解”、”见抖音收藏”、”见相册”等浏览性描述 → 普通想法
         - 仅一个网址、平台名称、或”了解某段历史”等泛泛描述 → 普通想法
         - 没有具体行动计划的泛泛了解 → 普通想法
+        - “了解 X 并形成推文/笔记/文章” → 了解+单次产出，整体可在一天内完成，属于普通想法
+        - “深入了解 X” + 任何单次可交付的动作（写推文、写笔记、总结） → 普通想法
 
         ## 注意
         - 标题中包含”学习”、”了解”不一定是项目，要看是否有明确的单次完成边界
