@@ -15,9 +15,6 @@ final class MustDoViewModel {
     /// 耗时缓存 [taskId: seconds]
     var elapsedSecondsCache: [UUID: Int] = [:]
 
-    /// 编辑模式（上下箭头排序）
-    var isEditMode: Bool = false
-
     /// 移回想法池后的回调（用于通知想法池刷新）
     var onDemotedToIdeaPool: (() async -> Void)?
 
@@ -176,56 +173,6 @@ final class MustDoViewModel {
         }
     }
 
-    /// 是否可以上移
-    func canMoveUp(at index: Int) -> Bool {
-        let pending = pendingTasks
-        guard index > 0 && index < pending.count else { return false }
-        return pending[index].priority == pending[index - 1].priority
-    }
-
-    /// 是否可以下移
-    func canMoveDown(at index: Int) -> Bool {
-        let pending = pendingTasks
-        guard index >= 0 && index < pending.count - 1 else { return false }
-        return pending[index].priority == pending[index + 1].priority
-    }
-
-    /// 上移
-    func moveUp(at index: Int) {
-        let pending = pendingTasks
-        guard index > 0,
-              pending[index].priority == pending[index - 1].priority else { return }
-
-        let targetId = pending[index].id
-        let priority = pending[index].priority
-        var samePriority = pending.filter { $0.priority == priority }
-
-        guard let localIdx = samePriority.firstIndex(where: { $0.id == targetId }),
-              localIdx > 0 else { return }
-
-        samePriority.swapAt(localIdx, localIdx - 1)
-        reindexSortOrder(samePriority)
-        Task { await refresh() }
-    }
-
-    /// 下移
-    func moveDown(at index: Int) {
-        let pending = pendingTasks
-        guard index < pending.count - 1,
-              pending[index].priority == pending[index + 1].priority else { return }
-
-        let targetId = pending[index].id
-        let priority = pending[index].priority
-        var samePriority = pending.filter { $0.priority == priority }
-
-        guard let localIdx = samePriority.firstIndex(where: { $0.id == targetId }),
-              localIdx < samePriority.count - 1 else { return }
-
-        samePriority.swapAt(localIdx, localIdx + 1)
-        reindexSortOrder(samePriority)
-        Task { await refresh() }
-    }
-
     /// 已完成的任务
     var completedTasks: [DailyTaskEntity] {
         tasks.filter { $0.taskStatus == .done }
@@ -254,12 +201,6 @@ final class MustDoViewModel {
     }
 
     // MARK: - SortOrder 管理
-
-    private func reindexSortOrder(_ tasks: [DailyTaskEntity]) {
-        for (i, task) in tasks.enumerated() {
-            task.sortOrder = i
-        }
-    }
 
     private func reindexAllPendingSortOrders() {
         let priorityOrder: [String: Int] = [

@@ -18,27 +18,6 @@ struct MustDoSection: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-
-                if !viewModel.pendingTasks.isEmpty && !viewModel.isEditMode {
-                    Button {
-                        viewModel.isEditMode = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("排序")
-                }
-
-                if viewModel.isEditMode {
-                    Button("完成") {
-                        viewModel.isEditMode = false
-                    }
-                    .font(.system(size: 11))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -56,24 +35,11 @@ struct MustDoSection: View {
                             task: task,
                             ideaPoolIdeas: ideaPoolIdeas,
                             elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0,
-                            isEditMode: viewModel.isEditMode,
-                            canMoveUp: viewModel.canMoveUp(at: index),
-                            canMoveDown: viewModel.canMoveDown(at: index),
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onPause: { Task { await viewModel.pauseTask(taskId: task.id) } },
                             onResume: { Task { await viewModel.resumeTask(taskId: task.id) } },
                             onComplete: { Task { await viewModel.markComplete(taskId: task.id) } },
                             onDemote: { Task { await viewModel.demoteToIdeaPool(taskId: task.id) } },
-                            onMoveUp: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    viewModel.moveUp(at: index)
-                                }
-                            },
-                            onMoveDown: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    viewModel.moveDown(at: index)
-                                }
-                            },
                             onUpdateNote: { note in
                                 Task { await viewModel.updateTaskNote(taskId: task.id, note: note) }
                             }
@@ -388,16 +354,11 @@ struct MustDoTaskRow: View {
     let task: DailyTaskEntity
     let ideaPoolIdeas: [IdeaEntity]
     var elapsedSeconds: Int = 0
-    var isEditMode: Bool = false
-    var canMoveUp: Bool = false
-    var canMoveDown: Bool = false
     let onStart: () -> Void
     let onPause: () -> Void
     let onResume: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
-    let onMoveUp: () -> Void
-    let onMoveDown: () -> Void
     var onUpdateNote: ((String) -> Void)? = nil
 
     @State private var showCompleteConfirm = false
@@ -438,11 +399,7 @@ struct MustDoTaskRow: View {
 
                 Spacer(minLength: 8)
 
-                if isEditMode {
-                    reorderButtons
-                } else {
                     actionButtons
-                }
             }
 
             // 行 3：备注
@@ -490,26 +447,6 @@ struct MustDoTaskRow: View {
             Label("预计\(task.estimatedMinutes.hourMinuteString)", systemImage: "clock")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private var reorderButtons: some View {
-        HStack(spacing: 2) {
-            Button(action: onMoveUp) {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(canMoveUp ? Color.primary : Color.gray.opacity(0.3))
-            }
-            .buttonStyle(.plain)
-            .disabled(!canMoveUp)
-
-            Button(action: onMoveDown) {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(canMoveDown ? Color.primary : Color.gray.opacity(0.3))
-            }
-            .buttonStyle(.plain)
-            .disabled(!canMoveDown)
         }
     }
 
