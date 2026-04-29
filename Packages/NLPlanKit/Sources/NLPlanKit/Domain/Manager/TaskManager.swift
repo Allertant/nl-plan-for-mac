@@ -321,6 +321,9 @@ final class TaskManager {
 
         if dailyTask.taskStatus == .running {
             try commitRunningTime(dailyTask)
+            if let openLog = try sessionLogRepo.fetchOpenSession(taskId: taskId) {
+                try sessionLogRepo.endSession(openLog)
+            }
         }
 
         dailyTask.taskStatus = .done

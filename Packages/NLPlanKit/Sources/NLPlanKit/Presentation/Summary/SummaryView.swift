@@ -99,7 +99,17 @@ struct SummaryView: View {
 
                         // 驳斥按钮
                         if viewModel.canAppeal {
-                            if viewModel.showAppealInput {
+                            if viewModel.isAppealing {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("AI 正在重新评分...")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            } else if viewModel.showAppealInput {
                                 VStack(spacing: 8) {
                                     TextField("告诉 AI 你的想法...", text: $viewModel.appealText, axis: .vertical)
                                         .textFieldStyle(.plain)
@@ -123,7 +133,7 @@ struct SummaryView: View {
                                         }
                                         .font(.system(size: 12))
                                         .buttonStyle(.borderedProminent)
-                                        .disabled(viewModel.isAppealing || viewModel.appealText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                        .disabled(viewModel.appealText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                                     }
                                 }
                                 .padding(12)
