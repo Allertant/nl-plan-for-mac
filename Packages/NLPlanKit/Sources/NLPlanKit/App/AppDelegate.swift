@@ -6,7 +6,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Properties
 
+    weak var appState: AppState?
     private var rightClickMonitor: Any?
+    private weak var statusBarButton: NSStatusBarButton?
 
     // MARK: - NSApplicationDelegate
 
@@ -31,20 +33,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Right-Click Context Menu
 
     private func setupRightClickMenu(for button: NSStatusBarButton) {
-        let menu = NSMenu()
-        let quitItem = NSMenuItem(
-            title: "Quit",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        )
-        menu.addItem(quitItem)
+        statusBarButton = button
 
         rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-            if self?.showMenuIfRightClicked(on: button, menu: menu, event: event) == true {
+            if self?.showMenuIfRightClicked(event: event) == true {
                 return nil
             }
             return event
         }
+    }
+
+    private func buildMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        if let appState, appState.isTimerRunning {
+            let title = truncateTitle(appState.currentTaskTitle)
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "进行中")
+            item.image?.size = NSSize(width: 16, height: 16)
+            menu.addItem(item)
+        }
+
+        menu.addItem(NSMenuItem.separator())
+
+        menu.addItem(NSMenuItem(
+            title: "Quit",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ))
+
+        return menu
+    }
+
+    private func truncateTitle(_ title: String) -> String {
+        if title.count > 10 {
+            return String(title.prefix(10)) + "…"
+        }
+        return title
     }
 
     /// 通过窗口层级查找 MenuBarExtra 创建的 NSStatusBarButton
@@ -76,11 +101,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 检测右键是否点击在菜单栏图标上，是则弹出上下文菜单
     @discardableResult
-    private func showMenuIfRightClicked(
-        on button: NSStatusBarButton,
-        menu: NSMenu,
-        event: NSEvent
-    ) -> Bool {
+    private func showMenuIfRightClicked(event: NSEvent) -> Bool {
+        guard let button = statusBarButton else { return false }
         let mouseLocation = NSEvent.mouseLocation
         guard let buttonWindow = button.window else { return false }
 
@@ -90,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard buttonFrameInScreen.contains(mouseLocation) else { return false }
 
+        let menu = buildMenu()
         let menuOrigin = NSPoint(x: buttonFrameInScreen.minX, y: buttonFrameInScreen.minY)
         menu.popUp(positioning: nil, at: menuOrigin, in: nil)
         return true

@@ -37,6 +37,7 @@ public struct NLPlanMenuBarScene: Scene {
                 .modelContainer(container)
                 .environment(appState)
                 .preferredColorScheme(appState.appearanceMode.colorScheme)
+                .onAppear { appDelegate.appState = appState }
         } label: {
             MenuBarLabelView(appState: appState)
         }

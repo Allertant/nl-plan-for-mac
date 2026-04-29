@@ -255,5 +255,17 @@ final class AppState {
             guard let ideaId else { return }
             await self?.ideaPoolViewModel?.refreshProjectAnalyses(ideaId: ideaId)
         }
+
+        // 连接回调：任务刷新后更新菜单栏计时状态
+        mustDoViewModel?.onTasksRefreshed = { [weak self] in
+            guard let self, let mustDoVM = self.mustDoViewModel else { return }
+            if let running = mustDoVM.runningTask {
+                self.isTimerRunning = true
+                self.currentTaskTitle = running.title
+            } else {
+                self.isTimerRunning = false
+                self.currentTaskTitle = ""
+            }
+        }
     }
 }
