@@ -259,7 +259,7 @@ enum PromptTemplates {
         extraContext: String? = nil
     ) -> String {
         let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status == "running" ? "进行中" : "待开始")"
+            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status)"
         }.joined(separator: "\n")
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in

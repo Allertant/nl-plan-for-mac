@@ -359,13 +359,22 @@ final class MustDoViewModel {
             }
 
             let mustDoInputs = currentTasks.map { task in
-                TaskRecommendationInput(
+                let elapsed = elapsedSecondsCache[task.id].map { $0 / 60 } ?? 0
+                let statusWithElapsed: String
+                if task.taskStatus == .running || task.taskStatus == .paused {
+                    statusWithElapsed = "\(task.status)(已用\(elapsed)分钟)"
+                } else if task.taskStatus == .done {
+                    statusWithElapsed = "已完成(实际\(task.actualMinutes ?? elapsed)分钟)"
+                } else {
+                    statusWithElapsed = task.status
+                }
+                return TaskRecommendationInput(
                     id: task.id,
                     title: task.title,
                     category: task.category,
                     estimatedMinutes: task.estimatedMinutes,
                     attempted: task.attempted,
-                    status: task.status,
+                    status: statusWithElapsed,
                     isProject: false,
                     projectDescription: nil,
                     planningBackground: nil,

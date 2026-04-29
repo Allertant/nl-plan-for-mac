@@ -194,6 +194,7 @@ private struct AIRecommendPanel: View {
                             task: rec,
                             reason: rec.reason,
                             isAccepted: viewModel.acceptedRecommendationIds.contains(rec.id),
+                            ideaPoolIdeas: ideaPoolIdeas,
                             selectedPriority: Binding(
                                 get: { viewModel.selectedPriorities[rec.id] ?? .medium },
                                 set: { viewModel.selectedPriorities[rec.id] = $0 }
@@ -265,8 +266,14 @@ private struct RecommendationRow: View {
     let task: TaskRecommendation
     let reason: String
     let isAccepted: Bool
+    let ideaPoolIdeas: [IdeaEntity]
     @Binding var selectedPriority: TaskPriority
     let onAccept: () -> Void
+
+    private var sourceIdea: IdeaEntity? {
+        guard let sourceIdeaId = task.sourceIdeaId else { return nil }
+        return ideaPoolIdeas.first(where: { $0.id == sourceIdeaId })
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -276,19 +283,31 @@ private struct RecommendationRow: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(isAccepted ? .gray : .primary)
                         .strikethrough(isAccepted)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if isAccepted {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(.green)
                     }
+
+                    if let sourceIdea {
+                        Menu {
+                            Text(sourceIdea.isProject ? "项目：\(sourceIdea.title)" : "想法：\(sourceIdea.title)")
+                        } label: {
+                            Image(systemName: "link")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                    }
                 }
 
                 Text(reason)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 8) {
                     Label(task.category, systemImage: "tag")
