@@ -9,8 +9,11 @@ struct MustDoSection: View {
         VStack(spacing: 4) {
             if let confirmAction = viewModel.pendingConfirm {
                 ConfirmActionPage(
+                    icon: confirmAction.isComplete ? "checkmark.circle" : "arrow.uturn.backward",
+                    iconTint: confirmAction.isComplete ? .green : .orange,
                     title: viewModel.confirmTaskTitle ?? "",
-                    isComplete: confirmAction.isComplete,
+                    message: confirmAction.isComplete ? "确认标记为已完成？" : "确认移回想法池？",
+                    confirmLabel: confirmAction.isComplete ? "确认完成" : "确认移回",
                     onCancel: { viewModel.cancelConfirm() },
                     onConfirm: { Task { await viewModel.executeConfirm() } }
                 )
@@ -106,17 +109,20 @@ struct MustDoSection: View {
 
 // MARK: - Confirm Action Page
 
-private struct ConfirmActionPage: View {
+struct ConfirmActionPage: View {
+    let icon: String
+    let iconTint: Color
     let title: String
-    let isComplete: Bool
+    let message: String
+    let confirmLabel: String
     let onCancel: () -> Void
     let onConfirm: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: isComplete ? "checkmark.circle" : "arrow.uturn.backward")
+            Image(systemName: icon)
                 .font(.system(size: 28))
-                .foregroundStyle(isComplete ? .green : .orange)
+                .foregroundStyle(iconTint)
 
             Text(title)
                 .font(.system(size: 13, weight: .medium))
@@ -124,7 +130,7 @@ private struct ConfirmActionPage: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
 
-            Text(isComplete ? "确认标记为已完成？" : "确认移回想法池？")
+            Text(message)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
@@ -136,7 +142,7 @@ private struct ConfirmActionPage: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button(isComplete ? "确认完成" : "确认移回") {
+                Button(confirmLabel) {
                     onConfirm()
                 }
                 .font(.system(size: 12))

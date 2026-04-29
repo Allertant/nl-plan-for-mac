@@ -14,7 +14,6 @@ struct IdeaPoolTaskRow: View {
     let onOpenProject: () -> Void
 
     @State private var flashCount = 0
-    @State private var showDeleteConfirm = false
     @State private var editingTitle = false
     @State private var editingMinutes = false
     @State private var editingNote = false
@@ -101,13 +100,8 @@ struct IdeaPoolTaskRow: View {
                         .onTapGesture { startEditingDeadline() }
                 }
                 Spacer(minLength: 8)
-                if showDeleteConfirm {
-                    Button("取消") { showDeleteConfirm = false }.buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
-                    Button("删除") { onDelete() }.buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(.red)
-                } else {
-                    Button { showDeleteConfirm = true } label: { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
-                        .buttonStyle(.plain).help("删除")
-                }
+                Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
+                    .buttonStyle(.plain).help("删除")
             }
 
             // 行 3（项目）：进度条 + 详情按钮

@@ -51,8 +51,7 @@ struct IdeaPoolSection: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
             if viewModel.ideas.isEmpty {
                 Text("暂无想法")
                     .font(.system(size: 12))
@@ -236,7 +235,7 @@ struct IdeaPoolSection: View {
                                 ) { priority in
                                     Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
                                 } onDelete: {
-                                    Task { await viewModel.deleteIdea(ideaId: idea.id) }
+                                    viewModel.requestDelete(ideaId: idea.id)
                                 } onUpdate: { title, category, estimatedMinutes, note, deadline in
                                     Task {
                                         await viewModel.updateIdea(
@@ -263,7 +262,6 @@ struct IdeaPoolSection: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
         .onChange(of: searchText) { _, _ in updateFilteredIdeas() }
         .onChange(of: selectedSearchTags) { _, _ in updateFilteredIdeas() }
         .onChange(of: viewModel.ideas) { _, _ in updateFilteredIdeas() }

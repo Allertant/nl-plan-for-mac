@@ -38,6 +38,17 @@ struct IdeaPoolPageView: View {
                 Divider()
 
                 // 内容区
+                if viewModel.pendingDeleteIdeaId != nil {
+                    ConfirmActionPage(
+                        icon: "trash",
+                        iconTint: .red,
+                        title: viewModel.pendingDeleteIdeaTitle ?? "",
+                        message: "确认删除该想法？",
+                        confirmLabel: "确认删除",
+                        onCancel: { viewModel.cancelDelete() },
+                        onConfirm: { Task { await viewModel.executeDelete() } }
+                    )
+                } else {
                 ScrollView {
                     VStack(spacing: 0) {
                         Color.clear
@@ -55,6 +66,7 @@ struct IdeaPoolPageView: View {
                     )
                 }
                 .scrollIndicators(.automatic)
+                }
             }
             .frame(width: 360, height: 520)
             .overlay(alignment: .bottomTrailing) {

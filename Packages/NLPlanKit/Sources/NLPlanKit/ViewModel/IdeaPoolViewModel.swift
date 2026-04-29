@@ -22,6 +22,29 @@ final class IdeaPoolViewModel {
     /// 提升到必做项后的回调（用于通知必做项刷新）
     var onPromotedToMustDo: (() async -> Void)?
 
+    // MARK: - 删除确认
+
+    var pendingDeleteIdeaId: UUID?
+
+    var pendingDeleteIdeaTitle: String? {
+        guard let id = pendingDeleteIdeaId else { return nil }
+        return ideas.first(where: { $0.id == id })?.title
+    }
+
+    func requestDelete(ideaId: UUID) {
+        pendingDeleteIdeaId = ideaId
+    }
+
+    func cancelDelete() {
+        pendingDeleteIdeaId = nil
+    }
+
+    func executeDelete() async {
+        guard let ideaId = pendingDeleteIdeaId else { return }
+        pendingDeleteIdeaId = nil
+        await deleteIdea(ideaId: ideaId)
+    }
+
     // MARK: - 清理状态
 
     enum CleanupState: Equatable {
