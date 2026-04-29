@@ -285,7 +285,9 @@ enum PromptTemplates {
             return "\(base)\(details)"
         }.joined(separator: "\n")
 
-        let mustDoTotalMinutes = mustDoTasks.reduce(0) { $0 + ($1.estimatedMinutes ?? 0) }
+        let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
+            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
+        }
         let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
 
         let strategyHint: String

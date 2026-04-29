@@ -381,7 +381,8 @@ final class IdeaPoolViewModel {
                 projectRecommendationSummary: idea.projectRecommendationSummary,
                 deadlineDisplay: idea.deadlineDisplayString,
                 note: idea.note,
-                projectNotes: []
+                projectNotes: [],
+                elapsedMinutes: 0
             )
         }
 

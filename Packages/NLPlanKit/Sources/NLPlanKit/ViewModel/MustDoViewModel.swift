@@ -354,7 +354,8 @@ final class MustDoViewModel {
                     projectRecommendationSummary: idea.projectRecommendationSummary,
                     deadlineDisplay: idea.deadlineDisplayString,
                     note: idea.note,
-                    projectNotes: projectNotes
+                    projectNotes: projectNotes,
+                    elapsedMinutes: 0
                 ))
             }
 
@@ -381,7 +382,8 @@ final class MustDoViewModel {
                     projectRecommendationSummary: nil,
                     deadlineDisplay: nil,
                     note: nil,
-                    projectNotes: []
+                    projectNotes: [],
+                    elapsedMinutes: elapsed
                 )
             }
 

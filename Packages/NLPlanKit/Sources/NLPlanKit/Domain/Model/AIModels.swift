@@ -81,6 +81,7 @@ struct TaskRecommendationInput: Sendable {
     let deadlineDisplay: String?
     let note: String?
     let projectNotes: [String]
+    let elapsedMinutes: Int
 }
 
 struct PlanningBackgroundPromptInput: Sendable {
