@@ -170,7 +170,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             strategy: strategy,
             extraContext: extraContext
         )
-        print("[AI推荐] prompt:\n\(prompt)")
+        print("[AI推荐·快速模式] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
             userPrompt: prompt,
@@ -273,6 +273,63 @@ final class DeepSeekAIService: AIServiceProtocol {
             reason: response.reason,
             researchPrompt: response.researchPrompt
         )
+    }
+
+    // MARK: - Project Suggestion (Two-Pass)
+
+    func selectProjects(
+        inputs: [ProjectSelectionInput],
+        remainingHours: Double
+    ) async throws -> ProjectSelectionResult {
+        let prompt = PromptTemplates.selectProjects(inputs: inputs, remainingHours: remainingHours)
+        print("[项目提示·第一轮] prompt:\n\(prompt)")
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: ProjectSelectionResponse.self
+        )
+        let items = response.items.compactMap { dto -> ProjectSelectionItem? in
+            guard let uuid = UUID(uuidString: dto.ideaId) else { return nil }
+            return ProjectSelectionItem(ideaId: uuid, reason: dto.reason)
+        }
+        return ProjectSelectionResult(items: items, overallReason: response.overallReason)
+    }
+
+    func generateProjectSlices(
+        projects: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        arrangements: [TaskRecommendationInput],
+        settledTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) async throws -> RecommendationResult {
+        let prompt = PromptTemplates.generateProjectSlices(
+            projects: projects,
+            mustDoTasks: mustDoTasks,
+            arrangements: arrangements,
+            settledTasks: settledTasks,
+            remainingHours: remainingHours
+        )
+        print("[项目提示·第二轮] prompt:\n\(prompt)")
+        let response = try await requestAndParse(
+            systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
+            userPrompt: prompt,
+            as: RecommendationResponse.self
+        )
+        let recommendations = response.recommendations.compactMap { dto -> TaskRecommendation? in
+            let taskId = dto.taskId.flatMap(UUID.init(uuidString:))
+            let sourceIdeaId = dto.sourceIdeaId.flatMap(UUID.init(uuidString:))
+            guard sourceIdeaId != nil else { return nil }
+            return TaskRecommendation(
+                taskId: taskId,
+                sourceIdeaId: sourceIdeaId,
+                arrangementId: nil,
+                title: dto.title,
+                category: dto.category,
+                estimatedMinutes: dto.estimatedMinutes,
+                reason: dto.reason
+            )
+        }
+        return RecommendationResult(recommendations: recommendations, overallReason: response.overallReason)
     }
 
     // MARK: - Deadline Parsing
