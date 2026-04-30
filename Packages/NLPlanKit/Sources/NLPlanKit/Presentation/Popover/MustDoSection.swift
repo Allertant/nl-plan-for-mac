@@ -421,12 +421,12 @@ private struct RecommendationRow: View {
                                 Button {
                                     selectedPriority = p
                                 } label: {
-                                    Label(p.displayName, systemImage: p == .high ? "flag.fill" : "flag")
+                                    Label(p.displayName, systemImage: p.iconName)
                                 }
                             }
                         } label: {
                             HStack(spacing: 2) {
-                                Image(systemName: priorityIcon)
+                                Image(systemName: selectedPriority.iconName)
                                     .font(.system(size: 9))
                                     .foregroundStyle(priorityColor)
                                 Text(selectedPriority.displayName)
@@ -467,19 +467,12 @@ private struct RecommendationRow: View {
         }
     }
 
-    private var priorityIcon: String {
-        switch selectedPriority {
-        case .high: return "flag.fill"
-        case .medium: return "flag"
-        case .low: return "flag"
-        }
-    }
-
     private var priorityColor: Color {
-        switch selectedPriority {
-        case .high: return .red
-        case .medium: return .orange
-        case .low: return .blue
+        switch selectedPriority.colorName {
+        case "red": return .red
+        case "orange": return .orange
+        case "blue": return .blue
+        default: return .secondary
         }
     }
 
@@ -582,7 +575,7 @@ struct MustDoTaskRow: View {
 
     private var taskInfoLineContent: some View {
         HStack(spacing: 8) {
-            Image(systemName: task.taskPriority == .high ? "flag.fill" : "flag")
+            Image(systemName: task.taskPriority.iconName)
                 .font(.system(size: 9))
                 .foregroundStyle(
                     task.taskPriority == .high ? .red :
