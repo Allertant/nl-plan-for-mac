@@ -26,6 +26,7 @@ final class DailyTaskEntity {
     var isSettled: Bool = false
     var settledAt: Date?
     var actualMinutes: Int?
+    var completedAt: Date?
     var timerAccumulatedSeconds: Int = 0
     var timerLastStartedAt: Date?
 
@@ -69,7 +70,8 @@ final class DailyTaskEntity {
         sourceType: String = DailyTaskSourceType.none.rawValue,
         isSettled: Bool = false,
         settledAt: Date? = nil,
-        actualMinutes: Int? = nil
+        actualMinutes: Int? = nil,
+        completedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -91,6 +93,7 @@ final class DailyTaskEntity {
         self.isSettled = isSettled
         self.settledAt = settledAt
         self.actualMinutes = actualMinutes
+        self.completedAt = completedAt
     }
 }
 

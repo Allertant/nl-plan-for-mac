@@ -327,6 +327,7 @@ final class TaskManager {
         }
 
         dailyTask.taskStatus = .done
+        dailyTask.completedAt = .now
         try dailyTaskRepo.update(dailyTask)
         touchSourceContext(dailyTask)
     }

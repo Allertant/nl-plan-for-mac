@@ -235,6 +235,11 @@ private struct HistoryDetailPageView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
+                if let completedAt = task.completedAt {
+                    Text("完成于 \(completedAt.timeString)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             if let incompletionReason = task.incompletionReason, !incompletionReason.isEmpty {
