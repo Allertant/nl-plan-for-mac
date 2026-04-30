@@ -13,7 +13,10 @@ struct CleanupDetailView: View {
         VStack(spacing: 0) {
             // 顶部导航栏
             HStack {
-                BackButton(action: onBack)
+                BackButton {
+                    Task { await viewModel.commitCleanupDeletes() }
+                    onBack()
+                }
 
                 Text("AI 清理建议")
                     .font(.system(size: 13, weight: .semibold))
@@ -113,6 +116,46 @@ struct CleanupDetailView: View {
                     .padding(16)
                 }
                 .scrollIndicators(.automatic)
+
+                // 底部操作栏
+                if case .loaded = viewModel.cleanupState {
+                    Divider()
+                    HStack {
+                        Button {
+                            Task { await viewModel.commitCleanupDeletes() }
+                            onBack()
+                        } label: {
+                            Text("全部跳过")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Button {
+                            viewModel.undoLastCleanup()
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(viewModel.canUndoCleanup ? Color.primary : Color.gray.opacity(0.3))
+                        .disabled(!viewModel.canUndoCleanup)
+                        .help("撤销")
+
+                        Button {
+                            viewModel.markAllCleanupItems()
+                        } label: {
+                            Text("全部清除")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
             }
         }
         .frame(width: 360, height: 520)

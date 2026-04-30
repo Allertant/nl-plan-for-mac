@@ -56,9 +56,6 @@ final class IdeaPoolViewModel {
 
     var cleanupState: CleanupState = .idle
 
-    /// 已确认删除的 ideaId
-    var confirmedCleanupIds: Set<UUID> = []
-
     /// 待确认删除的清理项 ID
     var pendingDeleteCleanupId: UUID?
 
@@ -68,14 +65,14 @@ final class IdeaPoolViewModel {
         return ideas.first(where: { $0.id == id })?.title
     }
 
-    /// 撤销栈
-    private var undoStack: [UUID] = []
+    /// 延迟删除栈：已从 UI 移除但未从数据库删除的清理项（支持撤销）
+    private var removedCleanupItems: [CleanupSuggestion] = []
 
     /// 高亮清除 Task（持有引用，新调用时取消旧的）
     private var highlightClearTask: Task<Void, Never>?
 
     /// 是否可以撤销
-    var canUndoCleanup: Bool { !undoStack.isEmpty }
+    var canUndoCleanup: Bool { !removedCleanupItems.isEmpty }
 
     var showCleanupPanel: Bool {
         switch cleanupState {
@@ -87,11 +84,6 @@ final class IdeaPoolViewModel {
     var currentCleanupResult: CleanupResult? {
         if case .loaded(let result) = cleanupState { return result }
         return nil
-    }
-
-    var allCleanupConfirmed: Bool {
-        guard let result = currentCleanupResult else { return false }
-        return result.items.allSatisfy { confirmedCleanupIds.contains($0.taskId) }
     }
 
     private let taskManager: TaskManager
@@ -396,8 +388,7 @@ final class IdeaPoolViewModel {
     func fetchCleanupSuggestions() async {
         cleanupState = .loading
         errorMessage = nil
-        confirmedCleanupIds = []
-        undoStack = []
+        removedCleanupItems = []
 
         let inputs = ideas.map { idea in
             TaskRecommendationInput(
@@ -445,49 +436,36 @@ final class IdeaPoolViewModel {
     func executeDeleteCleanup() async {
         guard let ideaId = pendingDeleteCleanupId else { return }
         pendingDeleteCleanupId = nil
-        do {
-            try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        // 从清理列表中移除已删除的项
-        if case .loaded(let result) = cleanupState {
-            let updated = result.items.filter { $0.taskId != ideaId }
-            if updated.isEmpty {
-                await refresh()
-                resetCleanupState()
-            } else {
-                cleanupState = .loaded(CleanupResult(items: updated, overallReason: result.overallReason))
-                await refresh()
-            }
-        }
-    }
 
-    func markCleanupItem(taskId: UUID) {
-        confirmedCleanupIds.insert(taskId)
-        undoStack.append(taskId)
+        // 延迟删除：从 UI 列表移除并存入撤销栈，不立即删数据库
+        if case .loaded(let result) = cleanupState {
+            let removed = result.items.filter { $0.taskId == ideaId }
+            removedCleanupItems.append(contentsOf: removed)
+            let updated = result.items.filter { $0.taskId != ideaId }
+            cleanupState = .loaded(CleanupResult(items: updated, overallReason: result.overallReason))
+        }
+        await refresh()
     }
 
     func markAllCleanupItems() {
-        guard let result = currentCleanupResult else { return }
-        for item in result.items where !confirmedCleanupIds.contains(item.taskId) {
-            confirmedCleanupIds.insert(item.taskId)
-            undoStack.append(item.taskId)
-        }
+        guard case .loaded(let result) = cleanupState else { return }
+        removedCleanupItems.append(contentsOf: result.items)
+        cleanupState = .loaded(CleanupResult(items: [], overallReason: result.overallReason))
     }
 
     func undoLastCleanup() {
-        guard let lastId = undoStack.popLast() else { return }
-        confirmedCleanupIds.remove(lastId)
+        guard let entry = removedCleanupItems.popLast() else { return }
+        if case .loaded(let result) = cleanupState {
+            cleanupState = .loaded(CleanupResult(items: result.items + [entry], overallReason: result.overallReason))
+        }
     }
 
-    func executeCleanup() async {
-        for ideaId in confirmedCleanupIds {
-            do {
-                try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+    /// 离开页面：提交所有已确认的删除，真正从数据库删除
+    func commitCleanupDeletes() async {
+        let idsToDelete = removedCleanupItems.map(\.taskId)
+        removedCleanupItems = []
+        for ideaId in idsToDelete {
+            try? await taskManager.deleteFromIdeaPool(ideaId: ideaId)
         }
         await refresh()
         resetCleanupState()
@@ -501,8 +479,7 @@ final class IdeaPoolViewModel {
 
     func resetCleanupState() {
         cleanupState = .idle
-        confirmedCleanupIds = []
-        undoStack = []
+        removedCleanupItems = []
     }
 
     // MARK: - Private
