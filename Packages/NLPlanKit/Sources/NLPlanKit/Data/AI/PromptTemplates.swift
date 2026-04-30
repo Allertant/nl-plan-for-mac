@@ -841,7 +841,7 @@ enum PromptTemplates {
     ) -> String {
         let projectList = projects.map { p in
             let durationText = p.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
-            var details = "[项目] \(p.title) - \(durationText) - \(p.category)"
+            var details = "[项目] \(p.title)（UUID: \(p.id.uuidString)） - \(durationText) - \(p.category)"
             if let desc = p.projectDescription, !desc.isEmpty {
                 details += "\n   项目描述：\(desc)"
             }
