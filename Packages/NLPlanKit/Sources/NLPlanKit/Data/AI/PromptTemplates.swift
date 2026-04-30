@@ -400,8 +400,9 @@ enum PromptTemplates {
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             let deadlineText = t.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
-            let arrangementTag = t.arrangementId != nil ? " - 用户安排（必须优先推荐）" : ""
-            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")\(arrangementTag)\(deadlineText)"
+            let arrangementTag = t.arrangementId != nil ? " - 用户安排" : ""
+            let projectTitleTag = t.projectTitle.map { " - 来自项目「\($0)」" } ?? ""
+            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")\(arrangementTag)\(projectTitleTag)\(deadlineText)"
             var details = ""
             if let note = t.note, !note.isEmpty {
                 details += "\n   备注：\(note)"
@@ -472,7 +473,7 @@ enum PromptTemplates {
         7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由。如果某个项目很重要但时间不足，生成一个更小的项目切片。
         8. 有截止时间（deadline）的任务应优先考虑，截止时间越紧迫优先级越高。但截止时间在未来且无需提前准备的任务，不必提前推荐。
         9. 会议、活动、约见等事件类想法：截止时间是今天才推荐；如果截止时间在未来且备注没有准备要求，不要提前推荐（当天再推荐即可）。
-        10. 标记为"用户安排"的任务是用户主动规划的事项，必须优先于其他任务推荐，直接推荐原内容，不要切片或改写。
+        10. 标记为"用户安排"的任务是用户在项目中的计划事项，与普通想法平级竞争，直接推荐原内容，不要切片或改写。推荐标题格式为"精简项目名: 安排内容"（如来自项目「搭建个人博客」的安排「选购域名」，标题为"搭建博客: 选购域名"）。
 
         reason 应写清楚：
         - 为什么适合今天

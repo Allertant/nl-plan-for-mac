@@ -343,7 +343,8 @@ final class MustDoViewModel {
                             note: nil,
                             projectNotes: projectNotes,
                             elapsedMinutes: 0,
-                            arrangementId: arrangement.id
+                            arrangementId: arrangement.id,
+                            projectTitle: idea.title
                         ))
                     }
                 } else {
@@ -362,7 +363,8 @@ final class MustDoViewModel {
                         note: idea.note,
                         projectNotes: projectNotes,
                         elapsedMinutes: 0,
-                        arrangementId: nil
+                        arrangementId: nil,
+                        projectTitle: nil
                     ))
                 }
             }
@@ -392,7 +394,8 @@ final class MustDoViewModel {
                     note: nil,
                     projectNotes: [],
                     elapsedMinutes: elapsed,
-                    arrangementId: nil
+                    arrangementId: nil,
+                    projectTitle: nil
                 )
             }
 

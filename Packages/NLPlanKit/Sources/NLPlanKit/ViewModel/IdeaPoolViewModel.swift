@@ -406,7 +406,8 @@ final class IdeaPoolViewModel {
                 note: idea.note,
                 projectNotes: [],
                 elapsedMinutes: 0,
-                arrangementId: nil
+                arrangementId: nil,
+                projectTitle: nil
             )
         }
 
