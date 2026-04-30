@@ -151,7 +151,7 @@ struct CleanupDetailContainerView: View {
         Group {
             if let ideaPoolVM = appState.ideaPoolViewModel {
                 CleanupDetailView(viewModel: ideaPoolVM) {
-                    appState.currentPage = .main
+                    appState.currentPage = .ideaPool
                 }
             } else {
                 ProgressView("加载中...")
