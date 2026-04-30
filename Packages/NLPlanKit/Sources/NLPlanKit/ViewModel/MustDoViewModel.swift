@@ -104,6 +104,8 @@ final class MustDoViewModel {
 
     /// 每条推荐项的用户选择优先级
     var selectedPriorities: [UUID: TaskPriority] = [:]
+    var editedCategories: [UUID: String] = [:]
+    var editedEstimatedMinutes: [UUID: Int] = [:]
 
     /// 当前推荐结果（便利访问）
     var currentRecommendations: RecommendationResult? {
@@ -301,6 +303,8 @@ final class MustDoViewModel {
         errorMessage = nil
         acceptedRecommendationIds = []
         selectedPriorities = [:]
+        editedCategories = [:]
+        editedEstimatedMinutes = [:]
         cumulativeTokenInput = 0
         cumulativeTokenOutput = 0
 
@@ -714,6 +718,8 @@ final class MustDoViewModel {
         recommendationTask = nil
         recommendationState = .idle
         acceptedRecommendationIds = []
+        editedCategories = [:]
+        editedEstimatedMinutes = [:]
     }
 
     // MARK: - Private
@@ -725,13 +731,15 @@ final class MustDoViewModel {
     }
 
     private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {
+        let category = editedCategories[recommendation.id] ?? recommendation.category
+        let minutes = editedEstimatedMinutes[recommendation.id] ?? recommendation.estimatedMinutes
         if let taskId = recommendation.taskId {
             try await taskManager.promoteToMustDo(ideaId: taskId, priority: priority, sortOrder: sortOrder)
         } else {
             let task = try await taskManager.createMustDoTask(
                 title: recommendation.title,
-                category: recommendation.category,
-                estimatedMinutes: recommendation.estimatedMinutes,
+                category: category,
+                estimatedMinutes: minutes,
                 priority: priority,
                 sortOrder: sortOrder,
                 sourceIdeaId: recommendation.sourceIdeaId,

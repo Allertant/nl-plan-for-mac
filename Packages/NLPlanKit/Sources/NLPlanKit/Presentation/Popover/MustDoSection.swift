@@ -232,9 +232,11 @@ private struct AIRecommendPanel: View {
                 } else {
                     ForEach(result.recommendations) { rec in
                         RecommendationRow(
+                            viewModel: viewModel,
                             task: rec,
                             reason: rec.reason,
                             isAccepted: viewModel.acceptedRecommendationIds.contains(rec.id),
+                            isEditable: viewModel.recommendationStrategy == .suggest,
                             ideaPoolIdeas: ideaPoolIdeas,
                             selectedPriority: Binding(
                                 get: { viewModel.selectedPriorities[rec.id] ?? .medium },
@@ -304,12 +306,29 @@ private struct AIRecommendPanel: View {
 // MARK: - 推荐任务行
 
 private struct RecommendationRow: View {
+    @Bindable var viewModel: MustDoViewModel
     let task: TaskRecommendation
     let reason: String
     let isAccepted: Bool
+    let isEditable: Bool
     let ideaPoolIdeas: [IdeaEntity]
     @Binding var selectedPriority: TaskPriority
     let onAccept: () -> Void
+
+    @State private var showingCategoryMenu = false
+    @State private var editingMinutes = false
+    @State private var draftMinutes = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case minutes }
+
+    private var currentCategory: String {
+        viewModel.editedCategories[task.id] ?? task.category
+    }
+
+    private var currentMinutes: Int {
+        viewModel.editedEstimatedMinutes[task.id] ?? task.estimatedMinutes
+    }
 
     private var sourceIdea: IdeaEntity? {
         guard let sourceIdeaId = task.sourceIdeaId else { return nil }
@@ -351,13 +370,49 @@ private struct RecommendationRow: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 8) {
-                    Label(task.category, systemImage: "tag")
-                        .font(.system(size: 10))
-                        .foregroundStyle(task.category.tagColor)
+                    if !isAccepted && isEditable {
+                        Button { showingCategoryMenu.toggle() } label: {
+                            TagChip(text: currentCategory)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                            CategoryPickerMenu(currentCategory: currentCategory) { tag in
+                                showingCategoryMenu = false
+                                if tag != task.category || viewModel.editedCategories[task.id] != nil {
+                                    viewModel.editedCategories[task.id] = tag
+                                }
+                            }
+                        }
+                    } else {
+                        Label(task.category, systemImage: "tag")
+                            .font(.system(size: 10))
+                            .foregroundStyle(task.category.tagColor)
+                    }
 
-                    Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                    if !isAccepted && isEditable && editingMinutes {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                            TextField("1h30m", text: $draftMinutes)
+                                .textFieldStyle(.plain)
+                                .frame(width: 52)
+                                .focused($focusedField, equals: .minutes)
+                                .onSubmit { commitMinutesEdit() }
+                        }
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                    } else {
+                        Label((isEditable ? currentMinutes : task.estimatedMinutes).hourMinuteString, systemImage: "clock")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .onTapGesture {
+                                guard !isAccepted && isEditable else { return }
+                                startEditingMinutes()
+                            }
+                    }
 
                     // 优先级选择
                     if !isAccepted {
@@ -422,9 +477,22 @@ private struct RecommendationRow: View {
         case .low: return .blue
         }
     }
-}
 
-/// 必做项任务卡片
+    private func startEditingMinutes() {
+        draftMinutes = currentMinutes.hourMinuteString
+        editingMinutes = true
+        focusedField = .minutes
+        CursorHelper.moveInsertionPointToEnd()
+    }
+
+    private func commitMinutesEdit() {
+        editingMinutes = false
+        let trimmed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let minutes = trimmed.parsedHourMinuteDuration else { return }
+        guard minutes != currentMinutes else { return }
+        viewModel.editedEstimatedMinutes[task.id] = minutes
+    }
+}
 struct MustDoTaskRow: View {
     let task: DailyTaskEntity
     let ideaPoolIdeas: [IdeaEntity]
