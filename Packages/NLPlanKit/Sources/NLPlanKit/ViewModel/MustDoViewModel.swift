@@ -313,6 +313,7 @@ final class MustDoViewModel {
             guard !Task.isCancelled else { return }
 
             var ideaInputs: [TaskRecommendationInput] = []
+            var arrangementProjectMap: [UUID: UUID] = [:] // arrangementId → projectId
             for idea in recommendationCandidates {
                 let projectNotes: [String]
                 if idea.isProject {
@@ -326,6 +327,7 @@ final class MustDoViewModel {
                    let arrangements = try? await taskManager.fetchPendingArrangements(projectId: idea.id),
                    !arrangements.isEmpty {
                     for arrangement in arrangements {
+                        arrangementProjectMap[arrangement.id] = idea.id
                         ideaInputs.append(TaskRecommendationInput(
                             id: arrangement.id,
                             title: arrangement.content,
@@ -413,15 +415,8 @@ final class MustDoViewModel {
                     cumulativeTokenOutput += usage.outputTokens
                 }
 
-                // 构建安排 ID 映射：input.id → arrangementId
-                let arrangementInputMap = Dictionary(
-                    ideaInputs.compactMap { input -> (UUID, UUID)? in
-                        guard let arrId = input.arrangementId else { return nil }
-                        return (input.id, arrId)
-                    },
-                    uniquingKeysWith: { $1 }
-                )
-                let arrangementInputIds = Set(arrangementInputMap.keys)
+                // 构建安排输入 ID 集合
+                let arrangementInputIds = Set(ideaInputs.compactMap { $0.arrangementId })
 
                 let ideaIds = Set(recommendationCandidates.map { $0.id })
                 let validRecs = result.recommendations.compactMap { recommendation -> TaskRecommendation? in
@@ -429,11 +424,12 @@ final class MustDoViewModel {
                         if ideaIds.contains(taskId) {
                             return recommendation
                         }
-                        if arrangementInputIds.contains(taskId), let arrId = arrangementInputMap[taskId] {
+                        if arrangementInputIds.contains(taskId),
+                           let projectId = arrangementProjectMap[taskId] {
                             return TaskRecommendation(
                                 taskId: nil,
-                                sourceIdeaId: recommendation.sourceIdeaId,
-                                arrangementId: arrId,
+                                sourceIdeaId: recommendation.sourceIdeaId ?? projectId,
+                                arrangementId: taskId,
                                 title: recommendation.title,
                                 category: recommendation.category,
                                 estimatedMinutes: recommendation.estimatedMinutes,
