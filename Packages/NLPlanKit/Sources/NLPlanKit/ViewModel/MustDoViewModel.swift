@@ -299,8 +299,7 @@ final class MustDoViewModel {
             let recommendationCandidates: [IdeaEntity]
             switch strategy {
             case .quick:
-                let nonProjectCandidates = allCandidates.filter { !$0.isProject }
-                recommendationCandidates = nonProjectCandidates.isEmpty ? allCandidates : nonProjectCandidates
+                recommendationCandidates = allCandidates
             case .comprehensive:
                 do {
                     recommendationCandidates = try await prepareComprehensiveCandidates(from: allCandidates)
@@ -323,29 +322,52 @@ final class MustDoViewModel {
                 }
 
                 // 项目有 pending 安排时，注入安排替代项目本身
-                if idea.isProject,
-                   let arrangements = try? await taskManager.fetchPendingArrangements(projectId: idea.id),
-                   !arrangements.isEmpty {
-                    for arrangement in arrangements {
-                        arrangementProjectMap[arrangement.id] = idea.id
+                if idea.isProject {
+                    let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
+                    if arrangements.isEmpty {
+                        // 快速模式跳过无安排的项目
+                        if strategy == .quick { continue }
+                        // 综合模式：项目本身作为候选
                         ideaInputs.append(TaskRecommendationInput(
-                            id: arrangement.id,
-                            title: arrangement.content,
+                            id: idea.id,
+                            title: idea.title,
                             category: idea.category,
-                            estimatedMinutes: arrangement.estimatedMinutes,
-                            attempted: false,
-                            status: "pending",
-                            isProject: false,
+                            estimatedMinutes: idea.estimatedMinutes,
+                            attempted: idea.attempted,
+                            status: idea.status,
+                            isProject: idea.isProject,
                             projectDescription: idea.projectDescription,
                             planningBackground: idea.planningBackground,
-                            projectRecommendationSummary: nil,
-                            deadlineDisplay: arrangement.deadline.map { $0.deadlineDisplayString },
-                            note: nil,
+                            projectRecommendationSummary: idea.projectRecommendationSummary,
+                            deadlineDisplay: idea.deadlineDisplayString,
+                            note: idea.note,
                             projectNotes: projectNotes,
                             elapsedMinutes: 0,
-                            arrangementId: arrangement.id,
-                            projectTitle: idea.title
+                            arrangementId: nil,
+                            projectTitle: nil
                         ))
+                    } else {
+                        for arrangement in arrangements {
+                            arrangementProjectMap[arrangement.id] = idea.id
+                            ideaInputs.append(TaskRecommendationInput(
+                                id: arrangement.id,
+                                title: arrangement.content,
+                                category: idea.category,
+                                estimatedMinutes: arrangement.estimatedMinutes,
+                                attempted: false,
+                                status: "pending",
+                                isProject: false,
+                                projectDescription: idea.projectDescription,
+                                planningBackground: idea.planningBackground,
+                                projectRecommendationSummary: nil,
+                                deadlineDisplay: arrangement.deadline.map { $0.deadlineDisplayString },
+                                note: nil,
+                                projectNotes: projectNotes,
+                                elapsedMinutes: 0,
+                                arrangementId: arrangement.id,
+                                projectTitle: idea.title
+                            ))
+                        }
                     }
                 } else {
                     ideaInputs.append(TaskRecommendationInput(
