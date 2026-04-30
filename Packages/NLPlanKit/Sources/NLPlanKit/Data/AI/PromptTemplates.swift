@@ -72,7 +72,9 @@ enum PromptTemplates {
         let taskList = currentTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             let deadlineText = t.deadlineDisplayString.map { "，截止:\($0)" } ?? ""
-            return "\(i + 1). 「\(t.title)」(\(t.category)，\(durationText)\(deadlineText))"
+            let projectText = t.isProject == true ? "，项目" : ""
+            let noteText = (t.note?.isEmpty == false) ? "，备注:\(t.note!)" : ""
+            return "\(i + 1). 「\(t.title)」(\(t.category)，\(durationText)\(projectText)\(deadlineText)\(noteText))"
         }.joined(separator: "\n")
 
         return """
@@ -95,6 +97,7 @@ enum PromptTemplates {
         普通单次事项必须填写 estimated_minutes；长期项目、系列计划、学习路线等整体不可一次完成的条目，estimated_minutes 设为 null。
         deadline 格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"，无截止时间则设为 null。如果用户修改要求中提到时间调整，相应更新 deadline。
         is_project：如果用户在修改要求中明确要求改变某个任务的项目/普通类型，按用户要求设置 is_project（true=项目，false=普通想法）。如果用户未提及类型变更，设为 null。
+        note：保留原有备注内容。仅当用户明确要求修改备注时才更改，否则原样保留。新增任务设为 null。
 
         输出严格的 JSON：
         {
@@ -104,7 +107,8 @@ enum PromptTemplates {
               "category": "分类",
               "estimated_minutes": 60,
               "deadline": "M-d" 或 "M-d HH:mm" 或 null,
-              "is_project": true 或 false 或 null
+              "is_project": true 或 false 或 null,
+              "note": "备注内容" 或 null
             }
           ]
         }

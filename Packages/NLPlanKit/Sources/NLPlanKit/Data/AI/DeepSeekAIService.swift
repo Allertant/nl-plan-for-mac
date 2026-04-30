@@ -90,6 +90,7 @@ final class DeepSeekAIService: AIServiceProtocol {
                 recommended: dto.recommended ?? false,
                 reason: dto.reason ?? "",
                 isProject: dto.isProject,
+                note: dto.note,
                 deadline: deadline,
                 deadlineHasExplicitYear: hasExplicitYear,
                 deadlineHasTime: hasTime
