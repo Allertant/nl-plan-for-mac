@@ -40,6 +40,11 @@ private struct ProjectDetailPageView: View {
     @State private var draftDescription = ""
     @FocusState private var descriptionFocused: Bool
 
+    // 标题编辑
+    @State private var isEditingTitle = false
+    @State private var draftTitle = ""
+    @FocusState private var titleFocused: Bool
+
     // 规划背景编辑
     @State private var isEditingPlanningBackground = false
     @State private var draftPlanningBackground = ""
@@ -91,6 +96,9 @@ private struct ProjectDetailPageView: View {
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await loadProjectDetail() }
+        .onChange(of: titleFocused) { _, focused in
+            if !focused && isEditingTitle { commitTitleEdit() }
+        }
         .onChange(of: descriptionFocused) { _, focused in
             if !focused && isEditingDescription { commitDescriptionEdit() }
         }
@@ -100,6 +108,7 @@ private struct ProjectDetailPageView: View {
     }
 
     private func dismissAllEditing() {
+        if isEditingTitle { titleFocused = false }
         if isEditingDescription { descriptionFocused = false }
         if isEditingPlanningBackground { planningBackgroundFocused = false }
         newNoteFocused = false
@@ -132,10 +141,38 @@ private struct ProjectDetailPageView: View {
 
     // MARK: - Cards
 
+    private func commitTitleEdit() {
+        isEditingTitle = false
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != projectDetail?.title else { return }
+        Task {
+            await viewModel.updateIdea(ideaId: idea.id, title: trimmed)
+            await reloadDetail()
+        }
+    }
+
     private func summaryCard(_ project: ProjectDetailSnapshot) -> some View {
         DetailSectionCard(title: "项目信息", systemImage: "lightbulb.fill", tint: .yellow, background: Color.yellow.opacity(0.08), border: Color.yellow.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                if isEditingTitle {
+                    TextField("项目标题", text: $draftTitle, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1...3)
+                        .focused($titleFocused)
+                        .onSubmit { titleFocused = false }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                } else {
+                    Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(3)
+                        .onTapGesture {
+                            draftTitle = project.title
+                            isEditingTitle = true
+                            DispatchQueue.main.async { titleFocused = true }
+                        }
+                }
                 HStack(spacing: 8) {
                     TagChip(text: project.category)
                     Text(project.createdDate.shortDateTimeString).font(.system(size: 10)).foregroundStyle(.tertiary)
