@@ -26,9 +26,9 @@ final class DailyTaskEntity {
     var isSettled: Bool = false
     var settledAt: Date?
     var actualMinutes: Int?
-    var completedAt: Date?
     var timerAccumulatedSeconds: Int = 0
     var timerLastStartedAt: Date?
+    var completedAt: Date?
 
     @Transient
     var taskStatus: TaskStatus {
