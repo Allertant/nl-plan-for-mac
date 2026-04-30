@@ -459,7 +459,12 @@ private struct RecommendationRow: View {
             ? Color(nsColor: .textBackgroundColor).opacity(0.3)
             : Color(nsColor: .textBackgroundColor)
         )
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = nil }
         .cornerRadius(6)
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil && editingMinutes { commitMinutesEdit() }
+        }
     }
 
     private var priorityIcon: String {
