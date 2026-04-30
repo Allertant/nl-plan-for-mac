@@ -320,22 +320,49 @@ final class MustDoViewModel {
                 } else {
                     projectNotes = []
                 }
-                ideaInputs.append(TaskRecommendationInput(
-                    id: idea.id,
-                    title: idea.title,
-                    category: idea.category,
-                    estimatedMinutes: idea.estimatedMinutes,
-                    attempted: idea.attempted,
-                    status: idea.status,
-                    isProject: idea.isProject,
-                    projectDescription: idea.projectDescription,
-                    planningBackground: idea.planningBackground,
-                    projectRecommendationSummary: idea.projectRecommendationSummary,
-                    deadlineDisplay: idea.deadlineDisplayString,
-                    note: idea.note,
-                    projectNotes: projectNotes,
-                    elapsedMinutes: 0
-                ))
+
+                // 项目有 pending 安排时，注入安排替代项目本身
+                if idea.isProject,
+                   let arrangements = try? await taskManager.fetchPendingArrangements(projectId: idea.id),
+                   !arrangements.isEmpty {
+                    for arrangement in arrangements {
+                        ideaInputs.append(TaskRecommendationInput(
+                            id: arrangement.id,
+                            title: arrangement.content,
+                            category: idea.category,
+                            estimatedMinutes: arrangement.estimatedMinutes,
+                            attempted: false,
+                            status: "pending",
+                            isProject: false,
+                            projectDescription: idea.projectDescription,
+                            planningBackground: idea.planningBackground,
+                            projectRecommendationSummary: idea.projectRecommendationSummary,
+                            deadlineDisplay: nil,
+                            note: nil,
+                            projectNotes: projectNotes,
+                            elapsedMinutes: 0,
+                            arrangementId: arrangement.id
+                        ))
+                    }
+                } else {
+                    ideaInputs.append(TaskRecommendationInput(
+                        id: idea.id,
+                        title: idea.title,
+                        category: idea.category,
+                        estimatedMinutes: idea.estimatedMinutes,
+                        attempted: idea.attempted,
+                        status: idea.status,
+                        isProject: idea.isProject,
+                        projectDescription: idea.projectDescription,
+                        planningBackground: idea.planningBackground,
+                        projectRecommendationSummary: idea.projectRecommendationSummary,
+                        deadlineDisplay: idea.deadlineDisplayString,
+                        note: idea.note,
+                        projectNotes: projectNotes,
+                        elapsedMinutes: 0,
+                        arrangementId: nil
+                    ))
+                }
             }
 
             let mustDoInputs = currentTasks.map { task in
@@ -362,7 +389,8 @@ final class MustDoViewModel {
                     deadlineDisplay: nil,
                     note: nil,
                     projectNotes: [],
-                    elapsedMinutes: elapsed
+                    elapsedMinutes: elapsed,
+                    arrangementId: nil
                 )
             }
 
@@ -385,15 +413,38 @@ final class MustDoViewModel {
                     cumulativeTokenOutput += usage.outputTokens
                 }
 
+                // 构建安排 ID 映射：input.id → arrangementId
+                let arrangementInputMap = Dictionary(
+                    ideaInputs.compactMap { input -> (UUID, UUID)? in
+                        guard let arrId = input.arrangementId else { return nil }
+                        return (input.id, arrId)
+                    },
+                    uniquingKeysWith: { $1 }
+                )
+                let arrangementInputIds = Set(arrangementInputMap.keys)
+
                 let ideaIds = Set(recommendationCandidates.map { $0.id })
-                let validRecs = result.recommendations.filter { recommendation in
+                let validRecs = result.recommendations.compactMap { recommendation -> TaskRecommendation? in
                     if let taskId = recommendation.taskId {
-                        return ideaIds.contains(taskId)
+                        if ideaIds.contains(taskId) {
+                            return recommendation
+                        }
+                        if arrangementInputIds.contains(taskId), let arrId = arrangementInputMap[taskId] {
+                            return TaskRecommendation(
+                                taskId: nil,
+                                sourceIdeaId: recommendation.sourceIdeaId,
+                                arrangementId: arrId,
+                                title: recommendation.title,
+                                category: recommendation.category,
+                                estimatedMinutes: recommendation.estimatedMinutes,
+                                reason: recommendation.reason
+                            )
+                        }
                     }
                     if let sourceIdeaId = recommendation.sourceIdeaId {
-                        return ideaIds.contains(sourceIdeaId)
+                        return recommendation
                     }
-                    return false
+                    return nil
                 }
                 let filteredResult = RecommendationResult(
                     recommendations: validRecs,
@@ -474,15 +525,21 @@ final class MustDoViewModel {
         if let taskId = recommendation.taskId {
             try await taskManager.promoteToMustDo(ideaId: taskId, priority: priority, sortOrder: sortOrder)
         } else {
-            _ = try await taskManager.createMustDoTask(
+            let task = try await taskManager.createMustDoTask(
                 title: recommendation.title,
                 category: recommendation.category,
                 estimatedMinutes: recommendation.estimatedMinutes,
                 priority: priority,
                 sortOrder: sortOrder,
                 sourceIdeaId: recommendation.sourceIdeaId,
+                arrangementId: recommendation.arrangementId,
                 recommendationReason: recommendation.reason
             )
+            // 标记安排为进行中
+            if let arrangementId = recommendation.arrangementId,
+               let arrangement = try? await taskManager.fetchArrangement(arrangementId) {
+                try? await taskManager.updateArrangementStatus(arrangement, status: .inProgress)
+            }
         }
     }
 

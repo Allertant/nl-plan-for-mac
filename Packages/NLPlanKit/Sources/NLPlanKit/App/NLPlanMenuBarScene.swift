@@ -16,6 +16,7 @@ public struct NLPlanMenuBarScene: Scene {
                 IdeaEntity.self,
                 DailyTaskEntity.self,
                 ProjectNoteEntity.self,
+                ProjectArrangementEntity.self,
                 SessionLogEntity.self,
                 DailySummaryEntity.self,
                 ParseQueueItemEntity.self

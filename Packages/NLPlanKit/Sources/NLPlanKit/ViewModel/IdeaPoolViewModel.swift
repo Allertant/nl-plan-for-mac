@@ -405,7 +405,8 @@ final class IdeaPoolViewModel {
                 deadlineDisplay: idea.deadlineDisplayString,
                 note: idea.note,
                 projectNotes: [],
-                elapsedMinutes: 0
+                elapsedMinutes: 0,
+                arrangementId: nil
             )
         }
 
@@ -480,6 +481,96 @@ final class IdeaPoolViewModel {
     func resetCleanupState() {
         cleanupState = .idle
         removedCleanupItems = []
+    }
+
+    // MARK: - 项目安排
+
+    var arrangements: [ProjectArrangementEntity] = []
+
+    enum PendingArrangementAction {
+        case delete
+        case revive
+    }
+
+    var pendingArrangementId: UUID?
+    var pendingArrangementAction: PendingArrangementAction?
+
+    var pendingArrangementTitle: String? {
+        guard let id = pendingArrangementId else { return nil }
+        return arrangements.first(where: { $0.id == id })?.content
+    }
+
+    func fetchArrangements(projectId: UUID) async {
+        do {
+            arrangements = try await taskManager.fetchArrangements(projectId: projectId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int = 30) async {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            let item = try await taskManager.addArrangement(
+                projectId: projectId,
+                content: trimmed,
+                estimatedMinutes: estimatedMinutes
+            )
+            arrangements.append(item)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateArrangementContent(arrangementId: UUID, content: String) async {
+        guard let item = arrangements.first(where: { $0.id == arrangementId }) else { return }
+        do {
+            try await taskManager.updateArrangement(item, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func requestDeleteArrangement(id: UUID) {
+        pendingArrangementId = id
+        pendingArrangementAction = .delete
+    }
+
+    func requestReviveArrangement(id: UUID) {
+        pendingArrangementId = id
+        pendingArrangementAction = .revive
+    }
+
+    func cancelArrangementAction() {
+        pendingArrangementId = nil
+        pendingArrangementAction = nil
+    }
+
+    func executeArrangementAction(projectId: UUID) async {
+        guard let id = pendingArrangementId,
+              let action = pendingArrangementAction else { return }
+        pendingArrangementId = nil
+        pendingArrangementAction = nil
+
+        switch action {
+        case .delete:
+            guard let item = arrangements.first(where: { $0.id == id }) else { return }
+            do {
+                try await taskManager.deleteArrangement(item)
+                arrangements.removeAll { $0.id == id }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+
+        case .revive:
+            guard let item = arrangements.first(where: { $0.id == id }) else { return }
+            do {
+                try await taskManager.updateArrangementStatus(item, status: .pending)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     // MARK: - Private

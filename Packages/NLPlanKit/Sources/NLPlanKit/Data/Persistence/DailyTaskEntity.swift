@@ -22,6 +22,7 @@ final class DailyTaskEntity {
     var note: String?
     @Attribute(originalName: "settlementNote") var incompletionReason: String?
     var sourceIdeaId: UUID?
+    var arrangementId: UUID?
     var sourceType: String
     var isSettled: Bool = false
     var settledAt: Date?
@@ -67,6 +68,7 @@ final class DailyTaskEntity {
         note: String? = nil,
         incompletionReason: String? = nil,
         sourceIdeaId: UUID? = nil,
+        arrangementId: UUID? = nil,
         sourceType: String = DailyTaskSourceType.none.rawValue,
         isSettled: Bool = false,
         settledAt: Date? = nil,
@@ -89,6 +91,7 @@ final class DailyTaskEntity {
         self.note = note
         self.incompletionReason = incompletionReason
         self.sourceIdeaId = sourceIdeaId
+        self.arrangementId = arrangementId
         self.sourceType = sourceType
         self.isSettled = isSettled
         self.settledAt = settledAt

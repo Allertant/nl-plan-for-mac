@@ -28,6 +28,7 @@ struct SummaryContainerView: View {
                 let dailyTaskRepo = DailyTaskRepository(modelContext: context)
                 let sessionLogRepo = SessionLogRepository(modelContext: context)
                 let summaryRepo = SummaryRepository(modelContext: context)
+                let arrangementRepo = ProjectArrangementRepository(modelContext: context)
                 let aiService = appState.makeAIService()
 
                 let dayMgr = DayManager(
@@ -35,6 +36,7 @@ struct SummaryContainerView: View {
                     dailyTaskRepo: dailyTaskRepo,
                     summaryRepo: summaryRepo,
                     sessionLogRepo: sessionLogRepo,
+                    arrangementRepo: arrangementRepo,
                     timerEngine: appState.timerEngine,
                     aiService: aiService
                 )
@@ -43,6 +45,7 @@ struct SummaryContainerView: View {
                     dailyTaskRepo: dailyTaskRepo,
                     thoughtRepo: ThoughtRepository(modelContext: context),
                     sessionLogRepo: sessionLogRepo,
+                    arrangementRepo: arrangementRepo,
                     aiService: aiService,
                     timerEngine: appState.timerEngine
                 )

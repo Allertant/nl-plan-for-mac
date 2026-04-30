@@ -82,6 +82,7 @@ private struct HistoryDetailPageView: View {
         let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
         let summaryRepo = SummaryRepository(modelContext: context)
+        let arrangementRepo = ProjectArrangementRepository(modelContext: context)
         let aiService = appState.makeAIService()
 
         let dayMgr = DayManager(
@@ -89,6 +90,7 @@ private struct HistoryDetailPageView: View {
             dailyTaskRepo: dailyTaskRepo,
             summaryRepo: summaryRepo,
             sessionLogRepo: sessionLogRepo,
+            arrangementRepo: arrangementRepo,
             timerEngine: appState.timerEngine,
             aiService: aiService
         )

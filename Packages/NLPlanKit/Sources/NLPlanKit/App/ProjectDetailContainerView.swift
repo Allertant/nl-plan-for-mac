@@ -58,6 +58,11 @@ private struct ProjectDetailPageView: View {
     @State private var newNoteText = ""
     @FocusState private var newNoteFocused: Bool
 
+    // 安排
+    @State private var newArrangementText = ""
+    @State private var newArrangementMinutes: Int = 30
+    @FocusState private var newArrangementFocused: Bool
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -75,22 +80,27 @@ private struct ProjectDetailPageView: View {
                 ProgressView("加载中...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let project = projectDetail {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        summaryCard(project)
-                        descriptionCard(project)
-                        planningBackgroundCard(project)
-                        tasksCard
-                        noteCard
+                if viewModel.pendingArrangementId != nil {
+                    arrangementConfirmPage
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            summaryCard(project)
+                            descriptionCard(project)
+                            planningBackgroundCard(project)
+                            tasksCard
+                            arrangementCard
+                            noteCard
+                        }
+                        .padding(12)
+                        .background(
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { dismissAllEditing() }
+                        )
                     }
-                    .padding(12)
-                    .background(
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture { dismissAllEditing() }
-                    )
+                    .scrollIndicators(.automatic)
                 }
-                .scrollIndicators(.automatic)
             }
         }
         .frame(width: 360, height: 520)
@@ -112,6 +122,7 @@ private struct ProjectDetailPageView: View {
         if isEditingDescription { descriptionFocused = false }
         if isEditingPlanningBackground { planningBackgroundFocused = false }
         newNoteFocused = false
+        newArrangementFocused = false
     }
 
     // MARK: - Data
@@ -121,9 +132,11 @@ private struct ProjectDetailPageView: View {
         async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: ideaId)
         async let settled = viewModel.fetchSettledTasks(sourceIdeaId: ideaId)
         async let projectNotes = viewModel.fetchProjectNotes(ideaId: ideaId)
+        async let projectArrangements = viewModel.fetchArrangements(projectId: ideaId)
         let active = await tasks
         let settledList = await settled
         notes = await projectNotes
+        _ = await projectArrangements
 
         let settledIds = Set(settledList.map(\.id))
         allTasks = active.filter { !settledIds.contains($0.id) } + settledList
@@ -389,6 +402,72 @@ private struct ProjectDetailPageView: View {
         return .orange
     }
 
+    // MARK: - Arrangement
+
+    private var arrangementConfirmPage: some View {
+        let isDelete = viewModel.pendingArrangementAction == .delete
+        return ConfirmActionPage(
+            icon: isDelete ? "trash" : "arrow.uturn.backward",
+            iconTint: isDelete ? .red : .blue,
+            title: viewModel.pendingArrangementTitle ?? "",
+            message: isDelete ? "确认删除该安排？" : "确认重新激活该安排？",
+            confirmLabel: isDelete ? "确认删除" : "确认激活",
+            onCancel: { viewModel.cancelArrangementAction() },
+            onConfirm: { Task { await viewModel.executeArrangementAction(projectId: idea.id) } }
+        )
+    }
+
+    private var arrangementCard: some View {
+        DetailSectionCard(title: "我的安排", systemImage: "calendar.badge.clock", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22), onBackgroundTap: dismissAllEditing) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(viewModel.arrangements, id: \.id) { item in
+                    ArrangementRow(
+                        item: item,
+                        onEdit: { content in
+                            Task { await viewModel.updateArrangementContent(arrangementId: item.id, content: content) }
+                        },
+                        onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
+                        onRevive: { viewModel.requestReviveArrangement(id: item.id) }
+                    )
+                }
+
+                if viewModel.arrangements.isEmpty {
+                    Text("暂无安排").font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
+
+                HStack(spacing: 8) {
+                    TextField("添加安排...", text: $newArrangementText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .lineLimit(1...3)
+                        .focused($newArrangementFocused)
+                    Stepper("\(newArrangementMinutes)分钟", value: $newArrangementMinutes, in: 5...180, step: 5)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Button {
+                        addArrangement()
+                    } label: {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 14)).foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+
+    private func addArrangement() {
+        let text = newArrangementText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        Task {
+            await viewModel.addArrangement(projectId: idea.id, content: text, estimatedMinutes: newArrangementMinutes)
+        }
+        newArrangementText = ""
+        newArrangementMinutes = 30
+    }
+
     private var noteCard: some View {
         DetailSectionCard(title: "笔记", systemImage: "note.text", tint: .orange, background: Color.orange.opacity(0.08), border: Color.orange.opacity(0.22), onBackgroundTap: dismissAllEditing) {
             VStack(alignment: .leading, spacing: 8) {
@@ -532,5 +611,116 @@ private struct ProjectNoteRow: View {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != note.content.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
         onUpdate(trimmed)
+    }
+}
+
+// MARK: - Arrangement Row
+
+private struct ArrangementRow: View {
+    let item: ProjectArrangementEntity
+    let onEdit: (String) -> Void
+    let onDelete: () -> Void
+    let onRevive: () -> Void
+
+    @State private var isEditing = false
+    @State private var draftText = ""
+    @FocusState private var isFocused: Bool
+
+    private var status: ArrangementStatus { item.arrangementStatus }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // 第一行：状态标记 + 内容
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(statusTint)
+                    .padding(.top, 2)
+
+                if isEditing {
+                    TextField("安排内容", text: $draftText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .lineLimit(1...5)
+                        .focused($isFocused)
+                        .onSubmit { isFocused = false }
+                } else {
+                    Text(item.content)
+                        .font(.system(size: 11))
+                        .foregroundStyle(status == .done ? .tertiary : .secondary)
+                        .strikethrough(status == .done)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onTapGesture {
+                            guard status == .pending else { return }
+                            draftText = item.content
+                            isEditing = true
+                            DispatchQueue.main.async { isFocused = true }
+                        }
+                }
+            }
+
+            // 第二行：元数据 + 操作按钮
+            HStack {
+                HStack(spacing: 8) {
+                    Label("\(item.estimatedMinutes)分钟", systemImage: "clock")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                    Text(item.createdAt.shortDateTimeString)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                if status == .done {
+                    Button(action: onRevive) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("复活")
+                }
+
+                if status != .inProgress {
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("删除")
+                }
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .onChange(of: isFocused) { _, focused in
+            if !focused && isEditing { commitEdit() }
+        }
+    }
+
+    private var statusIcon: String {
+        switch status {
+        case .pending: return "circle"
+        case .inProgress: return "circle.fill"
+        case .done: return "checkmark"
+        }
+    }
+
+    private var statusTint: Color {
+        switch status {
+        case .pending: return .secondary
+        case .inProgress: return .blue
+        case .done: return .green
+        }
+    }
+
+    private func commitEdit() {
+        isEditing = false
+        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != item.content.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+        onEdit(trimmed)
     }
 }

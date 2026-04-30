@@ -25,6 +25,7 @@ final class DailyTaskRepository {
         attempted: Bool = false,
         note: String? = nil,
         sourceIdeaId: UUID? = nil,
+        arrangementId: UUID? = nil,
         sourceType: DailyTaskSourceType = .none
     ) throws -> DailyTaskEntity {
         let task = DailyTaskEntity(
@@ -43,6 +44,7 @@ final class DailyTaskRepository {
             attempted: attempted,
             note: note,
             sourceIdeaId: sourceIdeaId,
+            arrangementId: arrangementId,
             sourceType: sourceType.rawValue
         )
         modelContext.insert(task)

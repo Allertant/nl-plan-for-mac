@@ -183,6 +183,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             return TaskRecommendation(
                 taskId: taskId,
                 sourceIdeaId: sourceIdeaId,
+                arrangementId: nil,
                 title: dto.title,
                 category: dto.category,
                 estimatedMinutes: dto.estimatedMinutes,

@@ -73,6 +73,7 @@ struct MainContentView: View {
             dailyTaskRepo: DailyTaskRepository(modelContext: context),
             summaryRepo: SummaryRepository(modelContext: context),
             sessionLogRepo: SessionLogRepository(modelContext: context),
+            arrangementRepo: ProjectArrangementRepository(modelContext: context),
             timerEngine: appState.timerEngine,
             aiService: appState.makeAIService()
         )

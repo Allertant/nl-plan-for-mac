@@ -82,6 +82,7 @@ struct TaskRecommendationInput: Sendable {
     let note: String?
     let projectNotes: [String]
     let elapsedMinutes: Int
+    let arrangementId: UUID?
 }
 
 struct PlanningBackgroundPromptInput: Sendable {
@@ -127,6 +128,7 @@ struct TaskRecommendation: Sendable, Identifiable, Equatable {
     let id = UUID()
     let taskId: UUID?
     let sourceIdeaId: UUID?
+    let arrangementId: UUID?
     let title: String
     let category: String
     let estimatedMinutes: Int

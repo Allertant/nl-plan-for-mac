@@ -9,6 +9,7 @@ final class TaskManager {
     private let dailyTaskRepo: DailyTaskRepository
     private let thoughtRepo: ThoughtRepository
     private let sessionLogRepo: SessionLogRepository
+    private let arrangementRepo: ProjectArrangementRepository
     private let aiService: AIServiceProtocol
     private let timerEngine: TimerEngine
     private let aiExecutionCoordinator = AIExecutionCoordinator()
@@ -21,6 +22,7 @@ final class TaskManager {
         dailyTaskRepo: DailyTaskRepository,
         thoughtRepo: ThoughtRepository,
         sessionLogRepo: SessionLogRepository,
+        arrangementRepo: ProjectArrangementRepository,
         aiService: AIServiceProtocol,
         timerEngine: TimerEngine
     ) {
@@ -28,6 +30,7 @@ final class TaskManager {
         self.dailyTaskRepo = dailyTaskRepo
         self.thoughtRepo = thoughtRepo
         self.sessionLogRepo = sessionLogRepo
+        self.arrangementRepo = arrangementRepo
         self.aiService = aiService
         self.timerEngine = timerEngine
     }
@@ -165,6 +168,7 @@ final class TaskManager {
         priority: TaskPriority = .medium,
         sortOrder: Int = 0,
         sourceIdeaId: UUID? = nil,
+        arrangementId: UUID? = nil,
         recommendationReason: String? = nil
     ) async throws -> DailyTaskEntity {
         let task = try dailyTaskRepo.create(
@@ -177,6 +181,7 @@ final class TaskManager {
             sortOrder: sortOrder,
             date: .now,
             sourceIdeaId: sourceIdeaId,
+            arrangementId: arrangementId,
             sourceType: try dailyTaskSourceType(sourceIdeaId: sourceIdeaId)
         )
 
@@ -198,6 +203,13 @@ final class TaskManager {
         // 暂停计时（如果正在运行）
         if dailyTask.taskStatus == .running {
             try commitRunningTime(dailyTask)
+        }
+
+        // 恢复安排状态为 pending
+        if let arrangementId = dailyTask.arrangementId,
+           let arrangement = try arrangementRepo.fetchById(arrangementId) {
+            arrangement.status = ArrangementStatus.pending.rawValue
+            try arrangementRepo.update(arrangement)
         }
 
         try dailyTaskRepo.deleteById(taskId)
@@ -476,6 +488,49 @@ final class TaskManager {
     /// 获取项目备注列表
     func fetchProjectNotes(ideaId: UUID) async throws -> [ProjectNoteEntity] {
         try ideaRepo.fetchProjectNotes(ideaId: ideaId)
+    }
+
+    // MARK: - 项目安排
+
+    func fetchArrangements(projectId: UUID) async throws -> [ProjectArrangementEntity] {
+        try arrangementRepo.fetchByProject(projectId: projectId)
+    }
+
+    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int) async throws -> ProjectArrangementEntity {
+        let order = try arrangementRepo.nextSortOrder(projectId: projectId)
+        return try arrangementRepo.create(
+            projectId: projectId,
+            content: content,
+            estimatedMinutes: estimatedMinutes,
+            sortOrder: order
+        )
+    }
+
+    func updateArrangement(_ item: ProjectArrangementEntity, content: String? = nil, estimatedMinutes: Int? = nil) async throws {
+        if let content { item.content = content }
+        if let estimatedMinutes { item.estimatedMinutes = estimatedMinutes }
+        try arrangementRepo.update(item)
+    }
+
+    func updateArrangementStatus(_ item: ProjectArrangementEntity, status: ArrangementStatus) async throws {
+        item.status = status.rawValue
+        try arrangementRepo.update(item)
+    }
+
+    func deleteArrangement(_ item: ProjectArrangementEntity) async throws {
+        try arrangementRepo.delete(item)
+    }
+
+    func fetchArrangement(_ id: UUID) async throws -> ProjectArrangementEntity? {
+        try arrangementRepo.fetchById(id)
+    }
+
+    func fetchPendingArrangements(projectId: UUID) async throws -> [ProjectArrangementEntity] {
+        try arrangementRepo.fetchPendingByProject(projectId: projectId)
+    }
+
+    func hasPendingArrangements(projectId: UUID) async throws -> Bool {
+        !(try arrangementRepo.fetchPendingByProject(projectId: projectId)).isEmpty
     }
 
     private func dailyTaskSourceType(sourceIdeaId: UUID?) throws -> DailyTaskSourceType {

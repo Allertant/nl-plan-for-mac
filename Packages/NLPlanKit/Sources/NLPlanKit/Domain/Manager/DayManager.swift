@@ -9,6 +9,7 @@ final class DayManager {
     private let dailyTaskRepo: DailyTaskRepository
     private let summaryRepo: SummaryRepository
     private let sessionLogRepo: SessionLogRepository
+    private let arrangementRepo: ProjectArrangementRepository
     private let timerEngine: TimerEngine
     private let aiService: AIServiceProtocol
     private let aiExecutionCoordinator = AIExecutionCoordinator()
@@ -18,6 +19,7 @@ final class DayManager {
         dailyTaskRepo: DailyTaskRepository,
         summaryRepo: SummaryRepository,
         sessionLogRepo: SessionLogRepository,
+        arrangementRepo: ProjectArrangementRepository,
         timerEngine: TimerEngine,
         aiService: AIServiceProtocol
     ) {
@@ -25,6 +27,7 @@ final class DayManager {
         self.dailyTaskRepo = dailyTaskRepo
         self.summaryRepo = summaryRepo
         self.sessionLogRepo = sessionLogRepo
+        self.arrangementRepo = arrangementRepo
         self.timerEngine = timerEngine
         self.aiService = aiService
     }
@@ -364,6 +367,13 @@ final class DayManager {
             task.actualMinutes = actualMinutes
             task.incompletionReason = note
             try dailyTaskRepo.update(task)
+
+            // 更新关联安排状态为 done
+            if let arrangementId = task.arrangementId,
+               let arrangement = try arrangementRepo.fetchById(arrangementId) {
+                arrangement.status = ArrangementStatus.done.rawValue
+                try arrangementRepo.update(arrangement)
+            }
 
             if let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
                 if task.taskStatus == .done {
