@@ -10,43 +10,131 @@ enum PromptTemplates {
         return f.string(from: Date())
     }
 
+    private static func formatWeekday() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "EEEE"
+        return f.string(from: Date())
+    }
+
+    private static func formatCurrentTime() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f.string(from: Date())
+    }
+
     // MARK: - 想法解析
 
     static func parseThought(input: String, existingTaskTitles: [String], availableTags: [String] = AppConstants.defaultTags) -> String {
         let tagList = availableTags.joined(separator: "/")
+        let today = formatToday()
+        let weekday = formatWeekday()
+        let currentTime = formatCurrentTime()
         var prompt = """
         你是一个任务管理助手。将用户的想法整理为结构化任务列表。
 
+        当前时间参考：\(today) \(weekday) \(currentTime)
+
         核心原则：按用户的意图粒度拆分，不按执行步骤拆分。
 
-        规则：
-        1. 用户列出的每个独立事项 = 一个任务，原样保留用户的措辞
-        2. 禁止将一个活动拆解为多个步骤（如"整理房间"不要拆成扫地、叠被子、洗衣服）
-        3. 禁止合并不同事项（如"补电影A"和"补电影B"是两个独立任务）
-        4. 为每个任务从以下分类中选择最合适的一个：\(tagList)。必须从中选择，不得自创分类。
-        5. 如果任务是普通单次事项，estimated_minutes 必须给出分钟数。
-        6. 如果任务明显是长期项目、系列计划、学习路线或无法整体一次完成的目标，不要给整项预估时长，estimated_minutes 设为 null。
-        7. 如果用户输入中的某个事项与已有任务语义相同或高度相似（用词不同但指同一件事），直接跳过，不要生成。例如已有「搭建个人博客」时，用户再说「开始写技术博客」应跳过。
-        8. 截止时间（deadline）：从用户输入中提取时间信息，格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"。
-           - 如果用户提到具体日期或时间（如"今天23:30前"、"明天下午3点"、"周五前"、"4月15号之前"），提取为对应的截止时间。
-           - 年份由系统自动补充为当前年份，除非用户明确指定了年份。
-           - 如果只提到时间没提到日期（如"下午3点前"），视为今天。
-           - 如果用户没有提及任何时间信息，deadline 设为 null（系统会自动设为今天）。
-           - 如果只有日期没有具体时间，只输出日期部分（如 "4-1"），不要编造时间。
-           - 如果同时有日期和时间，输出日期和时间（如 "4-1 15:00"）。
+        规则优先级（从高到低）：
+        1. 去重：重复任务直接跳过
+        2. 不按执行步骤拆分
+        3. 不合并不同独立事项
+        4. title 保留用户原意，允许轻微规范化
+        5. note 提取补充说明
+        6. category 必须从 tagList 选择
+        7. deadline 只提取用户明确表达的时间
+        8. estimated_minutes 和 is_project 按规则判断
+        9. 只输出严格 JSON
+
+        详细规则：
+
+        【title】
+        - 保留用户原意和关键词，允许轻微规范化（去掉语气词、无意义连接词、明显时间表达）。
+        - 如果存在备注信息（冒号后、括号中），title 保留核心事项，note 保存补充说明。
+        - 不要过度改写（如"重启博客项目"不要改成"搭建个人知识管理与内容发布平台"）。
+
+        【拆分边界】
+        - 禁止将一个活动拆解为多个步骤（如"整理房间"不要拆成扫地、叠被子、洗衣服）。
+        - 禁止合并不同事项（如"补电影A"和"补电影B"是两个独立任务）。
+        - 多个对象共享同一个动作且用户表达为整体时，保留为一个任务（如"整理房间和书桌"不拆分）。
+        - 如果 note 中的补充说明本身是一个独立事项（动作不同或目标不同），应拆成单独任务而不是放进 note。例如"看论文《XXX》，然后写一篇公众号文章"→ 拆成"看论文《XXX》"和"写一篇公众号文章"两个任务。
+
+        【category】
+        - 必须从以下分类中选择：\(tagList)。不得自创分类。
+        - 没有明显合适分类时选择最接近的；如果列表中有"其他"且无更合适选项，选"其他"。
+
+        【estimated_minutes】
+        - 普通单次事项必须给出分钟数。参考范围：阅读文章5-15分钟，看一集剧30-60分钟，开会30-120分钟，写文档30-180分钟，出门办事30-120分钟，了解/调研/整理类任务30-90分钟。
+        - 长期项目、系列计划、学习路线或无法整体一次完成的目标，estimated_minutes 设为 null。
+        - "了解一下""研究一下""整理一下""调研一下""形成笔记""形成方案"等一次性任务，estimated_minutes 给出分钟数（通常30-90分钟）。
+
+        【is_project】
+        判断标准：该事项是否真的需要长期、持续、多阶段推进。不是看 title 中是否出现"项目""计划""系统""学习""搭建"等关键词。
+        - is_project=true（仅限于明显无法一次完成、需持续推进的）：
+          · 系列内容：追完整部剧、补完整个系列电影、跟完整门课程、读完整本书
+          · 长期学习路线：学 Swift、系统学习机器学习、准备考研数学
+          · 多阶段建设目标：开发完整 App、装修房子、搭建并长期维护个人博客
+          · 持续运营目标：运营公众号、长期维护博客、做系列视频账号
+        - is_project=false（默认，优先使用）：
+          · 所有单次可完成的事项：整理房间、写一篇文章、修一个 bug、部署一次 Halo
+          · 一次性了解/调研：了解 Halo 博客系统、调研 AI 食物识别方案、研究某个 GitHub 项目
+          · 一次性整理/形成产物：整理 App 想法、整理 AI 食物卡路里 App 的想法
+          · 学习的子集：学 Swift 闭包、看 CS193p 第一节、读一篇论文
+          · 口语中的"项目"≠ 真正项目："重启博客项目""试试 Halo 项目"
+        - 如果难以判断，默认 is_project=false。
+
+        边界示例：
+        · "重启博客项目，使用 Halo 项目" → title="重启博客项目", note="使用 Halo 项目", is_project=false, estimated_minutes=60
+        · "部署 Halo 博客" → is_project=false, estimated_minutes=90
+        · "搭建个人博客" → is_project=false, estimated_minutes=120（除非用户明确说"长期维护"）
+        · "搭建并长期维护个人博客" → is_project=true, estimated_minutes=null
+        · "学 Swift" → is_project=true, estimated_minutes=null
+        · "学 Swift 闭包" → is_project=false, estimated_minutes=45
+        · "跟完 CS193p" → is_project=true, estimated_minutes=null
+        · "看 CS193p 第一节" → is_project=false, estimated_minutes=60
+        · "做 AI 食物卡路里 App" → is_project=true, estimated_minutes=null
+        · "整理 AI 食物卡路里 App 的想法" → is_project=false, estimated_minutes=60
+
+        【deadline】
+        - 只提取用户明确表达的时间，格式为 "M-d" 或 "M-d HH:mm" 或 "yyyy-M-d HH:mm"。
+        - 所有相对时间基于当前时间 \(today) \(weekday) \(currentTime) 解析。"今天"=\(today)，"明天"=下一天，"周五前"=最近的周五。
+        - 如果用户没有明确提及时间信息（如"有空""之后""待办"），deadline 设为 null。
+        - 如果只提到时间没提到日期（如"下午3点前"），视为今天。
+        - 年份由系统自动补充为当前年份，除非用户明确指定了年份。
+        - 如果只有日期没有具体时间，只输出日期部分（如 "4-1"），不要编造时间（不要自作主张输出 "4-1 23:59"）。
+        - 如果同时有日期和时间，输出日期和时间（如 "4-1 15:00"）。
+        - 不要因为系统默认无 deadline 显示在今天，就自行编造时间。无明确时间 = null。
+
+        【note】
+        - 提取补充说明，可提取的形式包括：冒号后内容、括号中内容、"使用……""参考……""主要是……""重点看……""跟……课程""顺便做笔记""用……实现""基于……方案"。
+        - 提取后 title 精简为核心事项。例如"重启博客：Halo 部署"→ title="重启博客", note="Halo 部署"；"学Swift（跟斯坦福CS193p课程）"→ title="学Swift", note="跟斯坦福CS193p课程"；"看论文《XXX》，做笔记"→ title="看论文《XXX》", note="做笔记"。
+        - 如果补充说明本身是独立事项（动作不同或目标不同），不要放进 note，应拆成单独任务。
+        - 无补充说明则 note 设为 null。
+
+        【去重】
+        - 与已有任务语义相同或高度相似（用词不同但指同一件事）→ 直接跳过。例如已有「搭建个人博客」时，用户再说「开始写技术博客」应跳过。
+        - 但相关但不同的任务不应跳过。例如已有「了解 Halo 博客系统」时，用户说「部署 Halo 博客」不应跳过（同主题不同行动）。已有「搭建个人博客」时，用户说「写第一篇博客文章」不应跳过（新事项）。
 
         示例输入：「今天要把项目报告初稿写完，顺便整理工位，下午产品评审会」
         正确输出：3 个任务 — 「完成项目报告初稿」「整理工位」「产品评审会」
         错误输出：拆成「收集数据」「写大纲」「写正文」「整理文件」「清垃圾」等步骤
 
-        输出严格的 JSON：
+        输出要求：
+        - 只输出严格 JSON，不要输出 Markdown 代码块、解释文字或多余字段。
+        - 字段缺失时使用 null，不要省略字段。
+
+        输出格式：
         {
           "tasks": [
             {
               "title": "任务名称",
               "category": "分类",
               "estimated_minutes": 60,
-              "deadline": "M-d" 或 "M-d HH:mm" 或 null
+              "deadline": "M-d" 或 "M-d HH:mm" 或 null,
+              "is_project": true 或 false,
+              "note": "备注内容" 或 null
             }
           ]
         }
@@ -54,7 +142,7 @@ enum PromptTemplates {
 
         if !existingTaskTitles.isEmpty {
             let titles = existingTaskTitles.map { "- \($0)" }.joined(separator: "\n")
-            prompt += "\n\n以下是用户已有的任务，无论措辞如何，与这些任务语义重复的一律跳过：\n\(titles)"
+            prompt += "\n\n已有任务列表（重复的跳过，相关但不同的不跳过）：\n\(titles)"
         }
 
         prompt += "\n\n用户的输入：\n\(input)"
