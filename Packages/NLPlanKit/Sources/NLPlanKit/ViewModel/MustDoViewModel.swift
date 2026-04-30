@@ -66,21 +66,21 @@ final class MustDoViewModel {
 
     enum RecommendationStrategy: String, CaseIterable, Identifiable {
         case quick = "quick"
-        case comprehensive = "comprehensive"
+        case suggest = "suggest"
 
         var id: String { rawValue }
 
         var displayName: String {
             switch self {
             case .quick: return "快速推荐"
-            case .comprehensive: return "综合推荐"
+            case .suggest: return "项目提示"
             }
         }
 
         var shortName: String {
             switch self {
             case .quick: return "快速"
-            case .comprehensive: return "综合"
+            case .suggest: return "提示"
             }
         }
     }
@@ -130,6 +130,28 @@ final class MustDoViewModel {
     var allRecommendationsAccepted: Bool {
         guard let recs = currentRecommendations else { return false }
         return recs.recommendations.allSatisfy { acceptedRecommendationIds.contains($0.id) }
+    }
+
+    /// 提示模式是否可用（存在无安排的项目）
+    var canSuggest: Bool {
+        get { _canSuggest }
+        set { _canSuggest = newValue }
+    }
+    private var _canSuggest: Bool = false
+
+    /// 更新 canSuggest 状态
+    func updateCanSuggest(ideaPoolIdeas: [IdeaEntity]) {
+        let projectIdeas = ideaPoolIdeas.filter {
+            $0.isProject && $0.ideaStatus != .inProgress && $0.ideaStatus != .completed && $0.ideaStatus != .archived
+        }
+        Task {
+            var hasProjectWithoutArrangements = false
+            for idea in projectIdeas where !hasProjectWithoutArrangements {
+                let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
+                if arrangements.isEmpty { hasProjectWithoutArrangements = true }
+            }
+            canSuggest = hasProjectWithoutArrangements
+        }
     }
 
     private let taskManager: TaskManager
@@ -296,118 +318,227 @@ final class MustDoViewModel {
             guard !Task.isCancelled else { return }
 
             recommendationState = .loading
-            let recommendationCandidates: [IdeaEntity]
-            switch strategy {
-            case .quick:
-                recommendationCandidates = allCandidates
-            case .comprehensive:
-                do {
-                    recommendationCandidates = try await prepareComprehensiveCandidates(from: allCandidates)
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    recommendationState = .error(error.localizedDescription)
-                    return
+
+            do {
+                switch strategy {
+                case .quick:
+                    try await runQuickRecommendation(
+                        allCandidates: allCandidates,
+                        currentTasks: currentTasks,
+                        remainingHours: remainingHours,
+                        extraContext: extraContext
+                    )
+                case .suggest:
+                    try await runSuggestRecommendation(
+                        allCandidates: allCandidates,
+                        currentTasks: currentTasks,
+                        remainingHours: remainingHours
+                    )
                 }
+            } catch is CancellationError {
+                // Silently ignore
+            } catch {
+                guard !Task.isCancelled else { return }
+                recommendationState = .error(error.localizedDescription)
             }
-            guard !Task.isCancelled else { return }
+        }
+    }
 
-            var ideaInputs: [TaskRecommendationInput] = []
-            var arrangementProjectMap: [UUID: UUID] = [:] // arrangementId → projectId
-            for idea in recommendationCandidates {
-                let projectNotes: [String]
-                if idea.isProject {
-                    projectNotes = (try? await taskManager.fetchProjectNotes(ideaId: idea.id))?.map(\.content) ?? []
-                } else {
-                    projectNotes = []
-                }
+    // MARK: - Quick Recommendation
 
-                // 项目有 pending 安排时，注入安排替代项目本身
-                if idea.isProject {
-                    let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
-                    if arrangements.isEmpty {
-                        // 快速模式跳过无安排的项目
-                        if strategy == .quick { continue }
-                        // 综合模式：项目本身作为候选
-                        ideaInputs.append(TaskRecommendationInput(
-                            id: idea.id,
-                            title: idea.title,
-                            category: idea.category,
-                            estimatedMinutes: idea.estimatedMinutes,
-                            attempted: idea.attempted,
-                            status: idea.status,
-                            isProject: idea.isProject,
-                            projectDescription: idea.projectDescription,
-                            planningBackground: idea.planningBackground,
-                            projectRecommendationSummary: idea.projectRecommendationSummary,
-                            deadlineDisplay: idea.deadlineDisplayString,
-                            note: idea.note,
-                            projectNotes: projectNotes,
-                            elapsedMinutes: 0,
-                            arrangementId: nil,
-                            projectTitle: nil
-                        ))
-                    } else {
-                        for arrangement in arrangements {
-                            arrangementProjectMap[arrangement.id] = idea.id
-                            ideaInputs.append(TaskRecommendationInput(
-                                id: arrangement.id,
-                                title: arrangement.content,
-                                category: idea.category,
-                                estimatedMinutes: arrangement.estimatedMinutes,
-                                attempted: false,
-                                status: "pending",
-                                isProject: false,
-                                projectDescription: idea.projectDescription,
-                                planningBackground: idea.planningBackground,
-                                projectRecommendationSummary: nil,
-                                deadlineDisplay: arrangement.deadline.map { $0.deadlineDisplayString },
-                                note: nil,
-                                projectNotes: projectNotes,
-                                elapsedMinutes: 0,
-                                arrangementId: arrangement.id,
-                                projectTitle: idea.title
-                            ))
-                        }
-                    }
-                } else {
+    private func runQuickRecommendation(
+        allCandidates: [IdeaEntity],
+        currentTasks: [DailyTaskEntity],
+        remainingHours: Double,
+        extraContext: String?
+    ) async throws {
+        var ideaInputs: [TaskRecommendationInput] = []
+        var arrangementProjectMap: [UUID: UUID] = [:]
+
+        for idea in allCandidates {
+            let projectNotes: [String]
+            if idea.isProject {
+                projectNotes = (try? await taskManager.fetchProjectNotes(ideaId: idea.id))?.map(\.content) ?? []
+            } else {
+                projectNotes = []
+            }
+
+            if idea.isProject {
+                let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
+                if arrangements.isEmpty { continue }
+                for arrangement in arrangements {
+                    arrangementProjectMap[arrangement.id] = idea.id
                     ideaInputs.append(TaskRecommendationInput(
-                        id: idea.id,
-                        title: idea.title,
+                        id: arrangement.id,
+                        title: arrangement.content,
                         category: idea.category,
-                        estimatedMinutes: idea.estimatedMinutes,
-                        attempted: idea.attempted,
-                        status: idea.status,
-                        isProject: idea.isProject,
+                        estimatedMinutes: arrangement.estimatedMinutes,
+                        attempted: false,
+                        status: "pending",
+                        isProject: false,
                         projectDescription: idea.projectDescription,
                         planningBackground: idea.planningBackground,
-                        projectRecommendationSummary: idea.projectRecommendationSummary,
-                        deadlineDisplay: idea.deadlineDisplayString,
-                        note: idea.note,
+                        projectRecommendationSummary: nil,
+                        deadlineDisplay: arrangement.deadline.map { $0.deadlineDisplayString },
+                        note: nil,
                         projectNotes: projectNotes,
                         elapsedMinutes: 0,
-                        arrangementId: nil,
-                        projectTitle: nil
+                        arrangementId: arrangement.id,
+                        projectTitle: idea.title
                     ))
                 }
+            } else {
+                ideaInputs.append(TaskRecommendationInput(
+                    id: idea.id,
+                    title: idea.title,
+                    category: idea.category,
+                    estimatedMinutes: idea.estimatedMinutes,
+                    attempted: idea.attempted,
+                    status: idea.status,
+                    isProject: idea.isProject,
+                    projectDescription: idea.projectDescription,
+                    planningBackground: idea.planningBackground,
+                    projectRecommendationSummary: idea.projectRecommendationSummary,
+                    deadlineDisplay: idea.deadlineDisplayString,
+                    note: idea.note,
+                    projectNotes: projectNotes,
+                    elapsedMinutes: 0,
+                    arrangementId: nil,
+                    projectTitle: nil
+                ))
+            }
+        }
+        guard !Task.isCancelled else { return }
+
+        let mustDoInputs = buildMustDoInputs(currentTasks)
+        let aiService = await makeAIService()
+        let result = try await aiExecutionCoordinator.run {
+            try await aiService.recommendTasks(
+                ideaPoolTasks: ideaInputs,
+                mustDoTasks: mustDoInputs,
+                remainingHours: remainingHours,
+                strategy: .quick,
+                extraContext: extraContext
+            )
+        }
+        guard !Task.isCancelled else { return }
+        accumulateTokenUsage(aiService)
+
+        let arrangementInputIds = Set(ideaInputs.compactMap { $0.arrangementId })
+        let ideaIds = Set(allCandidates.map { $0.id })
+        let validRecs = mapRecommendations(result, ideaIds: ideaIds, arrangementInputIds: arrangementInputIds, arrangementProjectMap: arrangementProjectMap)
+        let filteredResult = RecommendationResult(recommendations: validRecs, overallReason: result.overallReason)
+        assignPriorities(validRecs)
+        recommendationState = .loaded(filteredResult)
+    }
+
+    // MARK: - Suggest Recommendation (Two-Pass)
+
+    private func runSuggestRecommendation(
+        allCandidates: [IdeaEntity],
+        currentTasks: [DailyTaskEntity],
+        remainingHours: Double
+    ) async throws {
+        // 筛选无安排的项目
+        var projectCandidates: [IdeaEntity] = []
+        for idea in allCandidates where idea.isProject {
+            let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
+            if arrangements.isEmpty {
+                projectCandidates.append(idea)
+            }
+        }
+        guard !Task.isCancelled else { return }
+
+        if projectCandidates.isEmpty {
+            recommendationState = .error("当前没有需要 AI 提示的项目")
+            return
+        }
+
+        // 第一轮：轻量筛选
+        let selectionInputs = projectCandidates.map { idea in
+            ProjectSelectionInput(
+                ideaId: idea.id,
+                title: idea.title,
+                category: idea.category,
+                progress: idea.projectProgress,
+                recommendationSummary: idea.projectRecommendationSummary,
+                deadlineDisplay: nil
+            )
+        }
+
+        let aiService = await makeAIService()
+        let selectionResult = try await aiExecutionCoordinator.run {
+            try await aiService.selectProjects(inputs: selectionInputs, remainingHours: remainingHours)
+        }
+        guard !Task.isCancelled else { return }
+        accumulateTokenUsage(aiService)
+
+        let selectedIds = Set(selectionResult.items.map(\.ideaId))
+        let selectedProjects = projectCandidates.filter { selectedIds.contains($0.id) }
+        guard !selectedProjects.isEmpty else {
+            recommendationState = .loaded(RecommendationResult(recommendations: [], overallReason: selectionResult.overallReason))
+            return
+        }
+
+        // 第二轮：为选中项目构建详细信息并生成切片
+        var projectInputs: [TaskRecommendationInput] = []
+        var allArrangementInputs: [TaskRecommendationInput] = []
+        var allSettledInputs: [TaskRecommendationInput] = []
+
+        for project in selectedProjects {
+            let projectNotes = (try? await taskManager.fetchProjectNotes(ideaId: project.id))?.map(\.content) ?? []
+            projectInputs.append(TaskRecommendationInput(
+                id: project.id,
+                title: project.title,
+                category: project.category,
+                estimatedMinutes: project.estimatedMinutes,
+                attempted: project.attempted,
+                status: project.status,
+                isProject: project.isProject,
+                projectDescription: project.projectDescription,
+                planningBackground: project.planningBackground,
+                projectRecommendationSummary: nil,
+                deadlineDisplay: project.deadlineDisplayString,
+                note: project.note,
+                projectNotes: projectNotes,
+                elapsedMinutes: 0,
+                arrangementId: nil,
+                projectTitle: nil
+            ))
+
+            // 安排（未完成的）
+            let arrangements = (try? await taskManager.fetchArrangements(projectId: project.id)) ?? []
+            for arr in arrangements where arr.arrangementStatus != .done {
+                allArrangementInputs.append(TaskRecommendationInput(
+                    id: arr.id,
+                    title: arr.content,
+                    category: project.category,
+                    estimatedMinutes: arr.estimatedMinutes,
+                    attempted: false,
+                    status: arr.arrangementStatus == .inProgress ? "进行中" : "pending",
+                    isProject: false,
+                    projectDescription: nil,
+                    planningBackground: nil,
+                    projectRecommendationSummary: nil,
+                    deadlineDisplay: arr.deadline.map { $0.deadlineDisplayString },
+                    note: nil,
+                    projectNotes: [],
+                    elapsedMinutes: 0,
+                    arrangementId: arr.id,
+                    projectTitle: nil
+                ))
             }
 
-            let mustDoInputs = currentTasks.map { task in
-                let elapsed = elapsedSecondsCache[task.id].map { $0 / 60 } ?? 0
-                let statusWithElapsed: String
-                if task.taskStatus == .running || task.taskStatus == .paused {
-                    statusWithElapsed = "\(task.status)(已用\(elapsed)分钟)"
-                } else if task.taskStatus == .done {
-                    statusWithElapsed = "已完成(实际\(task.actualMinutes ?? elapsed)分钟)"
-                } else {
-                    statusWithElapsed = task.status
-                }
-                return TaskRecommendationInput(
+            // 历史记录
+            let settled = (try? await taskManager.fetchSettledTasks(sourceIdeaId: project.id)) ?? []
+            for task in settled {
+                allSettledInputs.append(TaskRecommendationInput(
                     id: task.id,
                     title: task.title,
                     category: task.category,
                     estimatedMinutes: task.estimatedMinutes,
-                    attempted: task.attempted,
-                    status: statusWithElapsed,
+                    attempted: false,
+                    status: task.taskStatus == .done ? "已完成" : "未完成",
                     isProject: false,
                     projectDescription: nil,
                     planningBackground: nil,
@@ -415,80 +546,116 @@ final class MustDoViewModel {
                     deadlineDisplay: nil,
                     note: nil,
                     projectNotes: [],
-                    elapsedMinutes: elapsed,
+                    elapsedMinutes: 0,
                     arrangementId: nil,
                     projectTitle: nil
-                )
+                ))
             }
+        }
+        guard !Task.isCancelled else { return }
 
-            do {
-                let aiService = await makeAIService()
-                let result = try await aiExecutionCoordinator.run {
-                    try await aiService.recommendTasks(
-                    ideaPoolTasks: ideaInputs,
-                    mustDoTasks: mustDoInputs,
-                    remainingHours: remainingHours,
-                    strategy: strategy,
-                    extraContext: extraContext
+        let mustDoInputs = buildMustDoInputs(currentTasks)
+        let sliceResult = try await aiExecutionCoordinator.run {
+            try await aiService.generateProjectSlices(
+                projects: projectInputs,
+                mustDoTasks: mustDoInputs,
+                arrangements: allArrangementInputs,
+                settledTasks: allSettledInputs,
+                remainingHours: remainingHours
+            )
+        }
+        guard !Task.isCancelled else { return }
+        accumulateTokenUsage(aiService)
+
+        let validRecs = sliceResult.recommendations.filter { rec in
+            rec.sourceIdeaId != nil && selectedIds.contains(rec.sourceIdeaId!)
+        }
+        let filteredResult = RecommendationResult(recommendations: validRecs, overallReason: sliceResult.overallReason)
+        assignPriorities(validRecs)
+        recommendationState = .loaded(filteredResult)
+    }
+
+    // MARK: - Recommendation Helpers
+
+    private func buildMustDoInputs(_ currentTasks: [DailyTaskEntity]) -> [TaskRecommendationInput] {
+        currentTasks.map { task in
+            let elapsed = elapsedSecondsCache[task.id].map { $0 / 60 } ?? 0
+            let statusWithElapsed: String
+            if task.taskStatus == .running || task.taskStatus == .paused {
+                statusWithElapsed = "\(task.status)(已用\(elapsed)分钟)"
+            } else if task.taskStatus == .done {
+                statusWithElapsed = "已完成(实际\(task.actualMinutes ?? elapsed)分钟)"
+            } else {
+                statusWithElapsed = task.status
+            }
+            return TaskRecommendationInput(
+                id: task.id,
+                title: task.title,
+                category: task.category,
+                estimatedMinutes: task.estimatedMinutes,
+                attempted: task.attempted,
+                status: statusWithElapsed,
+                isProject: false,
+                projectDescription: nil,
+                planningBackground: nil,
+                projectRecommendationSummary: nil,
+                deadlineDisplay: nil,
+                note: nil,
+                projectNotes: [],
+                elapsedMinutes: elapsed,
+                arrangementId: nil,
+                projectTitle: nil
+            )
+        }
+    }
+
+    private func mapRecommendations(
+        _ result: RecommendationResult,
+        ideaIds: Set<UUID>,
+        arrangementInputIds: Set<UUID>,
+        arrangementProjectMap: [UUID: UUID]
+    ) -> [TaskRecommendation] {
+        result.recommendations.compactMap { recommendation -> TaskRecommendation? in
+            if let taskId = recommendation.taskId {
+                if ideaIds.contains(taskId) {
+                    return recommendation
+                }
+                if arrangementInputIds.contains(taskId),
+                   let projectId = arrangementProjectMap[taskId] {
+                    return TaskRecommendation(
+                        taskId: nil,
+                        sourceIdeaId: recommendation.sourceIdeaId ?? projectId,
+                        arrangementId: taskId,
+                        title: recommendation.title,
+                        category: recommendation.category,
+                        estimatedMinutes: recommendation.estimatedMinutes,
+                        reason: recommendation.reason
                     )
                 }
-                guard !Task.isCancelled else { return }
-
-                // 累计 token（推荐调用）
-                if let usage = aiService.lastTokenUsage {
-                    cumulativeTokenInput += usage.inputTokens
-                    cumulativeTokenOutput += usage.outputTokens
-                }
-
-                // 构建安排输入 ID 集合
-                let arrangementInputIds = Set(ideaInputs.compactMap { $0.arrangementId })
-
-                let ideaIds = Set(recommendationCandidates.map { $0.id })
-                let validRecs = result.recommendations.compactMap { recommendation -> TaskRecommendation? in
-                    if let taskId = recommendation.taskId {
-                        if ideaIds.contains(taskId) {
-                            return recommendation
-                        }
-                        if arrangementInputIds.contains(taskId),
-                           let projectId = arrangementProjectMap[taskId] {
-                            return TaskRecommendation(
-                                taskId: nil,
-                                sourceIdeaId: recommendation.sourceIdeaId ?? projectId,
-                                arrangementId: taskId,
-                                title: recommendation.title,
-                                category: recommendation.category,
-                                estimatedMinutes: recommendation.estimatedMinutes,
-                                reason: recommendation.reason
-                            )
-                        }
-                    }
-                    if let sourceIdeaId = recommendation.sourceIdeaId {
-                        return recommendation
-                    }
-                    return nil
-                }
-                let filteredResult = RecommendationResult(
-                    recommendations: validRecs,
-                    overallReason: result.overallReason
-                )
-
-                for (index, rec) in validRecs.enumerated() {
-                    let priority: TaskPriority
-                    switch index {
-                    case 0: priority = .high
-                    case 1: priority = .medium
-                    default: priority = .low
-                    }
-                    selectedPriorities[rec.id] = priority
-                }
-
-                recommendationState = .loaded(filteredResult)
-            } catch is CancellationError {
-                // Silently ignore
-            } catch {
-                guard !Task.isCancelled else { return }
-                recommendationState = .error(error.localizedDescription)
             }
+            if let sourceIdeaId = recommendation.sourceIdeaId {
+                return recommendation
+            }
+            return nil
+        }
+    }
+
+    private func assignPriorities(_ recs: [TaskRecommendation]) {
+        for (index, rec) in recs.enumerated() {
+            let priority: TaskPriority
+            switch index {
+            case 0: priority = .high
+            case 1: priority = .medium
+            default: priority = .low
+            }
+            selectedPriorities[rec.id] = priority
+        }
+    }
+
+    private func accumulateTokenUsage(_ aiService: AIServiceProtocol) {
+        if let usage = aiService.lastTokenUsage {
+            cumulativeTokenInput += usage.inputTokens
+            cumulativeTokenOutput += usage.outputTokens
         }
     }
 

@@ -77,4 +77,19 @@ protocol AIServiceProtocol: Sendable {
     func generatePlanningBackgroundPrompt(
         input: PlanningBackgroundPromptInput
     ) async throws -> PlanningBackgroundPromptResult
+
+    /// 项目提示第一轮：从候选项目中选出今天最值得推进的
+    func selectProjects(
+        inputs: [ProjectSelectionInput],
+        remainingHours: Double
+    ) async throws -> ProjectSelectionResult
+
+    /// 项目提示第二轮：为选中项目生成具体的切片任务
+    func generateProjectSlices(
+        projects: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        arrangements: [TaskRecommendationInput],
+        settledTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) async throws -> RecommendationResult
 }

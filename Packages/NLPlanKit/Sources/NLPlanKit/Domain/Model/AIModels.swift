@@ -86,6 +86,29 @@ struct TaskRecommendationInput: Sendable {
     let projectTitle: String?
 }
 
+/// 第一轮项目筛选输入（轻量）
+struct ProjectSelectionInput: Sendable {
+    let ideaId: UUID
+    let title: String
+    let category: String
+    let progress: Double?
+    let recommendationSummary: String?
+    let deadlineDisplay: String?
+}
+
+/// 第一轮筛选结果（单条）
+struct ProjectSelectionItem: Sendable, Identifiable {
+    let id = UUID()
+    let ideaId: UUID
+    let reason: String
+}
+
+/// 第一轮筛选结果（整体）
+struct ProjectSelectionResult: Sendable {
+    let items: [ProjectSelectionItem]
+    let overallReason: String
+}
+
 struct PlanningBackgroundPromptInput: Sendable {
     let title: String
     let category: String

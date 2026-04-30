@@ -3,6 +3,8 @@ import Foundation
 /// Prompt 模板管理
 enum PromptTemplates {
 
+    // MARK: - 日期格式化
+
     private static func formatToday() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
@@ -436,9 +438,9 @@ enum PromptTemplates {
         let strategyHint: String
         switch strategy {
         case .quick:
-            strategyHint = "本轮是快速推荐模式，目标是优先清理想法池并快速形成完成感。默认优先考虑普通想法而非项目，倾向选择明确、低阻力、容易完成的事项。"
-        case .comprehensive:
-            strategyHint = "本轮是综合推荐模式，目标是在普通想法和项目之间综合权衡今天最值得推进的内容，不偏袒普通想法，也不默认偏袒项目。"
+            strategyHint = "本轮是快速推荐模式，目标是优先清理想法池并快速形成完成感。倾向选择明确、低阻力、容易完成的事项。"
+        case .suggest:
+            strategyHint = ""
         }
 
         let extraSection: String
@@ -788,6 +790,137 @@ enum PromptTemplates {
             "deviation_rate": \(originalInput.deviationRate)
           },
           "suggestion": "明日建议"
+        }
+        """
+    }
+
+    // MARK: - 项目提示（第一轮筛选）
+
+    static func selectProjects(inputs: [ProjectSelectionInput], remainingHours: Double) -> String {
+        let projectList = inputs.enumerated().map { i, p in
+            let progressText = p.progress.map { "\(Int($0))%" } ?? "未知"
+            let summaryText = p.recommendationSummary.map { " - \($0)" } ?? ""
+            let deadlineText = p.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
+            return "\(i + 1). [idea_id: \(p.ideaId.uuidString)] \(p.title) - \(p.category) - 进度:\(progressText)\(summaryText)\(deadlineText)"
+        }.joined(separator: "\n")
+
+        return """
+        你是一个任务管理助手。请从以下项目中选出 1-2 个今天最值得推进的项目。
+
+        ## 当前时间
+        今天是 \(formatToday())，剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
+
+        ## 候选项目
+        \(projectList)
+
+        ## 要求
+        选出 1-2 个今天最值得推进的项目，考虑：
+        1. 项目进度较低的优先（更需要推进）
+        2. 有近期截止时间的优先
+        3. 推荐状态摘要中提到的下一步方向是否适合今天执行
+        4. 如果没有合适的项目，返回空列表并说明理由
+
+        输出要求：只输出严格 JSON，不要输出 Markdown 代码块、解释文字或多余字段。
+        {
+          "items": [
+            { "idea_id": "项目的 UUID", "reason": "为什么今天适合推进这个项目" }
+          ],
+          "overall_reason": "整体选择说明"
+        }
+        """
+    }
+
+    // MARK: - 项目提示（第二轮生成）
+
+    static func generateProjectSlices(
+        projects: [TaskRecommendationInput],
+        mustDoTasks: [TaskRecommendationInput],
+        arrangements: [TaskRecommendationInput],
+        settledTasks: [TaskRecommendationInput],
+        remainingHours: Double
+    ) -> String {
+        let projectList = projects.map { p in
+            let durationText = p.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
+            var details = "[项目] \(p.title) - \(durationText) - \(p.category)"
+            if let desc = p.projectDescription, !desc.isEmpty {
+                details += "\n   项目描述：\(desc)"
+            }
+            if let bg = p.planningBackground, !bg.isEmpty {
+                details += "\n   规划背景：\(bg)"
+            }
+            if !p.projectNotes.isEmpty {
+                details += "\n   项目备注：" + p.projectNotes.joined(separator: "；")
+            }
+            return details
+        }.joined(separator: "\n")
+
+        let mustDoList = mustDoTasks.enumerated().map { i, t in
+            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status)"
+        }.joined(separator: "\n")
+
+        let arrangementList = arrangements.isEmpty ? "（无）" : arrangements.enumerated().map { i, a in
+            "\(i + 1). \(a.title) - \(a.estimatedMinutes ?? 0)分钟"
+        }.joined(separator: "\n")
+
+        let settledList = settledTasks.isEmpty ? "（无）" : settledTasks.enumerated().map { i, s in
+            "\(i + 1). \(s.title) - \(s.status)"
+        }.joined(separator: "\n")
+
+        let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
+            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
+        }
+        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
+
+        return """
+        你是一个任务管理助手。请为以下项目生成今天可执行的具体切片任务。
+
+        ## 当前时间
+        今天是 \(formatToday())，剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
+
+        ## 待切片项目
+        \(projectList)
+
+        ## 今日必做项（已有）
+        \(mustDoTasks.isEmpty ? "（无）" : mustDoList)
+
+        必做项预计总时长：\(mustDoTotalMinutes) 分钟
+
+        ## 项目已有安排（未完成）
+        \(arrangementList)
+
+        ## 项目历史完成记录
+        \(settledList)
+
+        ## 剩余可用空余时间
+        约 \(String(format: "%.1f", freeHours)) 小时
+
+        ## 要求
+        为每个项目生成 1 个今天可执行的切片任务，考虑：
+        1. 切片应在剩余空余时间内可完成（通常 30-120 分钟）
+        2. 参考历史完成记录，避免重复已完成的工作
+        3. 参考已有安排，不与安排冲突
+        4. 参考项目描述和规划背景，选择当前阶段最合适的下一步
+        5. 推荐标题格式为"精简项目名: 切片内容"（如「搭建博客: 调研静态站点生成工具」）
+        6. 如果没有合适的时间或项目状态不适合今天推进，返回空列表
+
+        reason 应写清楚：
+        - 为什么这个切片适合今天
+        - 项目当前处于什么阶段
+        - 这个切片对项目推进的价值
+
+        输出要求：只输出严格 JSON，不要输出 Markdown 代码块、解释文字或多余字段。
+        {
+          "recommendations": [
+            {
+              "task_id": null,
+              "source_idea_id": "来源项目 UUID",
+              "title": "精简项目名: 切片内容",
+              "category": "分类",
+              "estimated_minutes": 60,
+              "reason": "推荐理由"
+            }
+          ],
+          "overall_reason": "整体推荐说明"
         }
         """
     }

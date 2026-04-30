@@ -244,10 +244,19 @@ private struct AIRecommendFloatingButton: View {
                 .buttonStyle(.plain)
             }
         }
+        .onChange(of: ideaPoolIdeas.map(\.id)) {
+            updateCanSuggest()
+        }
+        .task { updateCanSuggest() }
+    }
+
+    private func updateCanSuggest() {
+        viewModel.updateCanSuggest(ideaPoolIdeas: ideaPoolIdeas)
     }
 
     private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy) -> some View {
-        Button {
+        let isDisabled = strategy == .suggest && !viewModel.canSuggest
+        return Button {
             let context = extraContext.trimmingCharacters(in: .whitespacesAndNewlines)
             viewModel.recommendationStrategy = strategy
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -263,14 +272,16 @@ private struct AIRecommendFloatingButton: View {
         } label: {
             Text(strategy.shortName)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundColor(isDisabled ? Color(nsColor: .disabledControlTextColor) : .white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.accentColor)
+                .background(isDisabled ? Color(nsColor: .disabledControlTextColor).opacity(0.2) : Color.accentColor)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+        .disabled(isDisabled)
+        .help(isDisabled ? "当前没有需要 AI 提示的项目" : "")
+        .shadow(color: .black.opacity(isDisabled ? 0 : 0.15), radius: 3, x: 0, y: 2)
         .transition(.scale(scale: 0.5).combined(with: .opacity))
     }
 }

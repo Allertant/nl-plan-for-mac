@@ -193,3 +193,25 @@ struct CleanupItemDTO: Decodable {
         case reason
     }
 }
+
+// MARK: - Project Selection Response (from AI JSON)
+
+struct ProjectSelectionResponse: Decodable {
+    let items: [ProjectSelectionDTO]
+    let overallReason: String
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case overallReason = "overall_reason"
+    }
+}
+
+struct ProjectSelectionDTO: Decodable {
+    let ideaId: String
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case ideaId = "idea_id"
+        case reason
+    }
+}
