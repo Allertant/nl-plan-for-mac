@@ -61,7 +61,10 @@ private struct ProjectDetailPageView: View {
     // 安排
     @State private var newArrangementText = ""
     @State private var newArrangementMinutes: Int = 30
+    @State private var editingNewArrangementMinutes = false
+    @State private var draftNewArrangementMinutes = ""
     @FocusState private var newArrangementFocused: Bool
+    @FocusState private var newArrangementMinutesFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -115,6 +118,9 @@ private struct ProjectDetailPageView: View {
         .onChange(of: planningBackgroundFocused) { _, focused in
             if !focused && isEditingPlanningBackground { commitPlanningBackgroundEdit() }
         }
+        .onChange(of: newArrangementMinutesFocused) { _, focused in
+            if !focused && editingNewArrangementMinutes { commitNewArrangementMinutes() }
+        }
     }
 
     private func dismissAllEditing() {
@@ -123,6 +129,7 @@ private struct ProjectDetailPageView: View {
         if isEditingPlanningBackground { planningBackgroundFocused = false }
         newNoteFocused = false
         newArrangementFocused = false
+        newArrangementMinutesFocused = false
     }
 
     // MARK: - Data
@@ -442,12 +449,35 @@ private struct ProjectDetailPageView: View {
                         .lineLimit(1...3)
                         .focused($newArrangementFocused)
                         .onSubmit { addArrangement() }
-                    Stepper("\(newArrangementMinutes)分钟", value: $newArrangementMinutes, in: 5...180, step: 5)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+
+                    Group {
+                        if editingNewArrangementMinutes {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                TextField("30m", text: $draftNewArrangementMinutes)
+                                    .textFieldStyle(.plain)
+                                    .frame(width: 52)
+                                    .focused($newArrangementMinutesFocused)
+                                    .onSubmit { commitNewArrangementMinutes() }
+                            }
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 4).padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                        } else {
+                            Label(newArrangementMinutes.hourMinuteString, systemImage: "clock")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .onTapGesture {
+                                    draftNewArrangementMinutes = newArrangementMinutes.hourMinuteString
+                                    editingNewArrangementMinutes = true
+                                    DispatchQueue.main.async { newArrangementMinutesFocused = true }
+                                }
+                        }
+                    }
+                    .frame(width: 72)
                 }
                 .padding(8)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(Color(nsColor: .windowBackgroundColor).contentShape(Rectangle()).onTapGesture { newArrangementMinutesFocused = false })
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
@@ -465,6 +495,12 @@ private struct ProjectDetailPageView: View {
         }
         newArrangementText = ""
         newArrangementMinutes = 30
+    }
+
+    private func commitNewArrangementMinutes() {
+        editingNewArrangementMinutes = false
+        guard let minutes = draftNewArrangementMinutes.trimmingCharacters(in: .whitespacesAndNewlines).parsedHourMinuteDuration else { return }
+        newArrangementMinutes = max(minutes, 5)
     }
 
     private var noteCard: some View {
