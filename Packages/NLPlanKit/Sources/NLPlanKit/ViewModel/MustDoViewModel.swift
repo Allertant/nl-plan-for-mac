@@ -475,8 +475,10 @@ final class MustDoViewModel {
 
         let selectedIds = Set(selectionResult.items.map(\.ideaId))
         let selectedProjects = projectCandidates.filter { selectedIds.contains($0.id) }
+        let selectionReason = selectionResult.overallReason
         guard !selectedProjects.isEmpty else {
-            recommendationState = .loaded(RecommendationResult(recommendations: [], overallReason: selectionResult.overallReason))
+            let reason = selectionReason.isEmpty ? "未选择任何项目" : selectionReason
+            recommendationState = .loaded(RecommendationResult(recommendations: [], overallReason: "【选择项目】\(reason)"))
             return
         }
 
@@ -570,7 +572,20 @@ final class MustDoViewModel {
         let validRecs = sliceResult.recommendations.filter { rec in
             rec.sourceIdeaId != nil && selectedIds.contains(rec.sourceIdeaId!)
         }
-        let filteredResult = RecommendationResult(recommendations: validRecs, overallReason: sliceResult.overallReason)
+        var combinedReason = ""
+        if !selectionReason.isEmpty {
+            combinedReason += "【选择项目】\(selectionReason)"
+        }
+        if !sliceResult.overallReason.isEmpty {
+            if !combinedReason.isEmpty { combinedReason += "\n" }
+            combinedReason += "【确定推荐项】\(sliceResult.overallReason)"
+        }
+        if validRecs.isEmpty {
+            let reason = combinedReason.isEmpty ? "【确定推荐项】未生成推荐项" : combinedReason
+            recommendationState = .loaded(RecommendationResult(recommendations: [], overallReason: reason))
+            return
+        }
+        let filteredResult = RecommendationResult(recommendations: validRecs, overallReason: combinedReason)
         assignPriorities(validRecs)
         recommendationState = .loaded(filteredResult)
     }

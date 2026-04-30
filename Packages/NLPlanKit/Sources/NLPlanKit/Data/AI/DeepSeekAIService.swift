@@ -282,7 +282,7 @@ final class DeepSeekAIService: AIServiceProtocol {
         remainingHours: Double
     ) async throws -> ProjectSelectionResult {
         let prompt = PromptTemplates.selectProjects(inputs: inputs, remainingHours: remainingHours)
-        print("[项目提示·第一轮] prompt:\n\(prompt)")
+        print("[项目提示·选择项目] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
             userPrompt: prompt,
@@ -309,7 +309,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             settledTasks: settledTasks,
             remainingHours: remainingHours
         )
-        print("[项目提示·第二轮] prompt:\n\(prompt)")
+        print("[项目提示·确定推荐项] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
             userPrompt: prompt,
