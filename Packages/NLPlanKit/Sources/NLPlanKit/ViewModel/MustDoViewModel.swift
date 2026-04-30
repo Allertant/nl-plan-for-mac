@@ -338,7 +338,7 @@ final class MustDoViewModel {
                             isProject: false,
                             projectDescription: idea.projectDescription,
                             planningBackground: idea.planningBackground,
-                            projectRecommendationSummary: idea.projectRecommendationSummary,
+                            projectRecommendationSummary: nil,
                             deadlineDisplay: arrangement.deadline.map { $0.deadlineDisplayString },
                             note: nil,
                             projectNotes: projectNotes,

@@ -170,6 +170,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             strategy: strategy,
             extraContext: extraContext
         )
+        print("[AI推荐] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
             userPrompt: prompt,

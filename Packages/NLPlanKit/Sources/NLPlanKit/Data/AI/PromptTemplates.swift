@@ -400,9 +400,15 @@ enum PromptTemplates {
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             let deadlineText = t.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
-            let arrangementTag = t.arrangementId != nil ? " - 用户安排" : ""
-            let projectTitleTag = t.projectTitle.map { " - 来自项目「\($0)」" } ?? ""
-            let base = "\(i + 1). [id: \(t.id.uuidString)] \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(t.isProject ? " - 项目型想法" : "")\(arrangementTag)\(projectTitleTag)\(deadlineText)"
+            let typeTag: String
+            if let projectTitle = t.projectTitle {
+                typeTag = "[项目安排·来自项目「\(projectTitle)」]"
+            } else if t.isProject {
+                typeTag = "[项目]"
+            } else {
+                typeTag = "[普通想法]"
+            }
+            let base = "\(i + 1). [id: \(t.id.uuidString)] \(typeTag) \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(deadlineText)"
             var details = ""
             if let note = t.note, !note.isEmpty {
                 details += "\n   备注：\(note)"
@@ -465,15 +471,17 @@ enum PromptTemplates {
         ## 要求
         从想法池中选出 1-3 项最适合今天完成的任务，考虑：
         1. 剩余空余时间是否充足，推荐总时长不应明显超过空余时间
-        2. 已尝试过（attempted）的任务优先级适当降低
+        2. 已尝试的任务优先级适当降低
         3. 分类尽量分散
         4. 按推荐执行顺序排列（第一个最应该先做）
-        5. 项目型想法不要直接推荐整个项目标题，应推荐一个今天可执行的小切片（如"整理核心功能清单""调研食物识别 API"），task_id=null，source_idea_id 填项目 UUID。普通想法直接推荐，不要强行切片。
+        5. 按候选项类型区别处理：
+           - [普通想法]：直接推荐原内容，task_id 填该想法 UUID。
+           - [项目]：不要推荐整个项目标题，推荐一个今天可执行的小切片，推荐标题格式为"精简项目名: 切片标题"（如「搭建博客: 调研食物识别 API」），task_id 设为 null，source_idea_id 填项目 UUID。
+           - [项目安排]：不要拆分，推荐标题格式为"精简项目名: 安排内容"（如来自「搭建个人博客」的安排「选购域名」，推荐标题为"搭建博客: 选购域名"），task_id 填安排 UUID。
         6. 快速模式下应明显偏向普通想法的清理与消化；综合模式下允许普通想法和项目同时竞争
         7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由。如果某个项目很重要但时间不足，生成一个更小的项目切片。
-        8. 有截止时间（deadline）的任务应优先考虑，截止时间越紧迫优先级越高。但截止时间在未来且无需提前准备的任务，不必提前推荐。
+        8. 有截止时间的任务应优先考虑，截止时间越紧迫优先级越高。但截止时间在未来且无需提前准备的任务，不必提前推荐。
         9. 会议、活动、约见等事件类想法：截止时间是今天才推荐；如果截止时间在未来且备注没有准备要求，不要提前推荐（当天再推荐即可）。
-        10. 标记为"用户安排"的任务是用户在项目中的计划事项，与普通想法平级竞争，直接推荐原内容，不要切片或改写。推荐标题格式为"精简项目名: 安排内容"（如来自项目「搭建个人博客」的安排「选购域名」，标题为"搭建博客: 选购域名"）。
 
         reason 应写清楚：
         - 为什么适合今天
