@@ -1,7 +1,7 @@
 import Foundation
 
 /// 必做项 ViewModel
-@Observable
+@MainActor @Observable
 final class MustDoViewModel {
     private struct ProjectSummaryGenerationOutcome {
         let ideaId: UUID

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// 总结页 ViewModel
-@Observable
+@MainActor @Observable
 final class SummaryViewModel {
 
     var summary: DailySummaryEntity?

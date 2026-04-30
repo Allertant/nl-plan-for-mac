@@ -38,7 +38,9 @@ struct RunningTimerView: View {
     private func startTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            addedSeconds += 1
+            DispatchQueue.main.async {
+                addedSeconds += 1
+            }
         }
     }
 
