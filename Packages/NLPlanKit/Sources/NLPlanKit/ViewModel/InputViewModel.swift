@@ -102,8 +102,7 @@ final class InputViewModel {
                     existingTaskTitles: existingTitles
                 )
                 accumulateTokenUsage(for: item.id)
-                item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks, force: true)
-                accumulateTokenUsage(for: item.id)
+                item.parsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks)
                 item.parseStatus = .completed
             } catch {
                 item.errorMessage = error.localizedDescription
