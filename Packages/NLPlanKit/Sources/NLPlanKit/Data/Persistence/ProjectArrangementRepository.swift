@@ -14,12 +14,14 @@ final class ProjectArrangementRepository {
         projectId: UUID,
         content: String,
         estimatedMinutes: Int = 30,
+        deadline: Date? = nil,
         sortOrder: Int = 0
     ) throws -> ProjectArrangementEntity {
         let item = ProjectArrangementEntity(
             projectId: projectId,
             content: content,
             estimatedMinutes: estimatedMinutes,
+            deadline: deadline,
             sortOrder: sortOrder
         )
         modelContext.insert(item)

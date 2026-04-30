@@ -496,19 +496,21 @@ final class TaskManager {
         try arrangementRepo.fetchByProject(projectId: projectId)
     }
 
-    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int) async throws -> ProjectArrangementEntity {
+    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int, deadline: Date? = nil) async throws -> ProjectArrangementEntity {
         let order = try arrangementRepo.nextSortOrder(projectId: projectId)
         return try arrangementRepo.create(
             projectId: projectId,
             content: content,
             estimatedMinutes: estimatedMinutes,
+            deadline: deadline,
             sortOrder: order
         )
     }
 
-    func updateArrangement(_ item: ProjectArrangementEntity, content: String? = nil, estimatedMinutes: Int? = nil) async throws {
+    func updateArrangement(_ item: ProjectArrangementEntity, content: String? = nil, estimatedMinutes: Int? = nil, deadline: Date? = nil) async throws {
         if let content { item.content = content }
         if let estimatedMinutes { item.estimatedMinutes = estimatedMinutes }
+        if let deadline { item.deadline = deadline }
         try arrangementRepo.update(item)
     }
 

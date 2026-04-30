@@ -508,16 +508,26 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int = 30) async {
+    func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int = 30, deadline: Date? = nil) async {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do {
             let item = try await taskManager.addArrangement(
                 projectId: projectId,
                 content: trimmed,
-                estimatedMinutes: estimatedMinutes
+                estimatedMinutes: estimatedMinutes,
+                deadline: deadline
             )
             arrangements.append(item)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateArrangement(arrangementId: UUID, content: String? = nil, estimatedMinutes: Int? = nil, deadline: Date? = nil) async {
+        guard let item = arrangements.first(where: { $0.id == arrangementId }) else { return }
+        do {
+            try await taskManager.updateArrangement(item, content: content, estimatedMinutes: estimatedMinutes, deadline: deadline)
         } catch {
             errorMessage = error.localizedDescription
         }

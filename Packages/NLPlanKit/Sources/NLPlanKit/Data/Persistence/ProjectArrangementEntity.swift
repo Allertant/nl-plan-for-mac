@@ -23,6 +23,7 @@ final class ProjectArrangementEntity {
     var projectId: UUID
     var content: String
     var estimatedMinutes: Int
+    var deadline: Date?
     var status: String
     var sortOrder: Int
     var createdAt: Date
@@ -38,6 +39,7 @@ final class ProjectArrangementEntity {
         projectId: UUID,
         content: String,
         estimatedMinutes: Int = 30,
+        deadline: Date? = nil,
         status: ArrangementStatus = .pending,
         sortOrder: Int = 0,
         createdAt: Date = .now,
@@ -47,6 +49,7 @@ final class ProjectArrangementEntity {
         self.projectId = projectId
         self.content = content
         self.estimatedMinutes = estimatedMinutes
+        self.deadline = deadline
         self.status = status.rawValue
         self.sortOrder = sortOrder
         self.createdAt = createdAt

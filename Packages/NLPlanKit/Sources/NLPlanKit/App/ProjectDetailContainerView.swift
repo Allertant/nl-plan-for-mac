@@ -423,8 +423,8 @@ private struct ProjectDetailPageView: View {
                 ForEach(viewModel.arrangements, id: \.id) { item in
                     ArrangementRow(
                         item: item,
-                        onEdit: { content in
-                            Task { await viewModel.updateArrangementContent(arrangementId: item.id, content: content) }
+                        onUpdate: { content, minutes, deadline in
+                            Task { await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline) }
                         },
                         onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
                         onRevive: { viewModel.requestReviveArrangement(id: item.id) }
@@ -436,20 +436,15 @@ private struct ProjectDetailPageView: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField("添加安排...", text: $newArrangementText, axis: .vertical)
+                    TextField("按 Enter 添加安排...", text: $newArrangementText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .lineLimit(1...3)
                         .focused($newArrangementFocused)
+                        .onSubmit { addArrangement() }
                     Stepper("\(newArrangementMinutes)分钟", value: $newArrangementMinutes, in: 5...180, step: 5)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                    Button {
-                        addArrangement()
-                    } label: {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 14)).foregroundStyle(.blue)
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(8)
                 .background(Color(nsColor: .windowBackgroundColor))
@@ -461,8 +456,12 @@ private struct ProjectDetailPageView: View {
     private func addArrangement() {
         let text = newArrangementText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        // 默认截止时间：明天 23:59
+        let cal = Calendar.current
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: .now)!
+        let deadline = cal.date(bySettingHour: 23, minute: 59, second: 0, of: tomorrow)
         Task {
-            await viewModel.addArrangement(projectId: idea.id, content: text, estimatedMinutes: newArrangementMinutes)
+            await viewModel.addArrangement(projectId: idea.id, content: text, estimatedMinutes: newArrangementMinutes, deadline: deadline)
         }
         newArrangementText = ""
         newArrangementMinutes = 30
@@ -618,56 +617,95 @@ private struct ProjectNoteRow: View {
 
 private struct ArrangementRow: View {
     let item: ProjectArrangementEntity
-    let onEdit: (String) -> Void
+    let onUpdate: (_ content: String?, _ estimatedMinutes: Int?, _ deadline: Date?) -> Void
     let onDelete: () -> Void
     let onRevive: () -> Void
 
-    @State private var isEditing = false
-    @State private var draftText = ""
-    @FocusState private var isFocused: Bool
+    @State private var editingTitle = false
+    @State private var editingMinutes = false
+    @State private var editingDeadline = false
+    @State private var draftTitle: String = ""
+    @State private var draftMinutes: String = ""
+    @State private var draftDeadline: String = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case title, minutes, deadline }
 
     private var status: ArrangementStatus { item.arrangementStatus }
+    private var isEditable: Bool { status == .pending }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // 第一行：状态标记 + 内容
+            // 行 1：状态标记 + 标题
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: statusIcon)
                     .font(.system(size: 10))
                     .foregroundStyle(statusTint)
                     .padding(.top, 2)
 
-                if isEditing {
-                    TextField("安排内容", text: $draftText, axis: .vertical)
+                if editingTitle {
+                    TextField("安排内容", text: $draftTitle, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
-                        .lineLimit(1...5)
-                        .focused($isFocused)
-                        .onSubmit { isFocused = false }
+                        .lineLimit(1...3)
+                        .focused($focusedField, equals: .title)
+                        .onSubmit { focusedField = nil }
+                        .padding(.horizontal, 4).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
                 } else {
                     Text(item.content)
                         .font(.system(size: 11))
                         .foregroundStyle(status == .done ? .tertiary : .secondary)
                         .strikethrough(status == .done)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .onTapGesture {
-                            guard status == .pending else { return }
-                            draftText = item.content
-                            isEditing = true
-                            DispatchQueue.main.async { isFocused = true }
-                        }
+                        .lineLimit(2)
+                        .onTapGesture { if isEditable { startEditingTitle() } }
                 }
             }
 
-            // 第二行：元数据 + 操作按钮
-            HStack {
-                HStack(spacing: 8) {
-                    Label("\(item.estimatedMinutes)分钟", systemImage: "clock")
+            // 行 2：时间 + 截止日期 + 操作按钮
+            HStack(spacing: 8) {
+                if editingMinutes {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                        TextField("1h30m", text: $draftMinutes)
+                            .textFieldStyle(.plain)
+                            .frame(width: 52)
+                            .focused($focusedField, equals: .minutes)
+                            .onSubmit { commitMinutesEdit() }
+                    }
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 4).padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                } else {
+                    Label(item.estimatedMinutes.hourMinuteString, systemImage: "clock")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .onTapGesture { if isEditable { startEditingMinutes() } }
+                }
+
+                if editingDeadline {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                        TextField("M-d", text: $draftDeadline)
+                            .textFieldStyle(.plain)
+                            .frame(width: 72)
+                            .focused($focusedField, equals: .deadline)
+                            .onSubmit { commitDeadlineEdit() }
+                    }
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 4).padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                } else if let deadline = item.deadline {
+                    Label(deadline.deadlineDisplayString, systemImage: "calendar")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .onTapGesture { if isEditable { startEditingDeadline() } }
+                } else if isEditable {
+                    Label("添加截止...", systemImage: "calendar")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
-                    Text(item.createdAt.shortDateTimeString)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .onTapGesture { startEditingDeadline() }
                 }
 
                 Spacer()
@@ -694,10 +732,14 @@ private struct ArrangementRow: View {
             }
         }
         .padding(8)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background { Color(nsColor: .textBackgroundColor).contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .onChange(of: isFocused) { _, focused in
-            if !focused && isEditing { commitEdit() }
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil {
+                if editingTitle { commitTitleEdit() }
+                if editingMinutes { commitMinutesEdit() }
+                if editingDeadline { commitDeadlineEdit() }
+            }
         }
     }
 
@@ -717,10 +759,58 @@ private struct ArrangementRow: View {
         }
     }
 
-    private func commitEdit() {
-        isEditing = false
-        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != item.content.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-        onEdit(trimmed)
+    private func startEditingTitle() {
+        if editingMinutes { commitMinutesEdit() }; if editingDeadline { commitDeadlineEdit() }
+        draftTitle = item.content; editingTitle = true; focusedField = .title
+    }
+    private func commitTitleEdit() {
+        editingTitle = false
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != item.content else { return }
+        onUpdate(trimmed, nil, nil)
+    }
+
+    private func startEditingMinutes() {
+        if editingTitle { commitTitleEdit() }; if editingDeadline { commitDeadlineEdit() }
+        draftMinutes = item.estimatedMinutes.hourMinuteString; editingMinutes = true; focusedField = .minutes
+    }
+    private func commitMinutesEdit() {
+        editingMinutes = false
+        guard let minutes = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines).parsedHourMinuteDuration else { return }
+        guard minutes != item.estimatedMinutes else { return }
+        onUpdate(nil, minutes, nil)
+    }
+
+    private func startEditingDeadline() {
+        if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }
+        draftDeadline = item.deadline?.deadlineDisplayString ?? ""; editingDeadline = true; focusedField = .deadline
+    }
+    private func commitDeadlineEdit() {
+        editingDeadline = false
+        let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty || isValidDeadlineFormat(trimmed) else { return }
+        let (parsed, _, _) = DeepSeekAIService.parseDeadlineString(trimmed.isEmpty ? nil : trimmed)
+        if parsed != item.deadline {
+            onUpdate(nil, nil, parsed)
+        }
+    }
+
+    private func isValidDeadlineFormat(_ string: String) -> Bool {
+        let parts = string.split(separator: " ", omittingEmptySubsequences: true)
+        guard let datePart = parts.first else { return false }
+        let dateComps = datePart.split(separator: "-").compactMap { Int($0) }
+        guard dateComps.count == 2 || dateComps.count == 3 else { return false }
+        if dateComps.count == 2 {
+            guard dateComps[0] >= 1 && dateComps[0] <= 12, dateComps[1] >= 1 && dateComps[1] <= 31 else { return false }
+        } else {
+            guard dateComps[0] >= 1, dateComps[1] >= 1 && dateComps[1] <= 12, dateComps[2] >= 1 && dateComps[2] <= 31 else { return false }
+        }
+        if parts.count > 1 {
+            let timeComps = String(parts[1]).split(separator: ":").compactMap { Int($0) }
+            guard timeComps.count >= 1 && timeComps.count <= 2 else { return false }
+            guard timeComps[0] >= 0 && timeComps[0] <= 23 else { return false }
+            if timeComps.count == 2 { guard timeComps[1] >= 0 && timeComps[1] <= 59 else { return false } }
+        }
+        return true
     }
 }

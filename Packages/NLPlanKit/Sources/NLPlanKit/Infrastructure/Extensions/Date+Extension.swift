@@ -99,6 +99,33 @@ extension Int {
     }
 }
 
+extension Date {
+    /// 显示用截止时间字符串（同年省略年份）
+    var deadlineDisplayString: String {
+        let cal = Calendar.current
+        let now = Date()
+        let showYear = cal.component(.year, from: self) != cal.component(.year, from: now)
+        let month = cal.component(.month, from: self)
+        let day = cal.component(.day, from: self)
+        let hour = cal.component(.hour, from: self)
+        let minute = cal.component(.minute, from: self)
+        let hasTime = !(hour == 0 && minute == 0)
+
+        if showYear {
+            let year = cal.component(.year, from: self)
+            if hasTime {
+                return String(format: "%d-%d-%d %02d:%02d", year, month, day, hour, minute)
+            }
+            return "\(year)-\(month)-\(day)"
+        } else {
+            if hasTime {
+                return String(format: "%d-%d %02d:%02d", month, day, hour, minute)
+            }
+            return "\(month)-\(day)"
+        }
+    }
+}
+
 extension String {
     /// 解析 h/m 时长表达式为分钟数，支持 `90`、`90m`、`2h`、`2h30m`
     var parsedHourMinuteDuration: Int? {
