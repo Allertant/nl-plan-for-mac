@@ -59,6 +59,15 @@ final class IdeaPoolViewModel {
     /// 已确认删除的 ideaId
     var confirmedCleanupIds: Set<UUID> = []
 
+    /// 待确认删除的清理项 ID
+    var pendingDeleteCleanupId: UUID?
+
+    /// 待确认删除的清理项标题
+    var pendingDeleteCleanupTitle: String? {
+        guard let id = pendingDeleteCleanupId else { return nil }
+        return ideas.first(where: { $0.id == id })?.title
+    }
+
     /// 撤销栈
     private var undoStack: [UUID] = []
 
@@ -422,6 +431,35 @@ final class IdeaPoolViewModel {
             cleanupState = .loaded(filteredResult)
         } catch {
             cleanupState = .error(error.localizedDescription)
+        }
+    }
+
+    func requestDeleteCleanup(taskId: UUID) {
+        pendingDeleteCleanupId = taskId
+    }
+
+    func cancelDeleteCleanup() {
+        pendingDeleteCleanupId = nil
+    }
+
+    func executeDeleteCleanup() async {
+        guard let ideaId = pendingDeleteCleanupId else { return }
+        pendingDeleteCleanupId = nil
+        do {
+            try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        // 从清理列表中移除已删除的项
+        if case .loaded(let result) = cleanupState {
+            let updated = result.items.filter { $0.taskId != ideaId }
+            if updated.isEmpty {
+                await refresh()
+                resetCleanupState()
+            } else {
+                cleanupState = .loaded(CleanupResult(items: updated, overallReason: result.overallReason))
+                await refresh()
+            }
         }
     }
 

@@ -21,7 +21,7 @@ struct CleanupDetailView: View {
                 Spacer()
 
                 if case .loaded(let result) = viewModel.cleanupState {
-                    let remaining = result.items.filter { !viewModel.confirmedCleanupIds.contains($0.taskId) }.count
+                    let remaining = result.items.count
                     if remaining > 0 {
                         Text("剩余 \(remaining) 项")
                             .font(.system(size: 11))
@@ -36,120 +36,83 @@ struct CleanupDetailView: View {
             Divider()
 
             // 内容区
-            ScrollView {
-                VStack(spacing: 8) {
-                    switch viewModel.cleanupState {
-                    case .loading:
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .controlSize(.regular)
-                            Text("AI 正在分析想法池...")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
-
-                    case .loaded(let result):
-                        if result.items.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.green)
-                                Text("想法池很整洁，无需清理")
-                                    .font(.system(size: 13))
+            if viewModel.pendingDeleteCleanupId != nil {
+                ConfirmActionPage(
+                    icon: "trash",
+                    iconTint: .red,
+                    title: viewModel.pendingDeleteCleanupTitle ?? "",
+                    message: "确认删除该想法？",
+                    confirmLabel: "确认删除",
+                    onCancel: { viewModel.cancelDeleteCleanup() },
+                    onConfirm: { Task { await viewModel.executeDeleteCleanup() } }
+                )
+            } else {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        switch viewModel.cleanupState {
+                        case .loading:
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .controlSize(.regular)
+                                Text("AI 正在分析想法池...")
+                                    .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
-                        } else {
-                            if !result.overallReason.isEmpty {
-                                Text(result.overallReason)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 4)
-                            }
 
-                            ForEach(result.items) { item in
-                                if let task = taskLookup[item.taskId] {
-                                    CleanupDetailRow(
-                                        task: task,
-                                        reason: item.reason,
-                                        isConfirmed: viewModel.confirmedCleanupIds.contains(item.taskId),
-                                        onConfirm: { viewModel.markCleanupItem(taskId: item.taskId) },
-                                        onSkip: { viewModel.skipCleanupItem(taskId: item.taskId) }
-                                    )
+                        case .loaded(let result):
+                            if result.items.isEmpty {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.green)
+                                    Text("想法池很整洁，无需清理")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                            } else {
+                                if !result.overallReason.isEmpty {
+                                    Text(result.overallReason)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 4)
+                                }
+
+                                ForEach(result.items) { item in
+                                    if let task = taskLookup[item.taskId] {
+                                        CleanupDetailRow(
+                                            task: task,
+                                            reason: item.reason,
+                                            onDelete: { viewModel.requestDeleteCleanup(taskId: item.taskId) },
+                                            onSkip: { viewModel.skipCleanupItem(taskId: item.taskId) }
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                    case .error(let message):
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.red)
-                            Text(message)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.red)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
+                        case .error(let message):
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.red)
+                                Text(message)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.red)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
 
-                    case .idle:
-                        EmptyView()
+                        case .idle:
+                            EmptyView()
+                        }
                     }
+                    .padding(16)
                 }
-                .padding(16)
-            }
-
-            // 底部操作栏
-            if case .loaded(let result) = viewModel.cleanupState, !result.items.isEmpty {
-                Divider()
-                HStack {
-                    Button {
-                        viewModel.resetCleanupState()
-                        onBack()
-                    } label: {
-                        Text("全部跳过")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Button {
-                        viewModel.undoLastCleanup()
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(viewModel.canUndoCleanup ? Color.primary : Color.gray.opacity(0.3))
-                    .disabled(!viewModel.canUndoCleanup)
-                    .help("撤销")
-
-                    Button {
-                        viewModel.markAllCleanupItems()
-                    } label: {
-                        Text("全部清除")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Button("完成") {
-                        Task {
-                            await viewModel.executeCleanup()
-                            onBack()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .scrollIndicators(.automatic)
             }
         }
         .frame(width: 360, height: 520)
@@ -161,8 +124,7 @@ struct CleanupDetailView: View {
 private struct CleanupDetailRow: View {
     let task: IdeaEntity
     let reason: String
-    let isConfirmed: Bool
-    let onConfirm: () -> Void
+    let onDelete: () -> Void
     let onSkip: () -> Void
 
     var body: some View {
@@ -170,8 +132,6 @@ private struct CleanupDetailRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isConfirmed ? .gray : .primary)
-                    .strikethrough(isConfirmed)
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
@@ -198,30 +158,24 @@ private struct CleanupDetailRow: View {
 
             Spacer()
 
-            if isConfirmed {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.green)
-            } else {
-                VStack(spacing: 4) {
-                    Button(action: onSkip) {
-                        Text("跳过")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-
-                    Button(action: onConfirm) {
-                        Image(systemName: "trash.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
+            VStack(spacing: 4) {
+                Button(action: onSkip) {
+                    Text("跳过")
+                        .font(.system(size: 10))
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+
+                Button(action: onDelete) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(10)
-        .background(isConfirmed ? Color(nsColor: .textBackgroundColor).opacity(0.3) : Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: .textBackgroundColor))
         .cornerRadius(6)
     }
 }
