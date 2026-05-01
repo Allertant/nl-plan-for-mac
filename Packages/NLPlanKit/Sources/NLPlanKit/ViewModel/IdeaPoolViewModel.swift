@@ -97,6 +97,7 @@ final class IdeaPoolViewModel {
     func refresh(newIdeaIds: Set<UUID> = []) async {
         do {
             ideas = try await taskManager.fetchIdeaPool()
+            try? await repairStaleInProgressIdeas()
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds
                 highlightClearTask?.cancel()
@@ -585,6 +586,17 @@ final class IdeaPoolViewModel {
     }
 
     // MARK: - Private
+
+    /// 修复状态为 .inProgress 但无关联活跃必做项的想法
+    private func repairStaleInProgressIdeas() async throws {
+        for idea in ideas where idea.ideaStatus == .inProgress {
+            let tasks = try await taskManager.fetchMustDo(sourceIdeaId: idea.id)
+            let hasActive = tasks.contains { !$0.isSettled }
+            if !hasActive {
+                idea.ideaStatus = .pending
+            }
+        }
+    }
 
     private func makeAIService() async -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
