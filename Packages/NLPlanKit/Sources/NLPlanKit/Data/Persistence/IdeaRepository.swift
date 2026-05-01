@@ -95,6 +95,13 @@ final class IdeaRepository {
         return ideas
     }
 
+    func fetchAll() throws -> [IdeaEntity] {
+        let descriptor = FetchDescriptor<IdeaEntity>(
+            sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func fetchRecommendationCandidates() throws -> [IdeaEntity] {
         let pending = IdeaStatus.pending.rawValue
         let attempted = IdeaStatus.attempted.rawValue

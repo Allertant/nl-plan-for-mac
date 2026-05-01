@@ -546,7 +546,12 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- `AppState.ensureViewModelsInitialized` 新增迁移逻辑，启动时自动执行
+- 迁移逻辑：`IdeaEntity(isProject==true)` → `ProjectEntity`（保持原 ID）
+- 迁移逻辑：`ProjectNoteEntity.ideaId` → 补写 `projectId`（保持原 ID）
+- 迁移逻辑：迁移完成后删除旧 `IdeaEntity`，标记 UserDefaults 防止重复执行
+- `IdeaRepository` 新增 `fetchAll()` 方法
 
 ---
 
@@ -667,4 +672,4 @@
 - [x] 阶段 4 已完成
 - [x] 阶段 5 已完成
 - [x] 阶段 6 已完成
-- [ ] 阶段 7 已完成
+- [x] 阶段 7 已完成

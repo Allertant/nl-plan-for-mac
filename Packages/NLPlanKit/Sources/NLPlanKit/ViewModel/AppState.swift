@@ -248,5 +248,75 @@ final class AppState {
             guard let ideaId else { return }
             await self?.ideaPoolViewModel?.refreshProjectAnalyses(ideaId: ideaId)
         }
+
+        // 迁移旧项目数据
+        Task {
+            await migrateOldProjectsIfNeeded(
+                context: context,
+                ideaRepo: ideaRepo,
+                projectRepo: projectRepo,
+                dailyTaskRepo: dailyTaskRepo
+            )
+        }
+    }
+
+    // MARK: - Migration
+
+    @MainActor
+    private func migrateOldProjectsIfNeeded(
+        context: ModelContext,
+        ideaRepo: IdeaRepository,
+        projectRepo: ProjectRepository,
+        dailyTaskRepo: DailyTaskRepository
+    ) async {
+        let migrationKey = "nlplan.projectsMigrated"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        do {
+            let allIdeas = try ideaRepo.fetchAll()
+            let projectIdeas = allIdeas.filter { $0.isProject }
+
+            for idea in projectIdeas {
+                // 创建 ProjectEntity
+                _ = try projectRepo.create(
+                    id: idea.id,
+                    title: idea.title,
+                    category: idea.category,
+                    priority: idea.taskPriority,
+                    sortOrder: idea.sortOrder,
+                    status: .pending,
+                    projectDecisionSource: idea.projectDecisionSource,
+                    projectProgress: idea.projectProgress,
+                    projectProgressSummary: idea.projectProgressSummary,
+                    projectProgressUpdatedAt: idea.projectProgressUpdatedAt,
+                    projectDescription: idea.projectDescription,
+                    planningBackground: idea.planningBackground,
+                    planningResearchPrompt: idea.planningResearchPrompt,
+                    planningResearchPromptReason: idea.planningResearchPromptReason,
+                    projectRecommendationContextUpdatedAt: idea.projectRecommendationContextUpdatedAt,
+                    projectRecommendationSummary: idea.projectRecommendationSummary,
+                    projectRecommendationSummaryGeneratedAt: idea.projectRecommendationSummaryGeneratedAt,
+                    projectRecommendationSummarySourceUpdatedAt: idea.projectRecommendationSummarySourceUpdatedAt,
+                    deadline: idea.deadline
+                )
+
+                // 更新项目备注的 projectId
+                let notes = try ideaRepo.fetchProjectNotes(ideaId: idea.id)
+                for note in notes {
+                    note.projectId = idea.id
+                }
+
+                // 删除旧的 IdeaEntity
+                try ideaRepo.delete(idea)
+            }
+
+            if !projectIdeas.isEmpty {
+                try context.save()
+            }
+
+            UserDefaults.standard.set(true, forKey: migrationKey)
+        } catch {
+            print("项目迁移失败：\(error)")
+        }
     }
 }
