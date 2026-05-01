@@ -586,6 +586,66 @@ final class IdeaPoolViewModel {
         }
     }
 
+    // MARK: - ProjectEntity 路径
+
+    func fetchProject(projectId: UUID) async -> ProjectEntity? {
+        do {
+            return try await taskManager.fetchProject(id: projectId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func updateProjectTitle(projectId: UUID, title: String) async {
+        do {
+            try await taskManager.updateProjectTitle(projectId: projectId, title: title)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateProjectDescription(projectId: UUID, description: String?) async {
+        do {
+            try await taskManager.updateProjectDescription(projectId: projectId, description: description)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updatePlanningBackground(projectId: UUID, planningBackground: String?) async {
+        do {
+            try await taskManager.updatePlanningBackground(projectId: projectId, planningBackground: planningBackground)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func generatePlanningBackgroundPrompt(projectId: UUID) async {
+        do {
+            try await taskManager.generatePlanningBackgroundPrompt(projectId: projectId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func addProjectNote(projectId: UUID, content: String) async {
+        do {
+            try await taskManager.addProjectNote(projectId: projectId, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func fetchProjectNotesByProjectId(projectId: UUID) async -> [ProjectNoteEntity] {
+        do {
+            return try await taskManager.fetchProjectNotesByProjectId(projectId: projectId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     // MARK: - Private
 
     /// 修复状态为 .inProgress 但无关联活跃必做项的想法

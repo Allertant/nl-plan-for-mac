@@ -104,4 +104,49 @@ final class ProjectRepository {
         modelContext.delete(project)
         try modelContext.save()
     }
+
+    // MARK: - Project Notes
+
+    func createProjectNote(projectId: UUID, content: String) throws -> ProjectNoteEntity {
+        let note = ProjectNoteEntity(content: content, projectId: projectId)
+        modelContext.insert(note)
+        try modelContext.save()
+        return note
+    }
+
+    func fetchProjectNotes(projectId: UUID) throws -> [ProjectNoteEntity] {
+        let targetId = projectId
+        let descriptor = FetchDescriptor<ProjectNoteEntity>(
+            predicate: #Predicate { $0.projectId == targetId },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    // MARK: - Project Planning
+
+    func updateDescription(_ project: ProjectEntity, description: String?) throws {
+        project.projectDescription = description
+        project.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func updatePlanningBackground(_ project: ProjectEntity, planningBackground: String?) throws {
+        project.planningBackground = planningBackground
+        project.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func updateTitle(_ project: ProjectEntity, title: String) throws {
+        project.title = title
+        project.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func updatePlanningResearch(_ project: ProjectEntity, prompt: String?, reason: String?) throws {
+        project.planningResearchPrompt = prompt
+        project.planningResearchPromptReason = reason
+        project.updatedAt = .now
+        try modelContext.save()
+    }
 }

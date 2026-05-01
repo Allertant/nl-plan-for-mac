@@ -376,6 +376,94 @@ final class TaskManager {
         try ideaRepo.fetchVisibleIdeas()
     }
 
+    // MARK: - 项目查询与更新
+
+    func fetchProject(id: UUID) async throws -> ProjectEntity? {
+        try projectRepo.fetchById(id)
+    }
+
+    func updateProject(_ project: ProjectEntity) async throws {
+        try projectRepo.update(project)
+    }
+
+    func touchProjectRecommendationContext(projectId: UUID) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        try projectRepo.touchRecommendationContext(project)
+    }
+
+    func updateProjectDescription(projectId: UUID, description: String?) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        try projectRepo.updateDescription(project, description: description)
+        try projectRepo.touchRecommendationContext(project)
+    }
+
+    func updatePlanningBackground(projectId: UUID, planningBackground: String?) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        try projectRepo.updatePlanningBackground(project, planningBackground: planningBackground)
+        try projectRepo.touchRecommendationContext(project)
+    }
+
+    func updateProjectTitle(projectId: UUID, title: String) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        try projectRepo.updateTitle(project, title: title)
+        try projectRepo.touchRecommendationContext(project)
+    }
+
+    // MARK: - 项目备注（ProjectEntity 路径）
+
+    func addProjectNote(projectId: UUID, content: String) async throws {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        _ = try projectRepo.createProjectNote(projectId: projectId, content: trimmed)
+        try? await touchProjectRecommendationContext(projectId: projectId)
+    }
+
+    func fetchProjectNotesByProjectId(projectId: UUID) async throws -> [ProjectNoteEntity] {
+        try projectRepo.fetchProjectNotes(projectId: projectId)
+    }
+
+    func generatePlanningBackgroundPrompt(projectId: UUID) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else { return }
+        let activeTasks = try await fetchMustDo(sourceIdeaId: projectId)
+        let settledTasks = try await fetchSettledTasks(sourceIdeaId: projectId)
+        let notes = try await fetchProjectNotesByProjectId(projectId: projectId)
+        let aiService = self.aiService
+
+        let result = try await aiExecutionCoordinator.run {
+            try await aiService.generatePlanningBackgroundPrompt(
+                input: PlanningBackgroundPromptInput(
+                    title: project.title,
+                    category: project.category,
+                    estimatedMinutes: nil,
+                    attempted: false,
+                    projectDescription: project.projectDescription,
+                    planningBackground: project.planningBackground,
+                    notes: notes.map(\.content),
+                    activeTasks: activeTasks.map { task in
+                        "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
+                    },
+                    settledTasks: settledTasks.map { task in
+                        let reason = {
+                            let t = task.incompletionReason?.trimmingCharacters(in: .whitespacesAndNewlines)
+                            return (t != nil && !t!.isEmpty) ? t! : "无说明"
+                        }()
+                        return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 未完成原因：\(reason)"
+                    }
+                )
+            )
+        }
+
+        try projectRepo.updatePlanningResearch(project, prompt: result.researchPrompt, reason: result.reason)
+    }
+
     /// 获取想法池中的单个任务
     func fetchIdeaPoolTask(ideaId: UUID) async throws -> IdeaEntity? {
         try ideaRepo.fetchById(ideaId)

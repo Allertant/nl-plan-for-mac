@@ -386,7 +386,14 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- `ProjectNoteEntity` 新增 `projectId` 字段（保留 `ideaId` 兼容旧数据）
+- `ProjectRepository` 新增备注 CRUD、项目字段更新方法
+- `TaskManager` 新增项目查询/更新方法（`fetchProject`、`updateProjectTitle`、`updateProjectDescription`、`updatePlanningBackground`、`addProjectNote(projectId:)`、`fetchProjectNotesByProjectId`、`generatePlanningBackgroundPrompt(projectId:)`）
+- `IdeaPoolViewModel` 新增 ProjectEntity 路径方法
+- `ProjectDetailSnapshot` 新增 `init(project:)`，标记 `Source` 枚举区分来源
+- `ProjectDetailContainerView` 改为接收 `projectId`，先查 `ProjectEntity` 再回退 `IdeaEntity`
+- 所有编辑操作（标题、描述、规划背景、备注、安排、研究提示词）按来源分发到对应路径
 
 ---
 
@@ -638,7 +645,7 @@
 - [x] 阶段 0 已完成
 - [x] 阶段 1 已完成
 - [x] 阶段 2 已完成
-- [ ] 阶段 3 已完成
+- [x] 阶段 3 已完成
 - [ ] 阶段 4 已完成
 - [ ] 阶段 5 已完成
 - [ ] 阶段 6 已完成
