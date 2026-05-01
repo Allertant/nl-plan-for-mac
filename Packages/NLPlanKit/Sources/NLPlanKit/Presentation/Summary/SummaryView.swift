@@ -332,6 +332,8 @@ struct SettlementTaskRow: View {
             }
 
             HStack(spacing: 8) {
+                TagChip(text: task.category)
+
                 Label(task.estimatedMinutes.hourMinuteString, systemImage: "clock")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
