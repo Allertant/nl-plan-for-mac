@@ -279,9 +279,10 @@ final class DeepSeekAIService: AIServiceProtocol {
 
     func selectProjects(
         inputs: [ProjectSelectionInput],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String?
     ) async throws -> ProjectSelectionResult {
-        let prompt = PromptTemplates.selectProjects(inputs: inputs, remainingHours: remainingHours)
+        let prompt = PromptTemplates.selectProjects(inputs: inputs, remainingHours: remainingHours, extraContext: extraContext)
         print("[项目提示·选择项目] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
@@ -300,14 +301,16 @@ final class DeepSeekAIService: AIServiceProtocol {
         mustDoTasks: [TaskRecommendationInput],
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String?
     ) async throws -> RecommendationResult {
         let prompt = PromptTemplates.generateProjectSlices(
             projects: projects,
             mustDoTasks: mustDoTasks,
             arrangements: arrangements,
             settledTasks: settledTasks,
-            remainingHours: remainingHours
+            remainingHours: remainingHours,
+            extraContext: extraContext
         )
         print("[项目提示·确定推荐项] prompt:\n\(prompt)")
         let response = try await requestAndParse(

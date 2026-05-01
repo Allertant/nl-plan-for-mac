@@ -796,13 +796,18 @@ enum PromptTemplates {
 
     // MARK: - 项目提示（第一轮筛选）
 
-    static func selectProjects(inputs: [ProjectSelectionInput], remainingHours: Double) -> String {
+    static func selectProjects(inputs: [ProjectSelectionInput], remainingHours: Double, extraContext: String? = nil) -> String {
         let projectList = inputs.enumerated().map { i, p in
             let progressText = p.progress.map { "\(Int($0))%" } ?? "未知"
             let summaryText = p.recommendationSummary.map { " - \($0)" } ?? ""
             let deadlineText = p.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
             return "\(i + 1). [idea_id: \(p.ideaId.uuidString)] \(p.title) - \(p.category) - 进度:\(progressText)\(summaryText)\(deadlineText)"
         }.joined(separator: "\n")
+
+        var extraSection = ""
+        if let extra = extraContext?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
+            extraSection = "\n## 用户额外要求\n\(extra)\n"
+        }
 
         return """
         你是一个任务管理助手。请从以下项目中选出 1-2 个今天最值得推进的项目。
@@ -812,7 +817,7 @@ enum PromptTemplates {
 
         ## 候选项目
         \(projectList)
-
+        \(extraSection)
         ## 要求
         选出 1-2 个今天最值得推进的项目，考虑：
         1. 项目进度较低的优先（更需要推进）
@@ -837,7 +842,8 @@ enum PromptTemplates {
         mustDoTasks: [TaskRecommendationInput],
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String? = nil
     ) -> String {
         let projectList = projects.map { p in
             let durationText = p.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
@@ -871,6 +877,15 @@ enum PromptTemplates {
         }
         let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
 
+        var extraSection = ""
+        if let extra = extraContext?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
+            extraSection = """
+
+        ## 用户额外要求
+        \(extra)
+        """
+        }
+
         return """
         你是一个任务管理助手。请为以下项目生成今天可执行的具体切片任务。
 
@@ -893,7 +908,7 @@ enum PromptTemplates {
 
         ## 剩余可用空余时间
         约 \(String(format: "%.1f", freeHours)) 小时
-
+        \(extraSection)
         ## 要求
         为每个项目生成 1 个今天可执行的切片任务，考虑：
         1. 切片应在剩余空余时间内可完成（通常 30-120 分钟）

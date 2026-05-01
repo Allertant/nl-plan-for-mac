@@ -81,7 +81,8 @@ protocol AIServiceProtocol: Sendable {
     /// 项目提示第一轮：从候选项目中选出今天最值得推进的
     func selectProjects(
         inputs: [ProjectSelectionInput],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String?
     ) async throws -> ProjectSelectionResult
 
     /// 项目提示第二轮：为选中项目生成具体的切片任务
@@ -90,6 +91,7 @@ protocol AIServiceProtocol: Sendable {
         mustDoTasks: [TaskRecommendationInput],
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String?
     ) async throws -> RecommendationResult
 }

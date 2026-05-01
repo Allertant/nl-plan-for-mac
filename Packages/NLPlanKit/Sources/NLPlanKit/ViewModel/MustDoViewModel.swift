@@ -336,7 +336,8 @@ final class MustDoViewModel {
                     try await runSuggestRecommendation(
                         allCandidates: allCandidates,
                         currentTasks: currentTasks,
-                        remainingHours: remainingHours
+                        remainingHours: remainingHours,
+                        extraContext: extraContext
                     )
                 }
             } catch is CancellationError {
@@ -441,7 +442,8 @@ final class MustDoViewModel {
     private func runSuggestRecommendation(
         allCandidates: [IdeaEntity],
         currentTasks: [DailyTaskEntity],
-        remainingHours: Double
+        remainingHours: Double,
+        extraContext: String?
     ) async throws {
         // 筛选无安排的项目
         var projectCandidates: [IdeaEntity] = []
@@ -472,7 +474,7 @@ final class MustDoViewModel {
 
         let aiService = await makeAIService()
         let selectionResult = try await aiExecutionCoordinator.run {
-            try await aiService.selectProjects(inputs: selectionInputs, remainingHours: remainingHours)
+            try await aiService.selectProjects(inputs: selectionInputs, remainingHours: remainingHours, extraContext: extraContext)
         }
         guard !Task.isCancelled else { return }
         accumulateTokenUsage(aiService)
@@ -567,7 +569,8 @@ final class MustDoViewModel {
                 mustDoTasks: mustDoInputs,
                 arrangements: allArrangementInputs,
                 settledTasks: allSettledInputs,
-                remainingHours: remainingHours
+                remainingHours: remainingHours,
+                extraContext: extraContext
             )
         }
         guard !Task.isCancelled else { return }
