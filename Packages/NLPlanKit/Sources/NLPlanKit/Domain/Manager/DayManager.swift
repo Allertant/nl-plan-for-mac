@@ -89,15 +89,22 @@ final class DayManager {
         return summary
     }
 
-    /// 检查是否存在需要用户手动补结算的日期。只返回提醒日期，不自动评分或迁移。
+    /// 检查是否存在需要用户手动补结算的日期。从昨天往前扫描，找到最近一个有必做项但没 summary 的日期。
     func pendingSettlementDate(referenceDate: Date = .now) throws -> Date? {
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: referenceDate)!
-        let yesterdayStart = Calendar.current.startOfDay(for: yesterday)
-        if try summaryRepo.fetch(date: yesterdayStart) != nil {
-            return nil
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: referenceDate)
+        for offset in 1...30 {
+            guard let date = cal.date(byAdding: .day, value: -offset, to: todayStart) else { break }
+            let dayStart = cal.startOfDay(for: date)
+            if try summaryRepo.fetch(date: dayStart) != nil {
+                continue
+            }
+            let tasks = try dailyTaskRepo.fetchTasks(date: dayStart)
+            if !tasks.isEmpty {
+                return dayStart
+            }
         }
-        let yesterdayTasks = try dailyTaskRepo.fetchTasks(date: yesterdayStart)
-        return yesterdayTasks.isEmpty ? nil : yesterdayStart
+        return nil
     }
 
     // MARK: - Check Yesterday
