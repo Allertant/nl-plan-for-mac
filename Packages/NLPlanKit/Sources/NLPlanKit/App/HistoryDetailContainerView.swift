@@ -230,6 +230,8 @@ private struct HistoryDetailPageView: View {
             }
 
             HStack(spacing: 8) {
+                TagChip(text: task.category)
+
                 Text("预估 \(task.estimatedMinutes)分钟")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
