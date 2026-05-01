@@ -136,17 +136,11 @@ private struct ProjectDetailPageView: View {
 
     private func loadProjectDetail() async {
         let ideaId = idea.id
-        async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: ideaId)
-        async let settled = viewModel.fetchSettledTasks(sourceIdeaId: ideaId)
         async let projectNotes = viewModel.fetchProjectNotes(ideaId: ideaId)
         async let projectArrangements = viewModel.fetchArrangements(projectId: ideaId)
-        let active = await tasks
-        let settledList = await settled
+        await refreshAllTasks()
         notes = await projectNotes
         _ = await projectArrangements
-
-        let settledIds = Set(settledList.map(\.id))
-        allTasks = active.filter { !settledIds.contains($0.id) } + settledList
 
         if let freshIdea = await viewModel.fetchIdea(ideaId: ideaId) {
             projectDetail = ProjectDetailSnapshot(idea: freshIdea)
@@ -157,6 +151,16 @@ private struct ProjectDetailPageView: View {
     private func reloadDetail() async {
         guard let freshIdea = await viewModel.fetchIdea(ideaId: idea.id) else { return }
         projectDetail = ProjectDetailSnapshot(idea: freshIdea)
+    }
+
+    private func refreshAllTasks() async {
+        let ideaId = idea.id
+        async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: ideaId)
+        async let settled = viewModel.fetchSettledTasks(sourceIdeaId: ideaId)
+        let active = await tasks
+        let settledList = await settled
+        let settledIds = Set(settledList.map(\.id))
+        allTasks = active.filter { !settledIds.contains($0.id) } + settledList
     }
 
     // MARK: - Cards
@@ -434,7 +438,7 @@ private struct ProjectDetailPageView: View {
                         onPromote: { priority in
                             Task {
                                 await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
-                                allTasks = await viewModel.fetchLinkedMustDoTasks(sourceIdeaId: idea.id)
+                                await refreshAllTasks()
                             }
                         },
                         onUpdate: { content, minutes, deadline in
