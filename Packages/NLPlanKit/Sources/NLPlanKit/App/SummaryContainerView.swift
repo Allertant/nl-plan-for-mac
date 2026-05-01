@@ -42,6 +42,7 @@ struct SummaryContainerView: View {
                 )
                 let taskMgr = TaskManager(
                     ideaRepo: ideaRepo,
+                    projectRepo: ProjectRepository(modelContext: context),
                     dailyTaskRepo: dailyTaskRepo,
                     thoughtRepo: ThoughtRepository(modelContext: context),
                     sessionLogRepo: sessionLogRepo,

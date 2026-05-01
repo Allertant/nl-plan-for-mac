@@ -280,27 +280,6 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func updateProjectState(ideaId: UUID, isProject: Bool, source: ProjectDecisionSource = .user) async {
-        do {
-            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
-            idea.isProject = isProject
-            idea.projectDecisionSource = source.rawValue
-            idea.estimatedMinutes = isProject ? nil : (idea.estimatedMinutes ?? 30)
-            if !isProject {
-                idea.projectProgress = 0
-                idea.projectProgressSummary = nil
-                idea.projectProgressUpdatedAt = nil
-            }
-            try await taskManager.updateIdea(idea)
-            if isProject {
-                try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
-            }
-            await refresh()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func refreshProjectAnalyses(ideaId: UUID? = nil) async {
         if let ideaId {
             guard !isRefreshingProjects, !refreshingProjectIds.contains(ideaId) else { return }

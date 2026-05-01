@@ -10,7 +10,6 @@ struct IdeaPoolTaskRow: View {
     let onDelete: () -> Void
     let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?, _ deadline: Date?) -> Void
     let onRefreshProject: () -> Void
-    let onUpdateProjectState: (Bool) -> Void
     let onOpenProject: () -> Void
 
     @State private var flashCount = 0
@@ -43,15 +42,9 @@ struct IdeaPoolTaskRow: View {
                     Text(idea.title).font(.system(size: 12, weight: .medium)).lineLimit(2).onTapGesture { if !idea.isProject { startEditingTitle() } }
                 }
                 if idea.aiRecommended { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.orange) }
-                Menu {
-                    Button(idea.isProject ? "设为普通想法" : "设为项目") { onUpdateProjectState(!idea.isProject) }
-                } label: {
-                    if idea.isProject {
-                        Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
-                    } else {
-                        Image(systemName: "chevron.down.circle").font(.system(size: 10)).foregroundStyle(.tertiary)
-                    }
-                }.menuStyle(.borderlessButton).menuIndicator(.hidden)
+                if idea.isProject {
+                    Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
+                }
                 if !idea.isProject && idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
                 if isInProgress { Text("进行中").font(.system(size: 9, weight: .medium)).foregroundStyle(.green).padding(.horizontal, 4).padding(.vertical, 1).background(Color.green.opacity(0.14)).cornerRadius(3) }
                 Spacer(minLength: 8)

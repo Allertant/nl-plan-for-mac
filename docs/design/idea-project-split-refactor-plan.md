@@ -338,11 +338,19 @@
 ### 风险
 
 - 当前已有旧项目数据仍在 `IdeaEntity`
-- 所以这一步只是“新数据入新表，旧数据继续兼容”
+- 所以这一步只是”新数据入新表，旧数据继续兼容”
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- `TaskManager` 新增 `projectRepo: ProjectRepository`，构造函数已更新
+- `saveParsedTasks` 返回类型改为 `[UUID]`，内部按 `isProject` 分流：项目 → `ProjectRepository.create`，普通想法 → `IdeaRepository.create`
+- `saveSingleParsedTask` 返回类型改为 `UUID`，同样分流
+- `InputViewModel.confirmQueueItem` / `approveSingleTask` 适配新返回类型
+- `AppState` / `SummaryContainerView` 的 TaskManager 实例化已补充 `projectRepo` 参数
+- 删除 `IdeaPoolViewModel.updateProjectState` 方法
+- 删除 `IdeaPoolTaskRow` 的互转菜单按钮（`onUpdateProjectState` 回调），保留项目标签静态展示
+- 删除 `IdeaPoolSection` 中对应的回调接线
 
 ---
 
@@ -629,7 +637,7 @@
 
 - [x] 阶段 0 已完成
 - [x] 阶段 1 已完成
-- [ ] 阶段 2 已完成
+- [x] 阶段 2 已完成
 - [ ] 阶段 3 已完成
 - [ ] 阶段 4 已完成
 - [ ] 阶段 5 已完成

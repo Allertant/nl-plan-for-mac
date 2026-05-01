@@ -6,6 +6,7 @@ import SwiftData
 final class TaskManager {
 
     private let ideaRepo: IdeaRepository
+    private let projectRepo: ProjectRepository
     private let dailyTaskRepo: DailyTaskRepository
     private let thoughtRepo: ThoughtRepository
     private let sessionLogRepo: SessionLogRepository
@@ -19,6 +20,7 @@ final class TaskManager {
 
     init(
         ideaRepo: IdeaRepository,
+        projectRepo: ProjectRepository,
         dailyTaskRepo: DailyTaskRepository,
         thoughtRepo: ThoughtRepository,
         sessionLogRepo: SessionLogRepository,
@@ -27,6 +29,7 @@ final class TaskManager {
         timerEngine: TimerEngine
     ) {
         self.ideaRepo = ideaRepo
+        self.projectRepo = projectRepo
         self.dailyTaskRepo = dailyTaskRepo
         self.thoughtRepo = thoughtRepo
         self.sessionLogRepo = sessionLogRepo
@@ -69,56 +72,72 @@ final class TaskManager {
         }
     }
 
-    /// 将已解析的任务保存到想法池
-    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [IdeaEntity] {
+    /// 将已解析的任务保存到想法池或项目表
+    func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [UUID] {
         // 1. 保存原始想法
         let thought = try thoughtRepo.create(rawText: rawText)
 
-        // 2. 转为 IdeaEntity 并保存
-        var createdIdeas: [IdeaEntity] = []
+        // 2. 按 isProject 分流保存
+        var createdIds: [UUID] = []
         for (index, parsed) in parsedTasks.enumerated() {
             let isProject = parsed.isProject ?? false
-            let idea = try ideaRepo.create(
-                title: parsed.title,
-                category: parsed.category,
-                estimatedMinutes: isProject ? nil : parsed.estimatedMinutes,
-                aiRecommended: parsed.recommended,
-                recommendationReason: parsed.reason,
-                sortOrder: index,
-                note: parsed.note,
-                isProject: isProject,
-                projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
-                projectProgress: isProject ? 0 : nil,
-                deadline: parsed.deadline
-            )
-            createdIdeas.append(idea)
+            if isProject {
+                let project = try projectRepo.create(
+                    title: parsed.title,
+                    category: parsed.category,
+                    sortOrder: index,
+                    projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
+                    deadline: parsed.deadline
+                )
+                createdIds.append(project.id)
+            } else {
+                let idea = try ideaRepo.create(
+                    title: parsed.title,
+                    category: parsed.category,
+                    estimatedMinutes: parsed.estimatedMinutes,
+                    aiRecommended: parsed.recommended,
+                    recommendationReason: parsed.reason,
+                    sortOrder: index,
+                    note: parsed.note,
+                    deadline: parsed.deadline
+                )
+                createdIds.append(idea.id)
+            }
         }
 
         // 3. 标记想法已处理
         try thoughtRepo.markProcessed(thought)
 
-        return createdIdeas
+        return createdIds
     }
 
-    /// 将单个已解析任务保存到想法池
-    func saveSingleParsedTask(_ parsed: ParsedTask, rawText: String) async throws -> IdeaEntity {
+    /// 将单个已解析任务保存到想法池或项目表
+    func saveSingleParsedTask(_ parsed: ParsedTask, rawText: String) async throws -> UUID {
         let isProject = parsed.isProject ?? false
-        return try ideaRepo.create(
-            title: parsed.title,
-            category: parsed.category,
-            estimatedMinutes: isProject ? nil : parsed.estimatedMinutes,
-            aiRecommended: parsed.recommended,
-            recommendationReason: parsed.reason,
-            note: parsed.note,
-            isProject: isProject,
-            projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
-            projectProgress: isProject ? 0 : nil,
-            deadline: parsed.deadline
-        )
+        if isProject {
+            let project = try projectRepo.create(
+                title: parsed.title,
+                category: parsed.category,
+                projectDecisionSource: parsed.isProject != nil ? "ai" : nil,
+                deadline: parsed.deadline
+            )
+            return project.id
+        } else {
+            let idea = try ideaRepo.create(
+                title: parsed.title,
+                category: parsed.category,
+                estimatedMinutes: parsed.estimatedMinutes,
+                aiRecommended: parsed.recommended,
+                recommendationReason: parsed.reason,
+                note: parsed.note,
+                deadline: parsed.deadline
+            )
+            return idea.id
+        }
     }
 
-    /// 提交自然语言 → AI 解析 → 进入想法池（一步到位）
-    func submitThought(rawText: String) async throws -> [IdeaEntity] {
+    /// 提交自然语言 → AI 解析 → 进入想法池或项目表（一步到位）
+    func submitThought(rawText: String) async throws -> [UUID] {
         let existingIdeas = try ideaRepo.fetchVisibleIdeas()
         let existingTitles = existingIdeas.map { $0.title }
         let parsedTasks = try await parseThoughts(rawText: rawText, existingTaskTitles: existingTitles)

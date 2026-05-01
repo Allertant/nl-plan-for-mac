@@ -193,6 +193,7 @@ final class AppState {
         let context = modelContainer.mainContext
 
         let ideaRepo = IdeaRepository(modelContext: context)
+        let projectRepo = ProjectRepository(modelContext: context)
         let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let thoughtRepo = ThoughtRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
@@ -201,6 +202,7 @@ final class AppState {
 
         let taskMgr = TaskManager(
             ideaRepo: ideaRepo,
+            projectRepo: projectRepo,
             dailyTaskRepo: dailyTaskRepo,
             thoughtRepo: thoughtRepo,
             sessionLogRepo: sessionLogRepo,

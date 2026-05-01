@@ -125,13 +125,12 @@ final class InputViewModel {
         do {
             let finalParsedTasks = try await classifyParsedTasksIfNeeded(parsedTasks)
             accumulateTokenUsage(for: id)
-            let createdIdeas = try await taskManager.saveParsedTasks(
+            let createdIds = try await taskManager.saveParsedTasks(
                 parsedTasks: finalParsedTasks,
                 rawText: item.rawText
             )
             successMessage = "✅ 已添加到想法池"
-            let ideaIds = createdIdeas.map { $0.id }
-            await onSubmitSuccess?(ideaIds)
+            await onSubmitSuccess?(createdIds)
 
             // 删除队列实体
             try parseQueueRepo.delete(item)
@@ -229,8 +228,8 @@ final class InputViewModel {
         do {
             let classified = try await classifyParsedTasksIfNeeded([task], force: task.isProject == nil)
             accumulateTokenUsage(for: queueItemID)
-            let idea = try await taskManager.saveSingleParsedTask(classified[0], rawText: item.rawText)
-            await onSubmitSuccess?([idea.id])
+            let createdId = try await taskManager.saveSingleParsedTask(classified[0], rawText: item.rawText)
+            await onSubmitSuccess?([createdId])
 
             tasks.remove(at: idx)
             item.parsedTasks = tasks
