@@ -14,6 +14,7 @@ public struct NLPlanMenuBarScene: Scene {
             let schema = Schema([
                 ThoughtEntity.self,
                 IdeaEntity.self,
+                ProjectEntity.self,
                 DailyTaskEntity.self,
                 ProjectNoteEntity.self,
                 ProjectArrangementEntity.self,
