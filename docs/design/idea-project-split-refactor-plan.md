@@ -304,7 +304,12 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- 新增 `ProjectEntity`，包含全部项目专属字段（进度、描述、规划背景、推荐摘要等）
+- 新增 `ProjectStatus` 枚举（pending / active / archived）
+- 新增 `ProjectRepository`，提供 create、fetchById、fetchVisibleProjects、fetchRecommendationCandidates、update、touchRecommendationContext、delete
+- `NLPlanMenuBarScene` 的 SwiftData schema 已注册 `ProjectEntity`
+- 现有 `IdeaEntity` 继续可用，未做任何改动
 
 ---
 
@@ -623,7 +628,7 @@
 ## 执行记录
 
 - [x] 阶段 0 已完成
-- [ ] 阶段 1 已完成
+- [x] 阶段 1 已完成
 - [ ] 阶段 2 已完成
 - [ ] 阶段 3 已完成
 - [ ] 阶段 4 已完成
