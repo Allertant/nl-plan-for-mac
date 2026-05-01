@@ -38,6 +38,9 @@ enum AppConstants {
     /// 工作结束时间持久化 key
     static let workEndTimeKey = "nlplan_work_end_time"
 
+    /// 并行计时持久化 key
+    static let allowParallelKey = "nlplan_allow_parallel"
+
     /// 自定义标签持久化 key
     static let tagsKey = "nlplan_custom_tags"
 

@@ -31,7 +31,14 @@ final class SettingsViewModel {
 
     // MARK: - 功能设置
 
-    var allowParallel: Bool = false
+    var allowParallel: Bool = false {
+        didSet {
+            UserDefaults.standard.set(allowParallel, forKey: AppConstants.allowParallelKey)
+            if let appState {
+                Task { await appState.timerEngine.setAllowParallel(allowParallel) }
+            }
+        }
+    }
     var syncToNotes: Bool = true
     var workEndHour: Double = AppConstants.defaultWorkEndHour
 
@@ -114,6 +121,7 @@ final class SettingsViewModel {
         loadSelectedModel()
         loadWorkEndTime()
         loadTags()
+        loadAllowParallel()
     }
 
     // MARK: - Lifecycle
@@ -196,6 +204,10 @@ final class SettingsViewModel {
 
     func loadSelectedModel() {
         selectedModel = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
+    }
+
+    func loadAllowParallel() {
+        allowParallel = UserDefaults.standard.bool(forKey: AppConstants.allowParallelKey)
     }
 
     func saveSelectedModel(_ model: String) {

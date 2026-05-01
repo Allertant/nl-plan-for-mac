@@ -26,6 +26,9 @@ public struct NLPlanMenuBarScene: Scene {
             container = mc
 
             let engine = TimerEngine()
+            if UserDefaults.standard.bool(forKey: AppConstants.allowParallelKey) {
+                Task { await engine.setAllowParallel(true) }
+            }
             _appState = State(initialValue: AppState(modelContainer: mc, timerEngine: engine))
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")

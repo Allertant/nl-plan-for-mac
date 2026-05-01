@@ -139,6 +139,7 @@ struct SettingsContainerView: View {
         })
         .task {
             viewModel.appState = appState
+            await appState.timerEngine.setAllowParallel(viewModel.allowParallel)
         }
     }
 }
