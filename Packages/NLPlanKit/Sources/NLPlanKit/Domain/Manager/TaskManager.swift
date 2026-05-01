@@ -126,14 +126,20 @@ final class TaskManager {
     }
 
     /// 从想法池中挑选任务加入必做项
-    func promoteToMustDo(ideaId: UUID, priority: TaskPriority? = nil, sortOrder: Int? = nil) async throws {
+    func promoteToMustDo(
+        ideaId: UUID,
+        priority: TaskPriority? = nil,
+        sortOrder: Int? = nil,
+        estimatedMinutesOverride: Int? = nil
+    ) async throws {
         guard let idea = try ideaRepo.fetchById(ideaId) else {
             throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
         guard idea.ideaStatus != .completed, idea.ideaStatus != .archived else { return }
 
         if !idea.isProject {
-            guard idea.estimatedMinutes != nil else {
+            let estimatedMinutes = estimatedMinutesOverride ?? idea.estimatedMinutes
+            guard estimatedMinutes != nil else {
                 throw NLPlanError.invalidData(message: "普通想法缺少预估时长，无法加入必做项")
             }
             let activeLinkedTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: idea.id)
@@ -143,7 +149,7 @@ final class TaskManager {
         _ = try dailyTaskRepo.create(
             title: idea.title,
             category: idea.category,
-            estimatedMinutes: idea.estimatedMinutes ?? 30,
+            estimatedMinutes: estimatedMinutesOverride ?? idea.estimatedMinutes ?? 30,
             priority: priority ?? idea.taskPriority,
             aiRecommended: idea.aiRecommended,
             recommendationReason: idea.recommendationReason,
@@ -530,7 +536,8 @@ final class TaskManager {
     func promoteArrangementToMustDo(
         arrangementId: UUID,
         priority: TaskPriority? = nil,
-        sortOrder: Int? = nil
+        sortOrder: Int? = nil,
+        estimatedMinutesOverride: Int? = nil
     ) async throws -> DailyTaskEntity? {
         guard let arrangement = try arrangementRepo.fetchById(arrangementId) else {
             throw NLPlanError.dataNotFound(entity: "ProjectArrangement", id: arrangementId)
@@ -557,7 +564,7 @@ final class TaskManager {
         let task = try dailyTaskRepo.create(
             title: arrangement.content,
             category: project.category,
-            estimatedMinutes: arrangement.estimatedMinutes,
+            estimatedMinutes: estimatedMinutesOverride ?? arrangement.estimatedMinutes,
             priority: priority ?? .medium,
             aiRecommended: false,
             recommendationReason: nil,

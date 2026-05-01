@@ -224,7 +224,8 @@ private struct AIRecommendPanel: View {
                             task: rec,
                             reason: rec.reason,
                             isAccepted: viewModel.acceptedRecommendationIds.contains(rec.id),
-                            isEditable: viewModel.recommendationStrategy == .suggest,
+                            canEditCategory: viewModel.recommendationStrategy == .suggest,
+                            canEditMinutes: true,
                             ideaPoolIdeas: ideaPoolIdeas,
                             selectedPriority: Binding(
                                 get: { viewModel.selectedPriorities[rec.id] ?? .medium },
@@ -298,7 +299,8 @@ private struct RecommendationRow: View {
     let task: TaskRecommendation
     let reason: String
     let isAccepted: Bool
-    let isEditable: Bool
+    let canEditCategory: Bool
+    let canEditMinutes: Bool
     let ideaPoolIdeas: [IdeaEntity]
     @Binding var selectedPriority: TaskPriority
     let onAccept: () -> Void
@@ -358,7 +360,7 @@ private struct RecommendationRow: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 8) {
-                    if !isAccepted && isEditable {
+                    if !isAccepted && canEditCategory {
                         Button { showingCategoryMenu.toggle() } label: {
                             TagChip(text: currentCategory)
                         }
@@ -372,12 +374,12 @@ private struct RecommendationRow: View {
                             }
                         }
                     } else {
-                        Label(task.category, systemImage: "tag")
+                        Label(currentCategory, systemImage: "tag")
                             .font(.system(size: 10))
-                            .foregroundStyle(task.category.tagColor)
+                            .foregroundStyle(currentCategory.tagColor)
                     }
 
-                    if !isAccepted && isEditable && editingMinutes {
+                    if !isAccepted && canEditMinutes && editingMinutes {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                             TextField("1h30m", text: $draftMinutes)
@@ -393,11 +395,11 @@ private struct RecommendationRow: View {
                         .background(Color.accentColor.opacity(0.1))
                         .cornerRadius(3)
                     } else {
-                        Label((isEditable ? currentMinutes : task.estimatedMinutes).hourMinuteString, systemImage: "clock")
+                        Label((canEditMinutes ? currentMinutes : task.estimatedMinutes).hourMinuteString, systemImage: "clock")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                             .onTapGesture {
-                                guard !isAccepted && isEditable else { return }
+                                guard !isAccepted && canEditMinutes else { return }
                                 startEditingMinutes()
                             }
                     }

@@ -788,10 +788,16 @@ final class MustDoViewModel {
             _ = try await taskManager.promoteArrangementToMustDo(
                 arrangementId: arrangementId,
                 priority: priority,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                estimatedMinutesOverride: minutes
             )
         } else if let taskId = recommendation.taskId {
-            try await taskManager.promoteToMustDo(ideaId: taskId, priority: priority, sortOrder: sortOrder)
+            try await taskManager.promoteToMustDo(
+                ideaId: taskId,
+                priority: priority,
+                sortOrder: sortOrder,
+                estimatedMinutesOverride: minutes
+            )
         } else {
             _ = try await taskManager.createMustDoTask(
                 title: recommendation.title,
