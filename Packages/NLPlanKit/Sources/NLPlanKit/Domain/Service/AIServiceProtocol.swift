@@ -82,15 +82,21 @@ protocol AIServiceProtocol: Sendable {
     func selectProjects(
         inputs: [ProjectSelectionInput],
         remainingHours: Double,
+        mustDoTotalMinutes: Int,
+        freeHours: Double,
+        categoryDistribution: String,
         extraContext: String?
     ) async throws -> ProjectSelectionResult
 
     /// 项目提示第二轮：为选中项目生成具体的切片任务
     func generateProjectSlices(
         projects: [TaskRecommendationInput],
-        mustDoTasks: [TaskRecommendationInput],
+        mustDoTotalMinutes: Int,
+        categoryDistribution: String,
+        freeHours: Double,
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
+        activeMustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
         extraContext: String?
     ) async throws -> RecommendationResult

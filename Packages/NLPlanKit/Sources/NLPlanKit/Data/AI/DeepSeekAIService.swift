@@ -280,9 +280,19 @@ final class DeepSeekAIService: AIServiceProtocol {
     func selectProjects(
         inputs: [ProjectSelectionInput],
         remainingHours: Double,
+        mustDoTotalMinutes: Int,
+        freeHours: Double,
+        categoryDistribution: String,
         extraContext: String?
     ) async throws -> ProjectSelectionResult {
-        let prompt = PromptTemplates.selectProjects(inputs: inputs, remainingHours: remainingHours, extraContext: extraContext)
+        let prompt = PromptTemplates.selectProjects(
+            inputs: inputs,
+            remainingHours: remainingHours,
+            mustDoTotalMinutes: mustDoTotalMinutes,
+            freeHours: freeHours,
+            categoryDistribution: categoryDistribution,
+            extraContext: extraContext
+        )
         print("[项目提示·选择项目] prompt:\n\(prompt)")
         let response = try await requestAndParse(
             systemPrompt: "你是一个任务管理助手，只输出 JSON 格式。",
@@ -298,17 +308,23 @@ final class DeepSeekAIService: AIServiceProtocol {
 
     func generateProjectSlices(
         projects: [TaskRecommendationInput],
-        mustDoTasks: [TaskRecommendationInput],
+        mustDoTotalMinutes: Int,
+        categoryDistribution: String,
+        freeHours: Double,
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
+        activeMustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
         extraContext: String?
     ) async throws -> RecommendationResult {
         let prompt = PromptTemplates.generateProjectSlices(
             projects: projects,
-            mustDoTasks: mustDoTasks,
+            mustDoTotalMinutes: mustDoTotalMinutes,
+            categoryDistribution: categoryDistribution,
+            freeHours: freeHours,
             arrangements: arrangements,
             settledTasks: settledTasks,
+            activeMustDoTasks: activeMustDoTasks,
             remainingHours: remainingHours,
             extraContext: extraContext
         )

@@ -395,9 +395,22 @@ enum PromptTemplates {
         strategy: MustDoViewModel.RecommendationStrategy,
         extraContext: String? = nil
     ) -> String {
-        let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). 标题: \(t.title) | 时长: \((t.estimatedMinutes ?? 0))分钟 | 分类: \(t.category) | 状态: \(t.status)"
-        }.joined(separator: "\n")
+        let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
+            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
+        }
+        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
+
+        let categoryDistribution: String
+        if mustDoTasks.isEmpty {
+            categoryDistribution = "（无）"
+        } else {
+            let counts = Dictionary(grouping: mustDoTasks, by: \.category)
+                .mapValues { $0.count }
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key)×\($0.value)" }
+                .joined(separator: ", ")
+            categoryDistribution = counts
+        }
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
@@ -435,11 +448,6 @@ enum PromptTemplates {
             return "\(base)\(details)"
         }.joined(separator: "\n")
 
-        let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
-            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
-        }
-        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
-
         let strategyHint: String
         switch strategy {
         case .quick:
@@ -464,10 +472,8 @@ enum PromptTemplates {
         ## 当前时间
         今天是 \(formatToday())，剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
 
-        ## 今日必做项（已有）
-        \(mustDoTasks.isEmpty ? "（无）" : mustDoList)
-
-        必做项预计总时长：\(mustDoTotalMinutes) 分钟
+        ## 今日已有必做项
+        总时长：\(mustDoTotalMinutes) 分钟 | 已有分类分布：\(categoryDistribution)
 
         ## 想法池（可选任务）
         \(ideaList)
@@ -513,6 +519,8 @@ enum PromptTemplates {
         }
         """
     }
+
+    // MARK: - 项目分类
 
     static func classifyProjects(tasks: [ProjectClassificationInput]) -> String {
         let taskList = tasks.enumerated().map { index, task in
@@ -585,6 +593,8 @@ enum PromptTemplates {
         """
     }
 
+    // MARK: - 项目进度分析
+
     static func analyzeProjectProgress(projects: [ProjectProgressInput]) -> String {
         let projectList = projects.enumerated().map { index, project in
             let completed = project.completedTasks.map {
@@ -631,6 +641,8 @@ enum PromptTemplates {
         }
         """
     }
+
+    // MARK: - 项目推荐摘要
 
     static func generateProjectRecommendationSummary(input: ProjectRecommendationSummaryInput) -> String {
         let notesText = input.notes.isEmpty ? "（无）" : input.notes.enumerated().map {
@@ -687,6 +699,8 @@ enum PromptTemplates {
         \(settledTasksText)
         """
     }
+
+    // MARK: - 规划背景提示
 
     static func generatePlanningBackgroundPrompt(input: PlanningBackgroundPromptInput) -> String {
         let notesText = input.notes.isEmpty ? "（无）" : input.notes.enumerated().map {
@@ -801,7 +815,14 @@ enum PromptTemplates {
 
     // MARK: - 项目提示（第一轮筛选）
 
-    static func selectProjects(inputs: [ProjectSelectionInput], remainingHours: Double, extraContext: String? = nil) -> String {
+    static func selectProjects(
+        inputs: [ProjectSelectionInput],
+        remainingHours: Double,
+        mustDoTotalMinutes: Int,
+        freeHours: Double,
+        categoryDistribution: String,
+        extraContext: String? = nil
+    ) -> String {
         let projectList = inputs.enumerated().map { i, p in
             let progressText = p.progress.map { "\(Int($0))%" } ?? "未知"
             var line = "\(i + 1). [idea_id: \(p.ideaId.uuidString)] 标题: \(p.title) | 分类: \(p.category) | 进度: \(progressText)"
@@ -825,6 +846,12 @@ enum PromptTemplates {
         ## 当前时间
         今天是 \(formatToday())，剩余工作时间约 \(String(format: "%.1f", remainingHours)) 小时
 
+        ## 今日已有必做项
+        总时长：\(mustDoTotalMinutes) 分钟 | 已有分类分布：\(categoryDistribution)
+
+        ## 剩余可用空余时间
+        约 \(String(format: "%.1f", freeHours)) 小时
+
         ## 候选项目
         \(projectList)
         \(extraSection)
@@ -833,7 +860,8 @@ enum PromptTemplates {
         1. 项目进度较低的优先（更需要推进）
         2. 有近期截止时间的优先
         3. 推荐状态摘要中提到的下一步方向是否适合今天执行
-        4. 如果没有合适的项目，返回空列表并说明理由
+        4. 剩余空余时间是否足够推进该项目
+        5. 如果没有合适的项目，返回空列表并说明理由
 
         输出要求：只输出严格 JSON，不要输出 Markdown 代码块、解释文字或多余字段。
         {
@@ -849,15 +877,21 @@ enum PromptTemplates {
 
     static func generateProjectSlices(
         projects: [TaskRecommendationInput],
-        mustDoTasks: [TaskRecommendationInput],
+        mustDoTotalMinutes: Int,
+        categoryDistribution: String,
+        freeHours: Double,
         arrangements: [TaskRecommendationInput],
         settledTasks: [TaskRecommendationInput],
+        activeMustDoTasks: [TaskRecommendationInput],
         remainingHours: Double,
         extraContext: String? = nil
     ) -> String {
         let projectList = projects.map { p in
             let durationText = p.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
             var details = "[项目] UUID: \(p.id.uuidString) | 标题: \(p.title) | 时长: \(durationText) | 分类: \(p.category)"
+            if let summary = p.projectRecommendationSummary, !summary.isEmpty {
+                details += "\n   推荐摘要：\(summary)"
+            }
             if let desc = p.projectDescription, !desc.isEmpty {
                 details += "\n   项目描述：\(desc)"
             }
@@ -870,10 +904,6 @@ enum PromptTemplates {
             return details
         }.joined(separator: "\n")
 
-        let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). 标题: \(t.title) | 时长: \((t.estimatedMinutes ?? 0))分钟 | 分类: \(t.category) | 状态: \(t.status)"
-        }.joined(separator: "\n")
-
         let arrangementList = arrangements.isEmpty ? "（无）" : arrangements.enumerated().map { i, a in
             "\(i + 1). 标题: \(a.title) | 时长: \(a.estimatedMinutes ?? 0)分钟 | 分类: \(a.category)"
         }.joined(separator: "\n")
@@ -882,10 +912,9 @@ enum PromptTemplates {
             "\(i + 1). 标题: \(s.title) | 分类: \(s.category) | 状态: \(s.status)"
         }.joined(separator: "\n")
 
-        let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
-            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
-        }
-        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
+        let activeMustDoList = activeMustDoTasks.isEmpty ? "（无）" : activeMustDoTasks.enumerated().map { i, t in
+            "\(i + 1). 标题: \(t.title) | 时长: \(t.estimatedMinutes ?? 0)分钟 | 分类: \(t.category) | 状态: \(t.status)"
+        }.joined(separator: "\n")
 
         var extraSection = ""
         if let extra = extraContext?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
@@ -905,28 +934,30 @@ enum PromptTemplates {
         ## 待切片项目
         \(projectList)
 
-        ## 今日必做项（已有）
-        \(mustDoTasks.isEmpty ? "（无）" : mustDoList)
+        ## 今日已有必做项
+        总时长：\(mustDoTotalMinutes) 分钟 | 已有分类分布：\(categoryDistribution)
 
-        必做项预计总时长：\(mustDoTotalMinutes) 分钟
+        ## 剩余可用空余时间
+        约 \(String(format: "%.1f", freeHours)) 小时
+
+        ## 项目关联活跃必做项（进行中或待开始）
+        \(activeMustDoList)
 
         ## 项目已有安排（未完成）
         \(arrangementList)
 
         ## 项目历史完成记录
         \(settledList)
-
-        ## 剩余可用空余时间
-        约 \(String(format: "%.1f", freeHours)) 小时
         \(extraSection)
         ## 要求
         为每个项目生成 1 个今天可执行的切片任务，考虑：
         1. 切片应在剩余空余时间内可完成（通常 30-120 分钟）
         2. 参考历史完成记录，避免重复已完成的工作
         3. 参考已有安排，不与安排冲突
-        4. 参考项目描述和规划背景，选择当前阶段最合适的下一步
-        5. 推荐标题格式为"精简项目名: 切片内容"（如「搭建博客: 调研静态站点生成工具」）
-        6. 如果没有合适的时间或项目状态不适合今天推进，返回空列表
+        4. 参考关联活跃必做项，不与正在进行的任务重叠
+        5. 参考项目描述、规划背景和推荐摘要，选择当前阶段最合适的下一步
+        6. 推荐标题格式为"精简项目名: 切片内容"（如「搭建博客: 调研静态站点生成工具」）
+        7. 如果没有合适的时间或项目状态不适合今天推进，返回空列表
 
         reason 应写清楚：
         - 为什么这个切片适合今天

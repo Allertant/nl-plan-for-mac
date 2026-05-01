@@ -445,6 +445,21 @@ final class MustDoViewModel {
         remainingHours: Double,
         extraContext: String?
     ) async throws {
+        // 统一计算必做项时间信息
+        let mustDoInputs = buildMustDoInputs(currentTasks)
+        let mustDoTotalMinutes = mustDoInputs.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
+            $0 + max(0, ($1.estimatedMinutes ?? 0) - $1.elapsedMinutes)
+        }
+        let freeHours = max(0, remainingHours - Double(mustDoTotalMinutes) / 60.0)
+        let categoryDistribution: String = {
+            if mustDoInputs.isEmpty { return "（无）" }
+            return Dictionary(grouping: mustDoInputs, by: \.category)
+                .mapValues { $0.count }
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key)×\($0.value)" }
+                .joined(separator: ", ")
+        }()
+
         // 筛选无安排的项目
         var projectCandidates: [IdeaEntity] = []
         for idea in allCandidates where idea.isProject {
@@ -474,7 +489,14 @@ final class MustDoViewModel {
 
         let aiService = await makeAIService()
         let selectionResult = try await aiExecutionCoordinator.run {
-            try await aiService.selectProjects(inputs: selectionInputs, remainingHours: remainingHours, extraContext: extraContext)
+            try await aiService.selectProjects(
+                inputs: selectionInputs,
+                remainingHours: remainingHours,
+                mustDoTotalMinutes: mustDoTotalMinutes,
+                freeHours: freeHours,
+                categoryDistribution: categoryDistribution,
+                extraContext: extraContext
+            )
         }
         guard !Task.isCancelled else { return }
         accumulateTokenUsage(aiService)
@@ -492,6 +514,7 @@ final class MustDoViewModel {
         var projectInputs: [TaskRecommendationInput] = []
         var allArrangementInputs: [TaskRecommendationInput] = []
         var allSettledInputs: [TaskRecommendationInput] = []
+        var allActiveMustDoInputs: [TaskRecommendationInput] = []
 
         for project in selectedProjects {
             let projectNotes = (try? await taskManager.fetchProjectNotes(ideaId: project.id))?.map(\.content) ?? []
@@ -505,7 +528,7 @@ final class MustDoViewModel {
                 isProject: project.isProject,
                 projectDescription: project.projectDescription,
                 planningBackground: project.planningBackground,
-                projectRecommendationSummary: nil,
+                projectRecommendationSummary: project.projectRecommendationSummary,
                 deadlineDisplay: project.deadlineDisplayString,
                 note: project.note,
                 projectNotes: projectNotes,
@@ -559,16 +582,41 @@ final class MustDoViewModel {
                     projectTitle: nil
                 ))
             }
+
+            // 关联活跃必做项（未结算的）
+            let activeMustDos = (try? await taskManager.fetchMustDo(sourceIdeaId: project.id)) ?? []
+            for task in activeMustDos where !task.isSettled {
+                allActiveMustDoInputs.append(TaskRecommendationInput(
+                    id: task.id,
+                    title: task.title,
+                    category: task.category,
+                    estimatedMinutes: task.estimatedMinutes,
+                    attempted: false,
+                    status: task.taskStatus == .done ? "已完成" : task.taskStatus.rawValue,
+                    isProject: false,
+                    projectDescription: nil,
+                    planningBackground: nil,
+                    projectRecommendationSummary: nil,
+                    deadlineDisplay: nil,
+                    note: nil,
+                    projectNotes: [],
+                    elapsedMinutes: 0,
+                    arrangementId: task.arrangementId,
+                    projectTitle: nil
+                ))
+            }
         }
         guard !Task.isCancelled else { return }
 
-        let mustDoInputs = buildMustDoInputs(currentTasks)
         let sliceResult = try await aiExecutionCoordinator.run {
             try await aiService.generateProjectSlices(
                 projects: projectInputs,
-                mustDoTasks: mustDoInputs,
+                mustDoTotalMinutes: mustDoTotalMinutes,
+                categoryDistribution: categoryDistribution,
+                freeHours: freeHours,
                 arrangements: allArrangementInputs,
                 settledTasks: allSettledInputs,
+                activeMustDoTasks: allActiveMustDoInputs,
                 remainingHours: remainingHours,
                 extraContext: extraContext
             )
