@@ -383,14 +383,18 @@ final class DayManager {
             }
 
             if let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                if task.taskStatus == .done {
-                    sourceIdea.ideaStatus = .completed
+                if sourceIdea.isProject {
+                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
                 } else {
-                    sourceIdea.ideaStatus = .attempted
-                    sourceIdea.attempted = true
+                    if task.taskStatus == .done {
+                        sourceIdea.ideaStatus = .completed
+                    } else {
+                        sourceIdea.ideaStatus = .attempted
+                        sourceIdea.attempted = true
+                    }
+                    try ideaRepo.update(sourceIdea)
+                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
                 }
-                try ideaRepo.update(sourceIdea)
-                try ideaRepo.touchProjectRecommendationContext(sourceIdea)
 
                 if sourceType == "项目链接必做项" {
                     affectedProjectIdeaIds.insert(sourceIdeaId)
