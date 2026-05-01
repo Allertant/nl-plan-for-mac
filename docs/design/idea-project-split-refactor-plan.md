@@ -430,7 +430,13 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- `DailyTaskEntity` 新增 `sourceProjectId: UUID?` 字段（保留 `sourceIdeaId` 兼容旧数据）
+- `DailyTaskRepository.create` 新增 `sourceProjectId` 参数
+- `TaskManager.promoteArrangementToMustDo` 改为先查 `ProjectEntity` 再回退 `IdeaEntity`，新项目写 `sourceProjectId`
+- `TaskManager.dailyTaskSourceType` 增加对 `ProjectEntity` 的检查
+- `DayManager.summarySourceType` 优先判断 `sourceProjectId`
+- `HistoryDetailContainerView` 加载 `sourceProjects` 字典，展示 `sourceProjectId` 对应的项目链接
 
 ---
 
@@ -646,7 +652,7 @@
 - [x] 阶段 1 已完成
 - [x] 阶段 2 已完成
 - [x] 阶段 3 已完成
-- [ ] 阶段 4 已完成
+- [x] 阶段 4 已完成
 - [ ] 阶段 5 已完成
 - [ ] 阶段 6 已完成
 - [ ] 阶段 7 已完成

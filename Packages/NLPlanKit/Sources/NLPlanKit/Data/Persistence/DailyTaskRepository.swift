@@ -25,6 +25,7 @@ final class DailyTaskRepository {
         attempted: Bool = false,
         note: String? = nil,
         sourceIdeaId: UUID? = nil,
+        sourceProjectId: UUID? = nil,
         arrangementId: UUID? = nil,
         sourceType: DailyTaskSourceType = .none
     ) throws -> DailyTaskEntity {
@@ -44,6 +45,7 @@ final class DailyTaskRepository {
             attempted: attempted,
             note: note,
             sourceIdeaId: sourceIdeaId,
+            sourceProjectId: sourceProjectId,
             arrangementId: arrangementId,
             sourceType: sourceType.rawValue
         )

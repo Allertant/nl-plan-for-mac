@@ -331,6 +331,9 @@ final class DayManager {
     }
 
     private func summarySourceType(for task: DailyTaskEntity) -> String {
+        if task.sourceProjectId != nil {
+            return "项目链接必做项"
+        }
         guard let sourceIdeaId = task.sourceIdeaId else {
             return task.aiRecommended ? "无来源必做项" : "普通想法来源必做项"
         }

@@ -26,6 +26,7 @@ private struct HistoryDetailPageView: View {
     @State private var summary: DailySummaryEntity?
     @State private var tasks: [DailyTaskEntity] = []
     @State private var sourceIdeas: [UUID: IdeaEntity] = [:]
+    @State private var sourceProjects: [UUID: ProjectEntity] = [:]
     @State private var isLoading = true
     @State private var showingIdeaPopover: IdeaEntity?
 
@@ -79,6 +80,7 @@ private struct HistoryDetailPageView: View {
     private func loadData() async {
         let context = appState.modelContainer.mainContext
         let ideaRepo = IdeaRepository(modelContext: context)
+        let projectRepo = ProjectRepository(modelContext: context)
         let dailyTaskRepo = DailyTaskRepository(modelContext: context)
         let sessionLogRepo = SessionLogRepository(modelContext: context)
         let summaryRepo = SummaryRepository(modelContext: context)
@@ -107,6 +109,11 @@ private struct HistoryDetailPageView: View {
             if let ideaId = task.sourceIdeaId, sourceIdeas[ideaId] == nil {
                 if let idea = try? ideaRepo.fetchById(ideaId) {
                     sourceIdeas[ideaId] = idea
+                }
+            }
+            if let projectId = task.sourceProjectId, sourceProjects[projectId] == nil {
+                if let project = try? projectRepo.fetchById(projectId) {
+                    sourceProjects[projectId] = project
                 }
             }
         }
@@ -269,6 +276,11 @@ private struct HistoryDetailPageView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+            } else if task.sourceProjectId != nil {
+                HStack {
+                    Spacer()
+                    ProjectNavLink(ideaId: task.sourceProjectId!, returnTo: .historyDetail(date))
                 }
             }
         }

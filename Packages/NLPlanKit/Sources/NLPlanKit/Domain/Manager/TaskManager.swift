@@ -651,26 +651,27 @@ final class TaskManager {
         }
         guard arrangement.arrangementStatus != .done else { return nil }
 
-        guard let project = try ideaRepo.fetchById(arrangement.projectId) else {
-            throw NLPlanError.dataNotFound(entity: "Idea", id: arrangement.projectId)
-        }
+        let projectEntity = try projectRepo.fetchById(arrangement.projectId)
+        let ideaEntity = try ideaRepo.fetchById(arrangement.projectId)
+        let category = projectEntity?.category ?? ideaEntity?.category ?? ""
+        let projectId = arrangement.projectId
 
         if let existingTask = try dailyTaskRepo.fetchActiveTask(arrangementId: arrangementId) {
             if arrangement.arrangementStatus != .inProgress {
                 arrangement.status = ArrangementStatus.inProgress.rawValue
                 try arrangementRepo.update(arrangement)
             }
-            if project.ideaStatus != .inProgress {
-                project.ideaStatus = .inProgress
-                try ideaRepo.touchProjectRecommendationContext(project)
-                try ideaRepo.update(project)
+            if let ideaEntity, ideaEntity.ideaStatus != .inProgress {
+                ideaEntity.ideaStatus = .inProgress
+                try ideaRepo.touchProjectRecommendationContext(ideaEntity)
+                try ideaRepo.update(ideaEntity)
             }
             return existingTask
         }
 
         let task = try dailyTaskRepo.create(
             title: arrangement.content,
-            category: project.category,
+            category: category,
             estimatedMinutes: estimatedMinutesOverride ?? arrangement.estimatedMinutes,
             priority: priority ?? .medium,
             aiRecommended: false,
@@ -678,7 +679,8 @@ final class TaskManager {
             sortOrder: sortOrder ?? arrangement.sortOrder,
             date: .now,
             note: nil,
-            sourceIdeaId: project.id,
+            sourceIdeaId: projectEntity == nil ? projectId : nil,
+            sourceProjectId: projectEntity != nil ? projectId : nil,
             arrangementId: arrangement.id,
             sourceType: .project
         )
@@ -686,9 +688,13 @@ final class TaskManager {
         arrangement.status = ArrangementStatus.inProgress.rawValue
         try arrangementRepo.update(arrangement)
 
-        project.ideaStatus = .inProgress
-        try ideaRepo.touchProjectRecommendationContext(project)
-        try ideaRepo.update(project)
+        if let projectEntity {
+            try projectRepo.touchRecommendationContext(projectEntity)
+        } else if let ideaEntity {
+            ideaEntity.ideaStatus = .inProgress
+            try ideaRepo.touchProjectRecommendationContext(ideaEntity)
+            try ideaRepo.update(ideaEntity)
+        }
 
         return task
     }
@@ -703,6 +709,7 @@ final class TaskManager {
 
     private func dailyTaskSourceType(sourceIdeaId: UUID?) throws -> DailyTaskSourceType {
         guard let sourceIdeaId else { return .none }
+        if try projectRepo.fetchById(sourceIdeaId) != nil { return .project }
         guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return .idea }
         return idea.isProject ? .project : .idea
     }
