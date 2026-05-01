@@ -430,6 +430,13 @@ private struct ProjectDetailPageView: View {
                 ForEach(viewModel.arrangements, id: \.id) { item in
                     ArrangementRow(
                         item: item,
+                        isPromoting: viewModel.promotingArrangementIds.contains(item.id),
+                        onPromote: { priority in
+                            Task {
+                                await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
+                                allTasks = await viewModel.fetchLinkedMustDoTasks(sourceIdeaId: idea.id)
+                            }
+                        },
                         onUpdate: { content, minutes, deadline in
                             Task { await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline) }
                         },
@@ -653,6 +660,8 @@ private struct ProjectNoteRow: View {
 
 private struct ArrangementRow: View {
     let item: ProjectArrangementEntity
+    let isPromoting: Bool
+    let onPromote: (TaskPriority) -> Void
     let onUpdate: (_ content: String?, _ estimatedMinutes: Int?, _ deadline: Date?) -> Void
     let onDelete: () -> Void
     let onRevive: () -> Void
@@ -669,6 +678,7 @@ private struct ArrangementRow: View {
 
     private var status: ArrangementStatus { item.arrangementStatus }
     private var isEditable: Bool { status == .pending }
+    private var canPromote: Bool { status == .pending && !isPromoting }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -697,6 +707,33 @@ private struct ArrangementRow: View {
                         .lineLimit(2)
                         .onTapGesture { if isEditable { startEditingTitle() } }
                 }
+
+                Spacer(minLength: 8)
+
+                Menu {
+                    ForEach(TaskPriority.allCases, id: \.self) { priority in
+                        Button {
+                            onPromote(priority)
+                        } label: {
+                            Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag")
+                        }
+                    }
+                } label: {
+                    if isPromoting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.green)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .help("加入必做项")
+                .disabled(!canPromote)
+                .opacity(canPromote ? 1 : 0.35)
             }
 
             // 行 2：时间 + 截止日期 + 操作按钮

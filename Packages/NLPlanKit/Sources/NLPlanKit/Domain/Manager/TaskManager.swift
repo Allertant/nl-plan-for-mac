@@ -527,6 +527,58 @@ final class TaskManager {
         try arrangementRepo.fetchById(id)
     }
 
+    func promoteArrangementToMustDo(
+        arrangementId: UUID,
+        priority: TaskPriority? = nil,
+        sortOrder: Int? = nil
+    ) async throws -> DailyTaskEntity? {
+        guard let arrangement = try arrangementRepo.fetchById(arrangementId) else {
+            throw NLPlanError.dataNotFound(entity: "ProjectArrangement", id: arrangementId)
+        }
+        guard arrangement.arrangementStatus != .done else { return nil }
+
+        guard let project = try ideaRepo.fetchById(arrangement.projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: arrangement.projectId)
+        }
+
+        if let existingTask = try dailyTaskRepo.fetchActiveTask(arrangementId: arrangementId) {
+            if arrangement.arrangementStatus != .inProgress {
+                arrangement.status = ArrangementStatus.inProgress.rawValue
+                try arrangementRepo.update(arrangement)
+            }
+            if project.ideaStatus != .inProgress {
+                project.ideaStatus = .inProgress
+                try ideaRepo.touchProjectRecommendationContext(project)
+                try ideaRepo.update(project)
+            }
+            return existingTask
+        }
+
+        let task = try dailyTaskRepo.create(
+            title: arrangement.content,
+            category: project.category,
+            estimatedMinutes: arrangement.estimatedMinutes,
+            priority: priority ?? .medium,
+            aiRecommended: false,
+            recommendationReason: nil,
+            sortOrder: sortOrder ?? arrangement.sortOrder,
+            date: .now,
+            note: nil,
+            sourceIdeaId: project.id,
+            arrangementId: arrangement.id,
+            sourceType: .project
+        )
+
+        arrangement.status = ArrangementStatus.inProgress.rawValue
+        try arrangementRepo.update(arrangement)
+
+        project.ideaStatus = .inProgress
+        try ideaRepo.touchProjectRecommendationContext(project)
+        try ideaRepo.update(project)
+
+        return task
+    }
+
     func fetchPendingArrangements(projectId: UUID) async throws -> [ProjectArrangementEntity] {
         try arrangementRepo.fetchPendingByProject(projectId: projectId)
     }

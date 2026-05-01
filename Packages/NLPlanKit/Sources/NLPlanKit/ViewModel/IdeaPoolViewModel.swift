@@ -17,6 +17,7 @@ final class IdeaPoolViewModel {
     var isRefreshingProjects: Bool = false
     var refreshingProjectIds: Set<UUID> = []
     var generatingPlanningPromptIdeaIds: Set<UUID> = []
+    var promotingArrangementIds: Set<UUID> = []
     private let minimumRefreshAnimationDuration: TimeInterval = 0.45
 
     /// 提升到必做项后的回调（用于通知必做项刷新）
@@ -539,6 +540,27 @@ final class IdeaPoolViewModel {
         guard let item = arrangements.first(where: { $0.id == arrangementId }) else { return }
         do {
             try await taskManager.updateArrangement(item, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func promoteArrangementToMustDo(arrangementId: UUID, priority: TaskPriority = .medium) async {
+        guard !promotingArrangementIds.contains(arrangementId) else { return }
+        promotingArrangementIds.insert(arrangementId)
+        defer { promotingArrangementIds.remove(arrangementId) }
+
+        do {
+            _ = try await taskManager.promoteArrangementToMustDo(arrangementId: arrangementId, priority: priority)
+            if let updated = try await taskManager.fetchArrangement(arrangementId) {
+                if let index = arrangements.firstIndex(where: { $0.id == arrangementId }) {
+                    arrangements[index] = updated
+                } else {
+                    arrangements.append(updated)
+                }
+            }
+            await refresh()
+            await onPromotedToMustDo?()
         } catch {
             errorMessage = error.localizedDescription
         }

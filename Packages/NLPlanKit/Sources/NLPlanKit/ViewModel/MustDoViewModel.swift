@@ -784,10 +784,16 @@ final class MustDoViewModel {
     private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {
         let category = editedCategories[recommendation.id] ?? recommendation.category
         let minutes = editedEstimatedMinutes[recommendation.id] ?? recommendation.estimatedMinutes
-        if let taskId = recommendation.taskId {
+        if let arrangementId = recommendation.arrangementId {
+            _ = try await taskManager.promoteArrangementToMustDo(
+                arrangementId: arrangementId,
+                priority: priority,
+                sortOrder: sortOrder
+            )
+        } else if let taskId = recommendation.taskId {
             try await taskManager.promoteToMustDo(ideaId: taskId, priority: priority, sortOrder: sortOrder)
         } else {
-            let task = try await taskManager.createMustDoTask(
+            _ = try await taskManager.createMustDoTask(
                 title: recommendation.title,
                 category: category,
                 estimatedMinutes: minutes,
@@ -797,11 +803,6 @@ final class MustDoViewModel {
                 arrangementId: recommendation.arrangementId,
                 recommendationReason: recommendation.reason
             )
-            // 标记安排为进行中
-            if let arrangementId = recommendation.arrangementId,
-               let arrangement = try? await taskManager.fetchArrangement(arrangementId) {
-                try? await taskManager.updateArrangementStatus(arrangement, status: .inProgress)
-            }
         }
     }
 
