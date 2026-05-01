@@ -396,12 +396,11 @@ enum PromptTemplates {
         extraContext: String? = nil
     ) -> String {
         let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status)"
+            "\(i + 1). 标题: \(t.title) | 时长: \((t.estimatedMinutes ?? 0))分钟 | 分类: \(t.category) | 状态: \(t.status)"
         }.joined(separator: "\n")
 
         let ideaList = ideaPoolTasks.enumerated().map { i, t in
             let durationText = t.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
-            let deadlineText = t.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
             let typeTag: String
             if let projectTitle = t.projectTitle {
                 typeTag = "[项目安排·来自项目「\(projectTitle)」]"
@@ -410,7 +409,13 @@ enum PromptTemplates {
             } else {
                 typeTag = "[普通想法]"
             }
-            let base = "\(i + 1). [id: \(t.id.uuidString)] \(typeTag) \(t.title) - \(durationText) - \(t.category)\(t.attempted ? " - 已尝试" : "")\(deadlineText)"
+            var base = "\(i + 1). [id: \(t.id.uuidString)] \(typeTag) 标题: \(t.title) | 时长: \(durationText) | 分类: \(t.category)"
+            if t.attempted {
+                base += " | 已尝试"
+            }
+            if let deadlineText = t.deadlineDisplay {
+                base += " | 截止: \(deadlineText)"
+            }
             var details = ""
             if let note = t.note, !note.isEmpty {
                 details += "\n   备注：\(note)"
@@ -438,14 +443,14 @@ enum PromptTemplates {
         let strategyHint: String
         switch strategy {
         case .quick:
-            strategyHint = "本轮是快速推荐模式，目标是优先清理想法池并快速形成完成感。倾向选择明确、低阻力、容易完成的事项。"
+            strategyHint = "本轮是快速推荐模式，从清理想法和项目安排中选择."
         case .suggest:
             strategyHint = ""
         }
 
         let extraSection: String
         if let extraContext, !extraContext.isEmpty {
-            extraSection = "\n## 用户额外要求\n\(extraContext)\n"
+            extraSection = "\n## 用户额外要求（优先级最高，可覆盖下方默认规则）\n\(extraContext)\n"
         } else {
             extraSection = ""
         }
@@ -799,14 +804,19 @@ enum PromptTemplates {
     static func selectProjects(inputs: [ProjectSelectionInput], remainingHours: Double, extraContext: String? = nil) -> String {
         let projectList = inputs.enumerated().map { i, p in
             let progressText = p.progress.map { "\(Int($0))%" } ?? "未知"
-            let summaryText = p.recommendationSummary.map { " - \($0)" } ?? ""
-            let deadlineText = p.deadlineDisplay.map { " - 截止:\($0)" } ?? ""
-            return "\(i + 1). [idea_id: \(p.ideaId.uuidString)] \(p.title) - \(p.category) - 进度:\(progressText)\(summaryText)\(deadlineText)"
+            var line = "\(i + 1). [idea_id: \(p.ideaId.uuidString)] 标题: \(p.title) | 分类: \(p.category) | 进度: \(progressText)"
+            if let summaryText = p.recommendationSummary {
+                line += " | 状态摘要: \(summaryText)"
+            }
+            if let deadlineText = p.deadlineDisplay {
+                line += " | 截止: \(deadlineText)"
+            }
+            return line
         }.joined(separator: "\n")
 
         var extraSection = ""
         if let extra = extraContext?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
-            extraSection = "\n## 用户额外要求\n\(extra)\n"
+            extraSection = "\n## 用户额外要求（优先级最高，可覆盖下方默认规则）\n\(extra)\n"
         }
 
         return """
@@ -847,7 +857,7 @@ enum PromptTemplates {
     ) -> String {
         let projectList = projects.map { p in
             let durationText = p.estimatedMinutes.map { "\($0)分钟" } ?? "无整体预估时长"
-            var details = "[项目] \(p.title)（UUID: \(p.id.uuidString)） - \(durationText) - \(p.category)"
+            var details = "[项目] UUID: \(p.id.uuidString) | 标题: \(p.title) | 时长: \(durationText) | 分类: \(p.category)"
             if let desc = p.projectDescription, !desc.isEmpty {
                 details += "\n   项目描述：\(desc)"
             }
@@ -861,15 +871,15 @@ enum PromptTemplates {
         }.joined(separator: "\n")
 
         let mustDoList = mustDoTasks.enumerated().map { i, t in
-            "\(i + 1). \(t.title) - \((t.estimatedMinutes ?? 0))分钟 - \(t.status)"
+            "\(i + 1). 标题: \(t.title) | 时长: \((t.estimatedMinutes ?? 0))分钟 | 分类: \(t.category) | 状态: \(t.status)"
         }.joined(separator: "\n")
 
         let arrangementList = arrangements.isEmpty ? "（无）" : arrangements.enumerated().map { i, a in
-            "\(i + 1). \(a.title) - \(a.estimatedMinutes ?? 0)分钟"
+            "\(i + 1). 标题: \(a.title) | 时长: \(a.estimatedMinutes ?? 0)分钟 | 分类: \(a.category)"
         }.joined(separator: "\n")
 
         let settledList = settledTasks.isEmpty ? "（无）" : settledTasks.enumerated().map { i, s in
-            "\(i + 1). \(s.title) - \(s.status)"
+            "\(i + 1). 标题: \(s.title) | 分类: \(s.category) | 状态: \(s.status)"
         }.joined(separator: "\n")
 
         let mustDoTotalMinutes = mustDoTasks.filter { !$0.status.hasPrefix("已完成") }.reduce(0) {
@@ -881,7 +891,7 @@ enum PromptTemplates {
         if let extra = extraContext?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
             extraSection = """
 
-        ## 用户额外要求
+        ## 用户额外要求（优先级最高，可覆盖下方默认规则）
         \(extra)
         """
         }
