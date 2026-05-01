@@ -11,9 +11,6 @@ struct IdeaPoolSection: View {
     @State private var didAutoFocusSearchField = false
     @FocusState private var isSearchFieldFocused: Bool
 
-    /// 过滤结果缓存（由 updateFilteredIdeas 更新）
-    @State private var filteredIdeas: [IdeaEntity] = []
-
     private var availableTags: [String] {
         UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
     }
@@ -46,6 +43,20 @@ struct IdeaPoolSection: View {
 
     private var hasSearchTokens: Bool {
         !selectedSearchTags.isEmpty || !(activeTagQuery?.isEmpty ?? true)
+    }
+
+    private var filteredIdeas: [IdeaEntity] {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasKeyword = !keyword.isEmpty
+        let hasTags = !selectedSearchTags.isEmpty
+        guard hasKeyword || hasTags else {
+            return viewModel.ideas
+        }
+        return viewModel.ideas.filter { idea in
+            let matchesKeyword = !hasKeyword || idea.title.localizedCaseInsensitiveContains(keyword)
+            let matchesTag = !hasTags || selectedSearchTags.contains(idea.category)
+            return matchesKeyword && matchesTag
+        }
     }
 
     @Environment(AppState.self) private var appState
@@ -262,27 +273,6 @@ struct IdeaPoolSection: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: searchText) { _, _ in updateFilteredIdeas() }
-        .onChange(of: selectedSearchTags) { _, _ in updateFilteredIdeas() }
-        .onChange(of: viewModel.ideas) { _, _ in updateFilteredIdeas() }
-        .onAppear { updateFilteredIdeas() }
-    }
-
-    // MARK: - Filter
-
-    private func updateFilteredIdeas() {
-        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasKeyword = !keyword.isEmpty
-        let hasTags = !selectedSearchTags.isEmpty
-        guard hasKeyword || hasTags else {
-            filteredIdeas = viewModel.ideas
-            return
-        }
-        filteredIdeas = viewModel.ideas.filter { idea in
-            let matchesKeyword = !hasKeyword || idea.title.localizedCaseInsensitiveContains(keyword)
-            let matchesTag = !hasTags || selectedSearchTags.contains(idea.category)
-            return matchesKeyword && matchesTag
-        }
     }
 
     // MARK: - Search helpers
