@@ -14,8 +14,13 @@ struct MainContentView: View {
             case .main:
                 PopoverContainerView()
 
-            case .ideaPool:
+            case .ideaPool, .projectDetail:
                 IdeaPoolContainerView()
+                    .overlay {
+                        if case .projectDetail = appState.currentPage {
+                            ProjectDetailContainerView()
+                        }
+                    }
 
             case .summary:
                 SummaryContainerView()
@@ -31,9 +36,6 @@ struct MainContentView: View {
 
             case .cleanupDetail:
                 CleanupDetailContainerView()
-
-            case .projectDetail:
-                ProjectDetailContainerView()
 
             case .historyDetail:
                 HistoryDetailContainerView()
