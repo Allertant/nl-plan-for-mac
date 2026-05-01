@@ -358,7 +358,7 @@ final class MustDoViewModel {
         extraContext: String?
     ) async throws {
         var ideaInputs: [TaskRecommendationInput] = []
-        var arrangementProjectMap: [UUID: UUID] = [:]
+        var arrangementProjectMap: [UUID: (projectId: UUID, projectTitle: String)] = [:]
 
         for idea in allCandidates {
             let projectNotes: [String]
@@ -372,7 +372,7 @@ final class MustDoViewModel {
                 let arrangements = (try? await taskManager.fetchPendingArrangements(projectId: idea.id)) ?? []
                 if arrangements.isEmpty { continue }
                 for arrangement in arrangements {
-                    arrangementProjectMap[arrangement.id] = idea.id
+                    arrangementProjectMap[arrangement.id] = (idea.id, idea.title)
                     ideaInputs.append(TaskRecommendationInput(
                         id: arrangement.id,
                         title: arrangement.content,
@@ -624,8 +624,21 @@ final class MustDoViewModel {
         guard !Task.isCancelled else { return }
         accumulateTokenUsage(aiService)
 
+        let projectTitleById = Dictionary(uniqueKeysWithValues: selectedProjects.map { ($0.id, $0.title) })
         let validRecs = sliceResult.recommendations.filter { rec in
             rec.sourceIdeaId != nil && selectedIds.contains(rec.sourceIdeaId!)
+        }.map { rec in
+            guard let sourceIdeaId = rec.sourceIdeaId,
+                  let projectTitle = projectTitleById[sourceIdeaId] else { return rec }
+            return TaskRecommendation(
+                taskId: rec.taskId,
+                sourceIdeaId: rec.sourceIdeaId,
+                arrangementId: rec.arrangementId,
+                title: self.normalizedProjectRecommendationTitle(rec.title, projectTitle: projectTitle),
+                category: rec.category,
+                estimatedMinutes: rec.estimatedMinutes,
+                reason: rec.reason
+            )
         }
         var combinedReason = ""
         if !selectionReason.isEmpty {
@@ -683,7 +696,7 @@ final class MustDoViewModel {
         _ result: RecommendationResult,
         ideaIds: Set<UUID>,
         arrangementInputIds: Set<UUID>,
-        arrangementProjectMap: [UUID: UUID]
+        arrangementProjectMap: [UUID: (projectId: UUID, projectTitle: String)]
     ) -> [TaskRecommendation] {
         result.recommendations.compactMap { recommendation -> TaskRecommendation? in
             if let taskId = recommendation.taskId {
@@ -691,12 +704,15 @@ final class MustDoViewModel {
                     return recommendation
                 }
                 if arrangementInputIds.contains(taskId),
-                   let projectId = arrangementProjectMap[taskId] {
+                   let projectContext = arrangementProjectMap[taskId] {
                     return TaskRecommendation(
                         taskId: nil,
-                        sourceIdeaId: recommendation.sourceIdeaId ?? projectId,
+                        sourceIdeaId: recommendation.sourceIdeaId ?? projectContext.projectId,
                         arrangementId: taskId,
-                        title: recommendation.title,
+                        title: self.normalizedProjectRecommendationTitle(
+                            recommendation.title,
+                            projectTitle: projectContext.projectTitle
+                        ),
                         category: recommendation.category,
                         estimatedMinutes: recommendation.estimatedMinutes,
                         reason: recommendation.reason
@@ -704,10 +720,45 @@ final class MustDoViewModel {
                 }
             }
             if let sourceIdeaId = recommendation.sourceIdeaId {
-                return recommendation
+                return TaskRecommendation(
+                    taskId: recommendation.taskId,
+                    sourceIdeaId: sourceIdeaId,
+                    arrangementId: recommendation.arrangementId,
+                    title: recommendation.title,
+                    category: recommendation.category,
+                    estimatedMinutes: recommendation.estimatedMinutes,
+                    reason: recommendation.reason
+                )
             }
             return nil
         }
+    }
+
+    private func normalizedProjectRecommendationTitle(_ title: String, projectTitle: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "\(normalizedProjectTitlePrefix(projectTitle)): 待补充任务" }
+
+        let separators = [":", "："]
+        for separator in separators {
+            if trimmed.contains(separator) {
+                let separatorCharacter: Character = separator == ":" ? ":" : "："
+                let components = trimmed.split(separator: separatorCharacter, omittingEmptySubsequences: false)
+                if components.count >= 2 {
+                    let prefix = components.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? normalizedProjectTitlePrefix(projectTitle)
+                    let suffix = components.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !prefix.isEmpty, !suffix.isEmpty {
+                        return "\(prefix): \(suffix)"
+                    }
+                }
+            }
+        }
+
+        return "\(normalizedProjectTitlePrefix(projectTitle)): \(trimmed)"
+    }
+
+    private func normalizedProjectTitlePrefix(_ projectTitle: String) -> String {
+        let trimmed = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "项目" : trimmed
     }
 
     private func assignPriorities(_ recs: [TaskRecommendation]) {
