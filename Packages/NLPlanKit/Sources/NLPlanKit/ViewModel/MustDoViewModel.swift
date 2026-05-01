@@ -144,7 +144,7 @@ final class MustDoViewModel {
     /// 更新 canSuggest 状态
     func updateCanSuggest(ideaPoolIdeas: [IdeaEntity]) {
         let projectIdeas = ideaPoolIdeas.filter {
-            $0.isProject && $0.ideaStatus != .inProgress && $0.ideaStatus != .completed && $0.ideaStatus != .archived
+            $0.isProject && isEligibleProjectRecommendationIdea($0)
         }
         Task {
             var hasProjectWithoutArrangements = false
@@ -309,9 +309,12 @@ final class MustDoViewModel {
         cumulativeTokenOutput = 0
 
         let allCandidates = ideaPoolIdeas.filter { idea in
-            idea.ideaStatus != .inProgress &&
-            idea.ideaStatus != .completed &&
-            idea.ideaStatus != .archived
+            if idea.isProject {
+                return isEligibleProjectRecommendationIdea(idea)
+            }
+            return idea.ideaStatus != .inProgress &&
+                idea.ideaStatus != .completed &&
+                idea.ideaStatus != .archived
         }
         let strategy = recommendationStrategy
         let currentTasks = tasks
@@ -830,6 +833,10 @@ final class MustDoViewModel {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
         return DeepSeekAIService(apiKey: apiKey, model: model)
+    }
+
+    private func isEligibleProjectRecommendationIdea(_ idea: IdeaEntity) -> Bool {
+        idea.ideaStatus != .completed && idea.ideaStatus != .archived
     }
 
     private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {
