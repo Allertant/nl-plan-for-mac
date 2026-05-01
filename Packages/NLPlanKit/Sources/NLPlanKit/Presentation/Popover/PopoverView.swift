@@ -126,12 +126,45 @@ struct PopoverView: View {
                     .padding(.bottom, 48)
                 }
             }
+            .overlay {
+                if let confirmAction = mustDoViewModel.pendingConfirm {
+                    confirmOverlay(for: confirmAction)
+                }
+            }
             .onAppear {
                 Task {
                     await ideaPoolViewModel.refresh()
                     await mustDoViewModel.refresh()
                 }
             }
+    }
+
+    @ViewBuilder
+    private func confirmOverlay(for action: MustDoViewModel.ConfirmAction) -> some View {
+        switch action {
+        case .complete:
+            ConfirmActionPage(
+                icon: "checkmark.circle",
+                iconTint: .green,
+                title: mustDoViewModel.confirmTaskTitle ?? "",
+                message: "确认标记为已完成？",
+                confirmLabel: "确认完成",
+                onCancel: { mustDoViewModel.cancelConfirm() },
+                onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
+            )
+            .background(.ultraThinMaterial)
+        case .demote:
+            ConfirmActionPage(
+                icon: "arrow.uturn.backward",
+                iconTint: .orange,
+                title: mustDoViewModel.confirmTaskTitle ?? "",
+                message: "确认移回想法池？",
+                confirmLabel: "确认移回",
+                onCancel: { mustDoViewModel.cancelConfirm() },
+                onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
+            )
+            .background(.ultraThinMaterial)
+        }
     }
 }
 

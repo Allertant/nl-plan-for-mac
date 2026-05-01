@@ -7,19 +7,7 @@ struct MustDoSection: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            if let confirmAction = viewModel.pendingConfirm {
-                ConfirmActionPage(
-                    icon: confirmAction.isComplete ? "checkmark.circle" : "arrow.uturn.backward",
-                    iconTint: confirmAction.isComplete ? .green : .orange,
-                    title: viewModel.confirmTaskTitle ?? "",
-                    message: confirmAction.isComplete ? "确认标记为已完成？" : "确认移回想法池？",
-                    confirmLabel: confirmAction.isComplete ? "确认完成" : "确认移回",
-                    onCancel: { viewModel.cancelConfirm() },
-                    onConfirm: { Task { await viewModel.executeConfirm() } }
-                )
-            } else {
-                mustDoListContent
-            }
+            mustDoListContent
         }
     }
 
