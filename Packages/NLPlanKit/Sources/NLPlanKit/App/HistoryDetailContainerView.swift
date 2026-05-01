@@ -98,6 +98,7 @@ private struct HistoryDetailPageView: View {
         do {
             summary = try await dayMgr.fetchSummary(date: date)
             tasks = try dailyTaskRepo.fetchAllTasks(date: date)
+                .sorted { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
         } catch {
             print("加载历史详情失败：\(error)")
         }
