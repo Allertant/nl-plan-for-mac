@@ -636,6 +636,7 @@ final class MustDoViewModel {
             return TaskRecommendation(
                 taskId: rec.taskId,
                 sourceIdeaId: rec.sourceIdeaId,
+                sourceProjectId: rec.sourceProjectId,
                 arrangementId: rec.arrangementId,
                 title: self.normalizedProjectRecommendationTitle(rec.title, projectTitle: projectTitle),
                 category: rec.category,
@@ -711,6 +712,7 @@ final class MustDoViewModel {
                     return TaskRecommendation(
                         taskId: nil,
                         sourceIdeaId: recommendation.sourceIdeaId ?? projectContext.projectId,
+                        sourceProjectId: recommendation.sourceProjectId,
                         arrangementId: taskId,
                         title: self.normalizedProjectRecommendationTitle(
                             recommendation.title,
@@ -726,6 +728,7 @@ final class MustDoViewModel {
                 return TaskRecommendation(
                     taskId: recommendation.taskId,
                     sourceIdeaId: sourceIdeaId,
+                    sourceProjectId: recommendation.sourceProjectId,
                     arrangementId: recommendation.arrangementId,
                     title: recommendation.title,
                     category: recommendation.category,
@@ -794,7 +797,7 @@ final class MustDoViewModel {
             acceptedRecommendationIds.insert(recommendation.id)
             await refresh()
             await onIdeaPoolChanged?()
-            await onProjectLinkChanged?(recommendation.sourceIdeaId)
+            await onProjectLinkChanged?(recommendation.sourceIdeaId ?? recommendation.sourceProjectId)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -808,7 +811,7 @@ final class MustDoViewModel {
                 do {
                     try await applyRecommendation(rec, priority: priority, sortOrder: index)
                     acceptedRecommendationIds.insert(rec.id)
-                    await onProjectLinkChanged?(rec.sourceIdeaId)
+                    await onProjectLinkChanged?(rec.sourceIdeaId ?? rec.sourceProjectId)
                 } catch {
                     errorMessage = error.localizedDescription
                 }
@@ -864,6 +867,7 @@ final class MustDoViewModel {
                 priority: priority,
                 sortOrder: sortOrder,
                 sourceIdeaId: recommendation.sourceIdeaId,
+                sourceProjectId: recommendation.sourceProjectId,
                 arrangementId: recommendation.arrangementId,
                 recommendationReason: recommendation.reason
             )

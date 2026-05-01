@@ -152,6 +152,7 @@ struct TaskRecommendation: Sendable, Identifiable, Equatable {
     let id = UUID()
     let taskId: UUID?
     let sourceIdeaId: UUID?
+    let sourceProjectId: UUID?
     let arrangementId: UUID?
     let title: String
     let category: String
@@ -161,6 +162,7 @@ struct TaskRecommendation: Sendable, Identifiable, Equatable {
     static func == (lhs: TaskRecommendation, rhs: TaskRecommendation) -> Bool {
         lhs.taskId == rhs.taskId &&
         lhs.sourceIdeaId == rhs.sourceIdeaId &&
+        lhs.sourceProjectId == rhs.sourceProjectId &&
         lhs.title == rhs.title
     }
 }

@@ -468,7 +468,13 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- `TaskRecommendation` 新增 `sourceProjectId` 字段
+- `TaskManager.createMustDoTask` 新增 `sourceProjectId` 参数，自动判断 sourceType
+- `MustDoViewModel.applyRecommendation` 传递 `sourceProjectId` 给 `createMustDoTask`
+- `MustDoViewModel.acceptRecommendation` / `acceptAllRecommendations` 回调使用 `sourceIdeaId ?? sourceProjectId`
+- `DeepSeekAIService` 两处 `TaskRecommendation` 构造补充 `sourceProjectId: nil`
+- `MustDoViewModel.mapRecommendations` 三处构造补充 `sourceProjectId`
 
 ---
 
@@ -653,6 +659,6 @@
 - [x] 阶段 2 已完成
 - [x] 阶段 3 已完成
 - [x] 阶段 4 已完成
-- [ ] 阶段 5 已完成
+- [x] 阶段 5 已完成
 - [ ] 阶段 6 已完成
 - [ ] 阶段 7 已完成

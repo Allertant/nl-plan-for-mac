@@ -193,9 +193,17 @@ final class TaskManager {
         priority: TaskPriority = .medium,
         sortOrder: Int = 0,
         sourceIdeaId: UUID? = nil,
+        sourceProjectId: UUID? = nil,
         arrangementId: UUID? = nil,
         recommendationReason: String? = nil
     ) async throws -> DailyTaskEntity {
+        let sourceType: DailyTaskSourceType
+        if sourceProjectId != nil {
+            sourceType = .project
+        } else {
+            sourceType = try dailyTaskSourceType(sourceIdeaId: sourceIdeaId)
+        }
+
         let task = try dailyTaskRepo.create(
             title: title,
             category: category,
@@ -206,11 +214,14 @@ final class TaskManager {
             sortOrder: sortOrder,
             date: .now,
             sourceIdeaId: sourceIdeaId,
+            sourceProjectId: sourceProjectId,
             arrangementId: arrangementId,
-            sourceType: try dailyTaskSourceType(sourceIdeaId: sourceIdeaId)
+            sourceType: sourceType
         )
 
-        if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
+        if let sourceProjectId {
+            try? await touchProjectRecommendationContext(projectId: sourceProjectId)
+        } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
             idea.ideaStatus = .inProgress
             try ideaRepo.update(idea)
         } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), idea.isProject {

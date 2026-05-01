@@ -184,6 +184,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             return TaskRecommendation(
                 taskId: taskId,
                 sourceIdeaId: sourceIdeaId,
+                sourceProjectId: nil,
                 arrangementId: nil,
                 title: dto.title,
                 category: dto.category,
@@ -341,6 +342,7 @@ final class DeepSeekAIService: AIServiceProtocol {
             return TaskRecommendation(
                 taskId: taskId,
                 sourceIdeaId: sourceIdeaId,
+                sourceProjectId: nil,
                 arrangementId: nil,
                 title: dto.title,
                 category: dto.category,
