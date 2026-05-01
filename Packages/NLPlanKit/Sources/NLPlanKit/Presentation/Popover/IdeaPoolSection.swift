@@ -45,16 +45,22 @@ struct IdeaPoolSection: View {
         !selectedSearchTags.isEmpty || !(activeTagQuery?.isEmpty ?? true)
     }
 
-    private var filteredIdeas: [IdeaEntity] {
+    private var allItems: [IdeaPoolListItem] {
+        let ideaItems = viewModel.ideas.map { IdeaPoolListItem.idea($0) }
+        let projectItems = viewModel.projects.map { IdeaPoolListItem.project($0) }
+        return ideaItems + projectItems
+    }
+
+    private var filteredItems: [IdeaPoolListItem] {
         let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasKeyword = !keyword.isEmpty
         let hasTags = !selectedSearchTags.isEmpty
         guard hasKeyword || hasTags else {
-            return viewModel.ideas
+            return allItems
         }
-        return viewModel.ideas.filter { idea in
-            let matchesKeyword = !hasKeyword || idea.title.localizedCaseInsensitiveContains(keyword)
-            let matchesTag = !hasTags || selectedSearchTags.contains(idea.category)
+        return allItems.filter { item in
+            let matchesKeyword = !hasKeyword || item.title.localizedCaseInsensitiveContains(keyword)
+            let matchesTag = !hasTags || selectedSearchTags.contains(item.category)
             return matchesKeyword && matchesTag
         }
     }
@@ -63,7 +69,7 @@ struct IdeaPoolSection: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.ideas.isEmpty {
+            if allItems.isEmpty {
                 Text("暂无想法")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -181,7 +187,7 @@ struct IdeaPoolSection: View {
                                     focusSearchFieldOnFirstAppear()
                                 }
 
-                            Text("\(filteredIdeas.count)条")
+                            Text("\(filteredItems.count)条")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
 
@@ -231,37 +237,53 @@ struct IdeaPoolSection: View {
                     .padding(.horizontal, 8)
                     .padding(.top, 6)
 
-                    if filteredIdeas.isEmpty && hasSearchTokens {
+                    if filteredItems.isEmpty && hasSearchTokens {
                         Text("未找到匹配的计划")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 16)
                     } else {
                         LazyVStack(spacing: 4) {
-                            ForEach(filteredIdeas, id: \.id) { idea in
-                                IdeaPoolTaskRow(
-                                    idea: idea,
-                                    isNew: viewModel.newlyAddedIdeaIds.contains(idea.id),
-                                    isRefreshingProject: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(idea.id)
-                                ) { priority in
-                                    Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
-                                } onDelete: {
-                                    viewModel.requestDelete(ideaId: idea.id)
-                                } onUpdate: { title, category, estimatedMinutes, note, deadline in
-                                    Task {
-                                        await viewModel.updateIdea(
-                                            ideaId: idea.id,
-                                            title: title,
-                                            category: category,
-                                            estimatedMinutes: estimatedMinutes,
-                                            note: note,
-                                            deadline: deadline
-                                        )
+                            ForEach(filteredItems) { item in
+                                switch item {
+                                case .idea(let idea):
+                                    IdeaPoolTaskRow(
+                                        idea: idea,
+                                        isNew: viewModel.newlyAddedIdeaIds.contains(idea.id),
+                                        isRefreshingProject: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(idea.id)
+                                    ) { priority in
+                                        Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
+                                    } onDelete: {
+                                        viewModel.requestDelete(ideaId: idea.id)
+                                    } onUpdate: { title, category, estimatedMinutes, note, deadline in
+                                        Task {
+                                            await viewModel.updateIdea(
+                                                ideaId: idea.id,
+                                                title: title,
+                                                category: category,
+                                                estimatedMinutes: estimatedMinutes,
+                                                note: note,
+                                                deadline: deadline
+                                            )
+                                        }
+                                    } onRefreshProject: {
+                                        Task { await viewModel.refreshProjectAnalyses(ideaId: idea.id) }
+                                    } onOpenProject: {
+                                        appState.currentPage = .projectDetail(idea.id)
                                     }
-                                } onRefreshProject: {
-                                    Task { await viewModel.refreshProjectAnalyses(ideaId: idea.id) }
-                                } onOpenProject: {
-                                    appState.currentPage = .projectDetail(idea.id)
+                                case .project(let project):
+                                    ProjectPoolRow(
+                                        project: project,
+                                        isRefreshing: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(project.id)
+                                    ) { priority in
+                                        Task { await viewModel.promoteProjectToMustDo(projectId: project.id, priority: priority) }
+                                    } onDelete: {
+                                        viewModel.requestDeleteProject(projectId: project.id)
+                                    } onRefresh: {
+                                        Task { await viewModel.refreshProjectAnalyses(ideaId: project.id) }
+                                    } onOpenDetail: {
+                                        appState.currentPage = .projectDetail(project.id)
+                                    }
                                 }
                             }
                         }

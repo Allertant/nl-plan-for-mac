@@ -217,3 +217,54 @@ struct IdeaPoolTaskRow: View {
         return true
     }
 }
+
+// MARK: - Project Pool Row
+
+struct ProjectPoolRow: View {
+    let project: ProjectEntity
+    var isRefreshing: Bool = false
+    let onPromote: (TaskPriority) -> Void
+    let onDelete: () -> Void
+    let onRefresh: () -> Void
+    let onOpenDetail: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(project.title).font(.system(size: 12, weight: .medium)).lineLimit(2)
+                Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
+                Spacer(minLength: 8)
+                Menu {
+                    ForEach(TaskPriority.allCases, id: \.self) { priority in
+                        Button { onPromote(priority) } label: { Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag") }
+                    }
+                } label: { Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(.green) }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).help("加入必做项")
+            }
+
+            HStack(spacing: 8) {
+                TagChip(text: project.category)
+                Text(project.createdDate.relativeTimeString()).font(.system(size: 10)).foregroundStyle(.tertiary)
+                Spacer(minLength: 8)
+                Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
+                    .buttonStyle(.plain).help("删除")
+            }
+
+            HStack(spacing: 6) {
+                ProgressView(value: (project.projectProgress ?? 0) / 100).progressViewStyle(.linear).tint(.indigo)
+                Text("\(Int(project.projectProgress ?? 0))%").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                Button(action: onRefresh) { RefreshingIcon(systemName: "arrow.clockwise", isAnimating: isRefreshing).font(.system(size: 10)).foregroundStyle(.indigo) }
+                    .buttonStyle(.plain).disabled(isRefreshing).help("刷新项目进度")
+                Spacer(minLength: 8)
+                Button("详情") { onOpenDetail() }
+                    .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.blue)
+            }
+            if let summary = project.projectProgressSummary, !summary.isEmpty {
+                Text(summary).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
+            }
+        }
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.indigo.opacity(0.06))
+        .cornerRadius(6)
+    }
+}

@@ -506,7 +506,13 @@
 
 ### 完成标记
 
-- [ ] 已完成
+- [x] 已完成
+- 新增 `IdeaPoolListItem` 枚举（`.idea(IdeaEntity)` / `.project(ProjectEntity)`）
+- `IdeaPoolViewModel` 新增 `projects: [ProjectEntity]`，`refresh()` 同时加载两个实体
+- `IdeaPoolSection` 改为遍历 `filteredItems: [IdeaPoolListItem]`，根据类型渲染不同行
+- 新增 `ProjectPoolRow` 独立组件，展示项目进度、摘要、详情入口
+- `IdeaPoolViewModel` 新增 `promoteProjectToMustDo`、`requestDeleteProject`、`deleteProject` 方法
+- `TaskManager` 新增 `deleteProject`、`fetchVisibleProjects` 方法
 
 ---
 
@@ -660,5 +666,5 @@
 - [x] 阶段 3 已完成
 - [x] 阶段 4 已完成
 - [x] 阶段 5 已完成
-- [ ] 阶段 6 已完成
+- [x] 阶段 6 已完成
 - [ ] 阶段 7 已完成

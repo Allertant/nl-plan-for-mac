@@ -1,6 +1,45 @@
 import Foundation
 import SwiftData
 
+/// 想法池聚合展示项
+enum IdeaPoolListItem: Identifiable {
+    case idea(IdeaEntity)
+    case project(ProjectEntity)
+
+    var id: UUID {
+        switch self {
+        case .idea(let idea): return idea.id
+        case .project(let project): return project.id
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .idea(let idea): return idea.title
+        case .project(let project): return project.title
+        }
+    }
+
+    var category: String {
+        switch self {
+        case .idea(let idea): return idea.category
+        case .project(let project): return project.category
+        }
+    }
+
+    var isProject: Bool {
+        if case .project = self { return true }
+        return false
+    }
+
+    var createdDate: Date {
+        switch self {
+        case .idea(let idea): return idea.createdDate
+        case .project(let project): return project.createdDate
+        }
+    }
+}
+
 /// 想法池 ViewModel
 @MainActor @Observable
 final class IdeaPoolViewModel {
@@ -11,6 +50,7 @@ final class IdeaPoolViewModel {
     }
 
     var ideas: [IdeaEntity] = []
+    var projects: [ProjectEntity] = []
     var isExpanded: Bool = false
     var errorMessage: String?
     var newlyAddedIdeaIds: Set<UUID> = []
@@ -26,24 +66,65 @@ final class IdeaPoolViewModel {
     // MARK: - 删除确认
 
     var pendingDeleteIdeaId: UUID?
+    var pendingDeleteProjectId: UUID?
 
     var pendingDeleteIdeaTitle: String? {
-        guard let id = pendingDeleteIdeaId else { return nil }
-        return ideas.first(where: { $0.id == id })?.title
+        if let id = pendingDeleteIdeaId {
+            return ideas.first(where: { $0.id == id })?.title
+        }
+        if let id = pendingDeleteProjectId {
+            return projects.first(where: { $0.id == id })?.title
+        }
+        return nil
     }
 
     func requestDelete(ideaId: UUID) {
         pendingDeleteIdeaId = ideaId
     }
 
+    func requestDeleteProject(projectId: UUID) {
+        pendingDeleteProjectId = projectId
+    }
+
     func cancelDelete() {
         pendingDeleteIdeaId = nil
+        pendingDeleteProjectId = nil
     }
 
     func executeDelete() async {
-        guard let ideaId = pendingDeleteIdeaId else { return }
-        pendingDeleteIdeaId = nil
-        await deleteIdea(ideaId: ideaId)
+        if let ideaId = pendingDeleteIdeaId {
+            pendingDeleteIdeaId = nil
+            await deleteIdea(ideaId: ideaId)
+        } else if let projectId = pendingDeleteProjectId {
+            pendingDeleteProjectId = nil
+            await deleteProject(projectId: projectId)
+        }
+    }
+
+    func promoteProjectToMustDo(projectId: UUID, priority: TaskPriority = .medium) async {
+        do {
+            // 创建项目切片必做项
+            _ = try await taskManager.createMustDoTask(
+                title: projects.first(where: { $0.id == projectId })?.title ?? "项目任务",
+                category: projects.first(where: { $0.id == projectId })?.category ?? "",
+                estimatedMinutes: 30,
+                priority: priority,
+                sourceProjectId: projectId
+            )
+            await refresh()
+            await onPromotedToMustDo?()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteProject(projectId: UUID) async {
+        do {
+            try await taskManager.deleteProject(projectId: projectId)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - 清理状态
@@ -98,6 +179,7 @@ final class IdeaPoolViewModel {
     func refresh(newIdeaIds: Set<UUID> = []) async {
         do {
             ideas = try await taskManager.fetchIdeaPool()
+            projects = (try? await taskManager.fetchVisibleProjects()) ?? []
             try? await repairStaleInProgressIdeas()
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds

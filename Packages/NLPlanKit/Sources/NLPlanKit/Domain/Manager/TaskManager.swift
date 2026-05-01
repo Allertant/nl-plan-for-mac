@@ -267,6 +267,14 @@ final class TaskManager {
         try ideaRepo.delete(idea)
     }
 
+    /// 删除项目
+    func deleteProject(projectId: UUID) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        try projectRepo.delete(project)
+    }
+
     /// 为项目想法添加备注记录
     func addProjectNote(ideaId: UUID, content: String) async throws {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -391,6 +399,10 @@ final class TaskManager {
 
     func fetchProject(id: UUID) async throws -> ProjectEntity? {
         try projectRepo.fetchById(id)
+    }
+
+    func fetchVisibleProjects() async throws -> [ProjectEntity] {
+        try projectRepo.fetchVisibleProjects()
     }
 
     func updateProject(_ project: ProjectEntity) async throws {
