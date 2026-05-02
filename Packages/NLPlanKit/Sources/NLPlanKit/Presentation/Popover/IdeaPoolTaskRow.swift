@@ -5,6 +5,7 @@ import SwiftUI
 struct IdeaPoolTaskRow: View {
     let idea: IdeaEntity
     var isNew: Bool = false
+    let onTogglePin: () -> Void
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
     let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?, _ deadline: Date?) -> Void
@@ -31,60 +32,25 @@ struct IdeaPoolTaskRow: View {
         VStack(alignment: .leading, spacing: 6) {
             // 行 1：标题 + 加入必做项按钮
             HStack(spacing: 4) {
-                if editingTitle {
-                    TextField("任务标题", text: $draftTitle, axis: .vertical).textFieldStyle(.plain).font(.system(size: 12, weight: .medium)).lineLimit(1...2)
-                        .focused($focusedField, equals: .title).onSubmit { commitTitleEdit() }
-                        .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                } else {
-                    Text(idea.title).font(.system(size: 12, weight: .medium)).lineLimit(2).onTapGesture { startEditingTitle() }
-                }
-                if idea.aiRecommended { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.orange) }
-                if idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
-                if isInProgress { Text("进行中").font(.system(size: 9, weight: .medium)).foregroundStyle(.green).padding(.horizontal, 4).padding(.vertical, 1).background(Color.green.opacity(0.14)).cornerRadius(3) }
+                titleView
+                statusIndicators
                 Spacer(minLength: 8)
-                Menu {
-                    ForEach(TaskPriority.allCases, id: \.self) { priority in
-                        Button { onPromote(priority) } label: { Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag") }
-                    }
-                } label: { Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(.green) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).help("加入必做项").disabled(isInProgress).opacity(isInProgress ? 0.35 : 1)
+                pinButton
+                promoteMenu
             }
 
             // 行 2：标签/时间/截止日期 + 删除按钮
             HStack(spacing: 8) {
-                Button { showingCategoryMenu.toggle() } label: { TagChip(text: idea.category) }.buttonStyle(.plain)
+                categoryButton
                     .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                         CategoryPickerMenu(currentCategory: idea.category) { tag in
                             showingCategoryMenu = false
                             if tag != idea.category { onUpdate(nil, tag, nil, nil, nil) }
                         }
                     }
-                if editingMinutes {
-                    HStack(spacing: 4) { Image(systemName: "clock"); TextField("1h30m", text: $draftMinutes).textFieldStyle(.plain).frame(width: 52).focused($focusedField, equals: .minutes).onSubmit { commitMinutesEdit() } }
-                        .font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                } else {
-                    if let estimatedMinutes = idea.estimatedMinutes {
-                        Label(estimatedMinutes.hourMinuteString, systemImage: "clock").font(.system(size: 10)).foregroundStyle(.secondary).onTapGesture { startEditingMinutes() }
-                    }
-                }
+                minutesView
                 Text(cachedRelativeTime).font(.system(size: 10)).foregroundStyle(.tertiary)
-                if editingDeadline {
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                        TextField("M-d", text: $draftDeadline)
-                            .textFieldStyle(.plain)
-                            .frame(width: 72)
-                            .focused($focusedField, equals: .deadline)
-                            .onSubmit { commitDeadlineEdit() }
-                    }
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-                    .padding(.horizontal, 4).padding(.vertical, 2)
-                    .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                } else if let deadlineDisplay = cachedDeadlineDisplay {
-                    Label(deadlineDisplay, systemImage: "calendar")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
-                        .onTapGesture { startEditingDeadline() }
-                }
+                deadlineView
                 Spacer(minLength: 8)
                 Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
                     .buttonStyle(.plain).help("删除")
@@ -103,6 +69,12 @@ struct IdeaPoolTaskRow: View {
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
         .background { rowBackground.contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
+        .overlay {
+            if idea.isPinned {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.accentColor.opacity(0.45), lineWidth: 1.5)
+            }
+        }
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil { if editingTitle { commitTitleEdit() }; if editingMinutes { commitMinutesEdit() }; if editingNote { commitNoteEdit() }; if editingDeadline { commitDeadlineEdit() } }
         }
@@ -129,6 +101,157 @@ struct IdeaPoolTaskRow: View {
         if flashCount % 2 == 1 { return Color.accentColor.opacity(0.15) }
         if isInProgress { return Color.green.opacity(0.10) }
         return Color.blue.opacity(0.05)
+    }
+
+    private var titleView: some View {
+        Group {
+            if editingTitle {
+                TextField("任务标题", text: $draftTitle, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1...2)
+                    .focused($focusedField, equals: .title)
+                    .onSubmit { commitTitleEdit() }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.1))
+                    .cornerRadius(3)
+            } else {
+                Text(idea.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(2)
+                    .onTapGesture { startEditingTitle() }
+            }
+        }
+    }
+
+    private var pinButton: some View {
+        Button(action: onTogglePin) {
+            Image(systemName: idea.isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 14))
+                .foregroundStyle(idea.isPinned ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(idea.isPinned ? "取消置顶" : "置顶")
+    }
+
+    private var statusIndicators: some View {
+        HStack(spacing: 4) {
+            if idea.aiRecommended {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.orange)
+            }
+            if idea.attempted {
+                attemptedBadge
+            }
+            if isInProgress {
+                inProgressBadge
+            }
+            if idea.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+    }
+
+    private var promoteMenu: some View {
+        Menu {
+            ForEach(TaskPriority.allCases, id: \.self) { priority in
+                Button { onPromote(priority) } label: {
+                    Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag")
+                }
+            }
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.green)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .help("加入必做项")
+        .disabled(isInProgress)
+        .opacity(isInProgress ? 0.35 : 1)
+    }
+
+    private var categoryButton: some View {
+        Button { showingCategoryMenu.toggle() } label: {
+            TagChip(text: idea.category)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var minutesView: some View {
+        Group {
+            if editingMinutes {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                    TextField("1h30m", text: $draftMinutes)
+                        .textFieldStyle(.plain)
+                        .frame(width: 52)
+                        .focused($focusedField, equals: .minutes)
+                        .onSubmit { commitMinutesEdit() }
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(3)
+            } else if let estimatedMinutes = idea.estimatedMinutes {
+                Label(estimatedMinutes.hourMinuteString, systemImage: "clock")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .onTapGesture { startEditingMinutes() }
+            }
+        }
+    }
+
+    private var deadlineView: some View {
+        Group {
+            if editingDeadline {
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                    TextField("M-d", text: $draftDeadline)
+                        .textFieldStyle(.plain)
+                        .frame(width: 72)
+                        .focused($focusedField, equals: .deadline)
+                        .onSubmit { commitDeadlineEdit() }
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(3)
+            } else if let deadlineDisplay = cachedDeadlineDisplay {
+                Label(deadlineDisplay, systemImage: "calendar")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .onTapGesture { startEditingDeadline() }
+            }
+        }
+    }
+
+    private var attemptedBadge: some View {
+        Text("已尝试")
+            .font(.system(size: 9))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(Color.orange.opacity(0.15))
+            .cornerRadius(3)
+    }
+
+    private var inProgressBadge: some View {
+        Text("进行中")
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(.green)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(Color.green.opacity(0.14))
+            .cornerRadius(3)
     }
 
     // MARK: - Edit Helpers
@@ -192,6 +315,7 @@ struct IdeaPoolTaskRow: View {
 struct ProjectPoolRow: View {
     let project: ProjectEntity
     var isRefreshing: Bool = false
+    let onTogglePin: () -> Void
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
     let onRefresh: () -> Void
@@ -228,7 +352,15 @@ struct ProjectPoolRow: View {
                         .onTapGesture { startEditingTitle() }
                 }
                 Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
+                if project.isPinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.indigo) }
                 Spacer(minLength: 8)
+                Button(action: onTogglePin) {
+                    Image(systemName: project.isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 14))
+                        .foregroundStyle(project.isPinned ? .indigo : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(project.isPinned ? "取消置顶" : "置顶")
                 Menu {
                     ForEach(TaskPriority.allCases, id: \.self) { priority in
                         Button { onPromote(priority) } label: { Label("优先级：\(priority.displayName)", systemImage: priority == .high ? "flag.fill" : "flag") }
@@ -287,6 +419,12 @@ struct ProjectPoolRow: View {
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
         .background { Color.indigo.opacity(0.06).contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
+        .overlay {
+            if project.isPinned {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.indigo.opacity(0.55), lineWidth: 1.5)
+            }
+        }
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil {
                 if editingTitle { commitTitleEdit() }

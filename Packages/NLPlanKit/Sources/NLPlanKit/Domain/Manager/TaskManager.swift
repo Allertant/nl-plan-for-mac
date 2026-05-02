@@ -268,6 +268,26 @@ final class TaskManager {
         try ideaRepo.delete(idea)
     }
 
+    func toggleIdeaPin(ideaId: UUID) async throws {
+        guard let idea = try ideaRepo.fetchById(ideaId) else {
+            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+        }
+        let pinned = !idea.isPinned
+        idea.isPinned = pinned
+        idea.pinnedAt = pinned ? .now : nil
+        try ideaRepo.update(idea)
+    }
+
+    func toggleProjectPin(projectId: UUID) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        let pinned = !project.isPinned
+        project.isPinned = pinned
+        project.pinnedAt = pinned ? .now : nil
+        try projectRepo.update(project)
+    }
+
     /// 删除项目
     func deleteProject(projectId: UUID) async throws {
         guard let project = try projectRepo.fetchById(projectId) else {

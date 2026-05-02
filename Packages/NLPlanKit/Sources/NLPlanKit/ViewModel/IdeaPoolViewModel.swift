@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 /// 想法池聚合展示项
 enum IdeaPoolListItem: Identifiable {
@@ -36,6 +37,20 @@ enum IdeaPoolListItem: Identifiable {
         switch self {
         case .idea(let idea): return idea.createdDate
         case .project(let project): return project.createdDate
+        }
+    }
+
+    var isPinned: Bool {
+        switch self {
+        case .idea(let idea): return idea.isPinned
+        case .project(let project): return project.isPinned
+        }
+    }
+
+    var pinnedAt: Date? {
+        switch self {
+        case .idea(let idea): return idea.pinnedAt
+        case .project(let project): return project.pinnedAt
         }
     }
 }
@@ -170,10 +185,19 @@ final class IdeaPoolViewModel {
     }
 
     /// 刷新想法池
-    func refresh(newIdeaIds: Set<UUID> = []) async {
+    func refresh(newIdeaIds: Set<UUID> = [], animated: Bool = false) async {
         do {
-            ideas = try await taskManager.fetchIdeaPool()
-            projects = (try? await taskManager.fetchVisibleProjects()) ?? []
+            let fetchedIdeas = try await taskManager.fetchIdeaPool()
+            let fetchedProjects = (try? await taskManager.fetchVisibleProjects()) ?? []
+            if animated {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    ideas = fetchedIdeas
+                    projects = fetchedProjects
+                }
+            } else {
+                ideas = fetchedIdeas
+                projects = fetchedProjects
+            }
             try? await repairStaleInProgressIdeas()
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds
@@ -235,6 +259,20 @@ final class IdeaPoolViewModel {
             if let deadline { project.deadline = deadline }
             try await taskManager.updateProject(project)
             await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func togglePin(for item: IdeaPoolListItem) async {
+        do {
+            switch item {
+            case .idea(let idea):
+                try await taskManager.toggleIdeaPin(ideaId: idea.id)
+            case .project(let project):
+                try await taskManager.toggleProjectPin(projectId: project.id)
+            }
+            await refresh(animated: true)
         } catch {
             errorMessage = error.localizedDescription
         }

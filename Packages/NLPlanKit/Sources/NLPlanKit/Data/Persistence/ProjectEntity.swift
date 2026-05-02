@@ -12,6 +12,8 @@ final class ProjectEntity {
     var status: String
     var createdDate: Date
     var updatedAt: Date
+    var pinnedState: Bool?
+    var pinnedAt: Date?
     var projectDecisionSource: String?
     var projectProgress: Double?
     var projectProgressSummary: String?
@@ -36,6 +38,12 @@ final class ProjectEntity {
     var taskPriority: TaskPriority {
         get { TaskPriority(rawValue: priority) ?? .medium }
         set { priority = newValue.rawValue }
+    }
+
+    @Transient
+    var isPinned: Bool {
+        get { pinnedState ?? false }
+        set { pinnedState = newValue }
     }
 
     @Transient
@@ -73,6 +81,8 @@ final class ProjectEntity {
         status: String = ProjectStatus.pending.rawValue,
         createdDate: Date = .now,
         updatedAt: Date = .now,
+        isPinned: Bool = false,
+        pinnedAt: Date? = nil,
         projectDecisionSource: String? = nil,
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
@@ -95,6 +105,8 @@ final class ProjectEntity {
         self.status = status
         self.createdDate = createdDate
         self.updatedAt = updatedAt
+        self.pinnedState = isPinned
+        self.pinnedAt = pinnedAt
         self.projectDecisionSource = projectDecisionSource
         self.projectProgress = projectProgress
         self.projectProgressSummary = projectProgressSummary

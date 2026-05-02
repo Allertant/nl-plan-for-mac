@@ -55,14 +55,12 @@ struct IdeaPoolSection: View {
         let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasKeyword = !keyword.isEmpty
         let hasTags = !selectedSearchTags.isEmpty
-        guard hasKeyword || hasTags else {
-            return allItems
-        }
-        return allItems.filter { item in
+        let matchedItems = (hasKeyword || hasTags) ? allItems.filter { item in
             let matchesKeyword = !hasKeyword || item.title.localizedCaseInsensitiveContains(keyword)
             let matchesTag = !hasTags || selectedSearchTags.contains(item.category)
             return matchesKeyword && matchesTag
-        }
+        } : allItems
+        return sortItems(matchedItems)
     }
 
     @Environment(AppState.self) private var appState
@@ -249,7 +247,10 @@ struct IdeaPoolSection: View {
                                 case .idea(let idea):
                                     IdeaPoolTaskRow(
                                         idea: idea,
-                                        isNew: viewModel.newlyAddedIdeaIds.contains(idea.id)
+                                        isNew: viewModel.newlyAddedIdeaIds.contains(idea.id),
+                                        onTogglePin: {
+                                            Task { await viewModel.togglePin(for: .idea(idea)) }
+                                        }
                                     ) { priority in
                                         Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
                                     } onDelete: {
@@ -269,7 +270,10 @@ struct IdeaPoolSection: View {
                                 case .project(let project):
                                     ProjectPoolRow(
                                         project: project,
-                                        isRefreshing: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(project.id)
+                                        isRefreshing: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(project.id),
+                                        onTogglePin: {
+                                            Task { await viewModel.togglePin(for: .project(project)) }
+                                        }
                                     ) { priority in
                                         Task { await viewModel.promoteProjectToMustDo(projectId: project.id, priority: priority) }
                                     } onDelete: {
@@ -305,6 +309,25 @@ struct IdeaPoolSection: View {
         guard isCandidateTagNavigationEnabled else { highlightedCandidateTag = nil; return }
         if let highlightedCandidateTag, candidateTags.contains(highlightedCandidateTag) { return }
         self.highlightedCandidateTag = candidateTags.first
+    }
+
+    private func sortItems(_ items: [IdeaPoolListItem]) -> [IdeaPoolListItem] {
+        items.sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned && !rhs.isPinned
+            }
+            if lhs.isPinned, rhs.isPinned {
+                let lhsPinnedAt = lhs.pinnedAt ?? .distantPast
+                let rhsPinnedAt = rhs.pinnedAt ?? .distantPast
+                if lhsPinnedAt != rhsPinnedAt {
+                    return lhsPinnedAt > rhsPinnedAt
+                }
+            }
+            if lhs.createdDate != rhs.createdDate {
+                return lhs.createdDate > rhs.createdDate
+            }
+            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+        }
     }
 
     private func commitActiveTagIfNeeded() {

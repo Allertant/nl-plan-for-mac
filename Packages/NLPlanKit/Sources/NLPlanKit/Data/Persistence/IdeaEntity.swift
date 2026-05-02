@@ -15,6 +15,8 @@ final class IdeaEntity {
     var status: String
     var createdDate: Date
     var updatedAt: Date
+    var pinnedState: Bool?
+    var pinnedAt: Date?
     var attempted: Bool
     var note: String?
     var deadline: Date?
@@ -29,6 +31,12 @@ final class IdeaEntity {
     var taskPriority: TaskPriority {
         get { TaskPriority(rawValue: priority) ?? .medium }
         set { priority = newValue.rawValue }
+    }
+
+    @Transient
+    var isPinned: Bool {
+        get { pinnedState ?? false }
+        set { pinnedState = newValue }
     }
 
     /// 显示用截止时间字符串（同年省略年份）
@@ -70,6 +78,8 @@ final class IdeaEntity {
         status: String = IdeaStatus.pending.rawValue,
         createdDate: Date = .now,
         updatedAt: Date = .now,
+        isPinned: Bool = false,
+        pinnedAt: Date? = nil,
         attempted: Bool = false,
         note: String? = nil,
         deadline: Date? = nil
@@ -85,6 +95,8 @@ final class IdeaEntity {
         self.status = status
         self.createdDate = createdDate
         self.updatedAt = updatedAt
+        self.pinnedState = isPinned
+        self.pinnedAt = pinnedAt
         self.attempted = attempted
         self.note = note
         self.deadline = deadline
