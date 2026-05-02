@@ -56,12 +56,12 @@ struct IdeaPoolPageView: View {
                 }
                 .scrollIndicators(.automatic)
                 .overlay {
-                    if viewModel.pendingDeleteIdeaId != nil {
+                    if viewModel.pendingDeleteIdeaId != nil || viewModel.pendingDeleteProjectId != nil {
                         ConfirmActionPage(
                             icon: "trash",
                             iconTint: .red,
                             title: viewModel.pendingDeleteIdeaTitle ?? "",
-                            message: "确认删除该想法？",
+                            message: viewModel.pendingDeleteProjectId != nil ? "确认删除该项目？" : "确认删除该想法？",
                             confirmLabel: "确认删除",
                             onCancel: { viewModel.cancelDelete() },
                             onConfirm: { Task { await viewModel.executeDelete() } }

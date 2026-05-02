@@ -225,6 +225,19 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func updateProject(projectId: UUID, title: String? = nil, category: String? = nil, deadline: Date? = nil) async {
+        do {
+            guard let project = try await taskManager.fetchProject(id: projectId) else { return }
+            if let title { project.title = title }
+            if let category { project.category = category }
+            if let deadline { project.deadline = deadline }
+            try await taskManager.updateProject(project)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func fetchLinkedMustDoTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
             return try await taskManager.fetchMustDo(sourceIdeaId: sourceIdeaId)

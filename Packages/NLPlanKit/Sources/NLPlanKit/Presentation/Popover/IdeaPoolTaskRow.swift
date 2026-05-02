@@ -196,11 +196,37 @@ struct ProjectPoolRow: View {
     let onDelete: () -> Void
     let onRefresh: () -> Void
     let onOpenDetail: () -> Void
+    let onUpdate: (_ title: String?, _ category: String?, _ deadline: Date?) -> Void
+
+    @State private var editingTitle = false
+    @State private var showingCategoryMenu = false
+    @State private var editingDeadline = false
+    @State private var draftTitle: String = ""
+    @State private var draftDeadline: String = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case title, deadline }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(project.title).font(.system(size: 12, weight: .medium)).lineLimit(2)
+                if editingTitle {
+                    TextField("项目标题", text: $draftTitle, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1...2)
+                        .focused($focusedField, equals: .title)
+                        .onSubmit { commitTitleEdit() }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                } else {
+                    Text(project.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(2)
+                        .onTapGesture { startEditingTitle() }
+                }
                 Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
                 Spacer(minLength: 8)
                 Menu {
@@ -212,8 +238,34 @@ struct ProjectPoolRow: View {
             }
 
             HStack(spacing: 8) {
-                TagChip(text: project.category)
+                Button { showingCategoryMenu.toggle() } label: {
+                    TagChip(text: project.category)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showingCategoryMenu, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                    CategoryPickerMenu(currentCategory: project.category) { tag in
+                        showingCategoryMenu = false
+                        if tag != project.category { onUpdate(nil, tag, nil) }
+                    }
+                }
                 Text(project.createdDate.relativeTimeString()).font(.system(size: 10)).foregroundStyle(.tertiary)
+                if editingDeadline {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                        TextField("M-d", text: $draftDeadline)
+                            .textFieldStyle(.plain)
+                            .frame(width: 72)
+                            .focused($focusedField, equals: .deadline)
+                            .onSubmit { commitDeadlineEdit() }
+                    }
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 4).padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+                } else if let deadlineDisplay = project.deadlineDisplayString {
+                    Label(deadlineDisplay, systemImage: "calendar")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .onTapGesture { startEditingDeadline() }
+                }
                 Spacer(minLength: 8)
                 Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
                     .buttonStyle(.plain).help("删除")
@@ -233,7 +285,74 @@ struct ProjectPoolRow: View {
             }
         }
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.indigo.opacity(0.06))
+        .background { Color.indigo.opacity(0.06).contentShape(Rectangle()).onTapGesture { focusedField = nil } }
         .cornerRadius(6)
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil {
+                if editingTitle { commitTitleEdit() }
+                if editingDeadline { commitDeadlineEdit() }
+            }
+        }
+    }
+
+    private func startEditingTitle() {
+        if editingDeadline { commitDeadlineEdit() }
+        draftTitle = project.title
+        editingTitle = true
+        focusedField = .title
+        CursorHelper.moveInsertionPointToEnd()
+    }
+
+    private func commitTitleEdit() {
+        editingTitle = false
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != project.title else { return }
+        onUpdate(trimmed, nil, nil)
+    }
+
+    private func startEditingDeadline() {
+        if editingTitle { commitTitleEdit() }
+        draftDeadline = project.deadlineDisplayString ?? ""
+        editingDeadline = true
+        focusedField = .deadline
+        CursorHelper.moveInsertionPointToEnd()
+    }
+
+    private func commitDeadlineEdit() {
+        editingDeadline = false
+        let trimmed = draftDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty || isValidDeadlineFormat(trimmed) else { return }
+        let (parsed, _, _) = DeepSeekAIService.parseDeadlineString(trimmed.isEmpty ? nil : trimmed)
+        if parsed != project.deadline {
+            onUpdate(nil, nil, parsed)
+        }
+    }
+
+    private func isValidDeadlineFormat(_ string: String) -> Bool {
+        let parts = string.split(separator: " ", omittingEmptySubsequences: true)
+        guard let datePart = parts.first else { return false }
+
+        let dateComps = datePart.split(separator: "-").compactMap { Int($0) }
+        guard dateComps.count == 2 || dateComps.count == 3 else { return false }
+
+        if dateComps.count == 2 {
+            guard dateComps[0] >= 1 && dateComps[0] <= 12,
+                  dateComps[1] >= 1 && dateComps[1] <= 31 else { return false }
+        } else {
+            guard dateComps[0] >= 1,
+                  dateComps[1] >= 1 && dateComps[1] <= 12,
+                  dateComps[2] >= 1 && dateComps[2] <= 31 else { return false }
+        }
+
+        if parts.count > 1 {
+            let timeComps = String(parts[1]).split(separator: ":").compactMap { Int($0) }
+            guard timeComps.count >= 1 && timeComps.count <= 2 else { return false }
+            guard timeComps[0] >= 0 && timeComps[0] <= 23 else { return false }
+            if timeComps.count == 2 {
+                guard timeComps[1] >= 0 && timeComps[1] <= 59 else { return false }
+            }
+        }
+
+        return true
     }
 }

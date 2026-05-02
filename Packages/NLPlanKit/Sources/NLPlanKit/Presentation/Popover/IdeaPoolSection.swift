@@ -278,6 +278,15 @@ struct IdeaPoolSection: View {
                                         Task { await viewModel.refreshProjectAnalyses(projectId: project.id) }
                                     } onOpenDetail: {
                                         appState.currentPage = .projectDetail(project.id)
+                                    } onUpdate: { title, category, deadline in
+                                        Task {
+                                            await viewModel.updateProject(
+                                                projectId: project.id,
+                                                title: title,
+                                                category: category,
+                                                deadline: deadline
+                                            )
+                                        }
                                     }
                                 }
                             }
