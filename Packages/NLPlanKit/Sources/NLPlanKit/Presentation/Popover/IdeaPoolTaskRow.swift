@@ -1,16 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// 想法池单行卡片（逐行布局：左内容 + 右按钮同行对齐）
+/// 想法池单行卡片（普通想法专用）
 struct IdeaPoolTaskRow: View {
     let idea: IdeaEntity
     var isNew: Bool = false
-    var isRefreshingProject: Bool = false
     let onPromote: (TaskPriority) -> Void
     let onDelete: () -> Void
     let onUpdate: (_ title: String?, _ category: String?, _ estimatedMinutes: Int?, _ note: String?, _ deadline: Date?) -> Void
-    let onRefreshProject: () -> Void
-    let onOpenProject: () -> Void
 
     @State private var flashCount = 0
     @State private var editingTitle = false
@@ -34,18 +31,15 @@ struct IdeaPoolTaskRow: View {
         VStack(alignment: .leading, spacing: 6) {
             // 行 1：标题 + 加入必做项按钮
             HStack(spacing: 4) {
-                if !idea.isProject && editingTitle {
+                if editingTitle {
                     TextField("任务标题", text: $draftTitle, axis: .vertical).textFieldStyle(.plain).font(.system(size: 12, weight: .medium)).lineLimit(1...2)
                         .focused($focusedField, equals: .title).onSubmit { commitTitleEdit() }
                         .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
                 } else {
-                    Text(idea.title).font(.system(size: 12, weight: .medium)).lineLimit(2).onTapGesture { if !idea.isProject { startEditingTitle() } }
+                    Text(idea.title).font(.system(size: 12, weight: .medium)).lineLimit(2).onTapGesture { startEditingTitle() }
                 }
                 if idea.aiRecommended { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.orange) }
-                if idea.isProject {
-                    Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
-                }
-                if !idea.isProject && idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
+                if idea.attempted { Text("已尝试").font(.system(size: 9)).foregroundStyle(.orange).padding(.horizontal, 4).padding(.vertical, 1).background(Color.orange.opacity(0.15)).cornerRadius(3) }
                 if isInProgress { Text("进行中").font(.system(size: 9, weight: .medium)).foregroundStyle(.green).padding(.horizontal, 4).padding(.vertical, 1).background(Color.green.opacity(0.14)).cornerRadius(3) }
                 Spacer(minLength: 8)
                 Menu {
@@ -65,8 +59,7 @@ struct IdeaPoolTaskRow: View {
                             if tag != idea.category { onUpdate(nil, tag, nil, nil, nil) }
                         }
                     }
-                if idea.isProject { EmptyView() }
-                else if editingMinutes {
+                if editingMinutes {
                     HStack(spacing: 4) { Image(systemName: "clock"); TextField("1h30m", text: $draftMinutes).textFieldStyle(.plain).frame(width: 52).focused($focusedField, equals: .minutes).onSubmit { commitMinutesEdit() } }
                         .font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
                 } else {
@@ -97,34 +90,14 @@ struct IdeaPoolTaskRow: View {
                     .buttonStyle(.plain).help("删除")
             }
 
-            // 行 3（项目）：进度条 + 详情按钮
-            if idea.isProject {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        ProgressView(value: (idea.projectProgress ?? 0) / 100).progressViewStyle(.linear).tint(.indigo)
-                        Text("\(Int(idea.projectProgress ?? 0))%").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                        Button(action: onRefreshProject) { RefreshingIcon(systemName: "arrow.clockwise", isAnimating: isRefreshingProject).font(.system(size: 10)).foregroundStyle(.indigo) }
-                            .buttonStyle(.plain).disabled(isRefreshingProject).help("刷新项目进度")
-                        Spacer(minLength: 8)
-                        Button("详情") { onOpenProject() }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.blue)
-                    }
-                    if let summary = idea.projectProgressSummary, !summary.isEmpty { Text(summary).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2) }
-                }
-            }
-
-            // 行 4（非项目）：备注
-            if !idea.isProject {
-                if editingNote {
-                    TextField("添加备注...", text: $draftNote).textFieldStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
-                        .focused($focusedField, equals: .note).onSubmit { commitNoteEdit() }
-                        .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
-                } else {
-                    Text(idea.note?.isEmpty ?? true ? "添加备注..." : idea.note ?? "").font(.system(size: 10))
-                        .foregroundStyle((idea.note?.isEmpty ?? true) ? .tertiary : .secondary).onTapGesture { startEditingNote() }
-                }
+            // 行 3：备注
+            if editingNote {
+                TextField("添加备注...", text: $draftNote).textFieldStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
+                    .focused($focusedField, equals: .note).onSubmit { commitNoteEdit() }
+                    .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
+            } else {
+                Text(idea.note?.isEmpty ?? true ? "添加备注..." : idea.note ?? "").font(.system(size: 10))
+                    .foregroundStyle((idea.note?.isEmpty ?? true) ? .tertiary : .secondary).onTapGesture { startEditingNote() }
             }
         }
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
@@ -154,10 +127,6 @@ struct IdeaPoolTaskRow: View {
 
     private var rowBackground: Color {
         if flashCount % 2 == 1 { return Color.accentColor.opacity(0.15) }
-        if idea.isProject {
-            if isInProgress { return Color.indigo.opacity(0.10) }
-            return Color.indigo.opacity(0.06)
-        }
         if isInProgress { return Color.green.opacity(0.10) }
         return Color.blue.opacity(0.05)
     }

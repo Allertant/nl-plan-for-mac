@@ -249,8 +249,7 @@ struct IdeaPoolSection: View {
                                 case .idea(let idea):
                                     IdeaPoolTaskRow(
                                         idea: idea,
-                                        isNew: viewModel.newlyAddedIdeaIds.contains(idea.id),
-                                        isRefreshingProject: viewModel.isRefreshingProjects || viewModel.refreshingProjectIds.contains(idea.id)
+                                        isNew: viewModel.newlyAddedIdeaIds.contains(idea.id)
                                     ) { priority in
                                         Task { await viewModel.promoteToMustDo(ideaId: idea.id, priority: priority) }
                                     } onDelete: {
@@ -266,10 +265,6 @@ struct IdeaPoolSection: View {
                                                 deadline: deadline
                                             )
                                         }
-                                    } onRefreshProject: {
-                                        Task { await viewModel.refreshProjectAnalyses(ideaId: idea.id) }
-                                    } onOpenProject: {
-                                        appState.currentPage = .projectDetail(idea.id)
                                     }
                                 case .project(let project):
                                     ProjectPoolRow(
@@ -280,7 +275,7 @@ struct IdeaPoolSection: View {
                                     } onDelete: {
                                         viewModel.requestDeleteProject(projectId: project.id)
                                     } onRefresh: {
-                                        Task { await viewModel.refreshProjectAnalyses(ideaId: project.id) }
+                                        Task { await viewModel.refreshProjectAnalyses(projectId: project.id) }
                                     } onOpenDetail: {
                                         appState.currentPage = .projectDetail(project.id)
                                     }

@@ -6,6 +6,7 @@ import SwiftData
 final class DayManager {
 
     private let ideaRepo: IdeaRepository
+    private let projectRepo: ProjectRepository
     private let dailyTaskRepo: DailyTaskRepository
     private let summaryRepo: SummaryRepository
     private let sessionLogRepo: SessionLogRepository
@@ -16,6 +17,7 @@ final class DayManager {
 
     init(
         ideaRepo: IdeaRepository,
+        projectRepo: ProjectRepository,
         dailyTaskRepo: DailyTaskRepository,
         summaryRepo: SummaryRepository,
         sessionLogRepo: SessionLogRepository,
@@ -24,6 +26,7 @@ final class DayManager {
         aiService: AIServiceProtocol
     ) {
         self.ideaRepo = ideaRepo
+        self.projectRepo = projectRepo
         self.dailyTaskRepo = dailyTaskRepo
         self.summaryRepo = summaryRepo
         self.sessionLogRepo = sessionLogRepo
@@ -64,7 +67,11 @@ final class DayManager {
                 }
                 if let sourceIdeaId = task.sourceIdeaId,
                    let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+                    try ideaRepo.update(sourceIdea)
+                }
+                if let sourceProjectId = task.sourceProjectId,
+                   let project = try projectRepo.fetchById(sourceProjectId) {
+                    try projectRepo.touchRecommendationContext(project)
                 }
             }
         }
@@ -334,13 +341,10 @@ final class DayManager {
         if task.sourceProjectId != nil {
             return "项目链接必做项"
         }
-        guard let sourceIdeaId = task.sourceIdeaId else {
+        guard task.sourceIdeaId != nil else {
             return task.aiRecommended ? "无来源必做项" : "普通想法来源必做项"
         }
-        guard let source = try? ideaRepo.fetchById(sourceIdeaId) else {
-            return "普通想法来源必做项"
-        }
-        return source.isProject ? "项目链接必做项" : "普通想法来源必做项"
+        return "普通想法来源必做项"
     }
 
     private func summaryNote(for task: DailyTaskEntity, incompleteNotes: [UUID: String]) -> String? {
@@ -365,7 +369,7 @@ final class DayManager {
         settlementDate: Date,
         incompleteNotes: [UUID: String]
     ) throws {
-        var affectedProjectIdeaIds: Set<UUID> = []
+        var affectedProjectIds: Set<UUID> = []
 
         for task in tasks {
             let sourceType = summarySourceType(for: task)
@@ -385,38 +389,37 @@ final class DayManager {
                 try arrangementRepo.update(arrangement)
             }
 
-            if let sourceIdeaId = task.sourceIdeaId, let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-                if sourceIdea.isProject {
-                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+            // 普通想法来源
+            if let sourceIdeaId = task.sourceIdeaId,
+               let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+                if task.taskStatus == .done {
+                    sourceIdea.ideaStatus = .completed
                 } else {
-                    if task.taskStatus == .done {
-                        sourceIdea.ideaStatus = .completed
-                    } else {
-                        sourceIdea.ideaStatus = .attempted
-                        sourceIdea.attempted = true
-                    }
-                    try ideaRepo.update(sourceIdea)
-                    try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+                    sourceIdea.ideaStatus = .attempted
+                    sourceIdea.attempted = true
                 }
+                try ideaRepo.update(sourceIdea)
+            }
 
+            // 项目来源
+            if let sourceProjectId = task.sourceProjectId,
+               let project = try projectRepo.fetchById(sourceProjectId) {
+                try projectRepo.touchRecommendationContext(project)
                 if sourceType == "项目链接必做项" {
-                    affectedProjectIdeaIds.insert(sourceIdeaId)
+                    affectedProjectIds.insert(sourceProjectId)
                 }
             }
         }
-        try refreshProjectIdeaStatusesAfterSettlement(affectedProjectIdeaIds)
+        try refreshProjectStatusesAfterSettlement(affectedProjectIds)
     }
 
-    private func refreshProjectIdeaStatusesAfterSettlement(_ ideaIds: Set<UUID>) throws {
-        for ideaId in ideaIds {
-            let activeTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: ideaId)
+    private func refreshProjectStatusesAfterSettlement(_ projectIds: Set<UUID>) throws {
+        for projectId in projectIds {
+            let activeTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: projectId)
             guard activeTasks.isEmpty else { continue }
 
-            if let idea = try ideaRepo.fetchById(ideaId),
-               idea.ideaStatus == .inProgress {
-                idea.ideaStatus = .pending
-                try ideaRepo.update(idea)
-                try ideaRepo.touchProjectRecommendationContext(idea)
+            if let project = try projectRepo.fetchById(projectId) {
+                try projectRepo.touchRecommendationContext(project)
             }
         }
     }

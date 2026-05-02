@@ -120,6 +120,7 @@ struct PopoverView: View {
                     AIRecommendFloatingButton(
                         viewModel: mustDoViewModel,
                         ideaPoolIdeas: ideaPoolViewModel.ideas,
+                        projects: ideaPoolViewModel.projects,
                         remainingWorkHours: remainingWorkHours
                     )
                     .padding(.trailing, 14)
@@ -221,6 +222,7 @@ struct APIKeyNotConfiguredBanner: View {
 private struct AIRecommendFloatingButton: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
+    let projects: [ProjectEntity]
     let remainingWorkHours: Double
 
     @State private var isExpanded = false
@@ -284,7 +286,7 @@ private struct AIRecommendFloatingButton: View {
     }
 
     private func updateCanSuggest() {
-        viewModel.updateCanSuggest(ideaPoolIdeas: ideaPoolIdeas)
+        viewModel.updateCanSuggest(projects: projects)
     }
 
     private func strategyBall(_ strategy: MustDoViewModel.RecommendationStrategy) -> some View {
@@ -299,6 +301,7 @@ private struct AIRecommendFloatingButton: View {
             isInputFocused = false
             viewModel.fetchRecommendations(
                 ideaPoolIdeas: ideaPoolIdeas,
+                projects: projects,
                 remainingHours: remainingWorkHours,
                 extraContext: context.isEmpty ? nil : context
             )

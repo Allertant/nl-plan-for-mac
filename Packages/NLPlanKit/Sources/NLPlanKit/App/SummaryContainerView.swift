@@ -25,6 +25,7 @@ struct SummaryContainerView: View {
             if appState.summaryViewModel == nil {
                 let context = appState.modelContainer.mainContext
                 let ideaRepo = IdeaRepository(modelContext: context)
+                let projectRepo = ProjectRepository(modelContext: context)
                 let dailyTaskRepo = DailyTaskRepository(modelContext: context)
                 let sessionLogRepo = SessionLogRepository(modelContext: context)
                 let summaryRepo = SummaryRepository(modelContext: context)
@@ -33,6 +34,7 @@ struct SummaryContainerView: View {
 
                 let dayMgr = DayManager(
                     ideaRepo: ideaRepo,
+                    projectRepo: projectRepo,
                     dailyTaskRepo: dailyTaskRepo,
                     summaryRepo: summaryRepo,
                     sessionLogRepo: sessionLogRepo,

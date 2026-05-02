@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 长期想法实体。只表达“想法池中的长期对象”，不表达某天承诺执行的必做项。
+/// 普通想法实体。只表达"想法池中的长期对象"，不表达某天承诺执行的必做项。
 @Model
 final class IdeaEntity {
     @Attribute(.unique) var id: UUID
@@ -17,20 +17,8 @@ final class IdeaEntity {
     var updatedAt: Date
     var attempted: Bool
     var note: String?
-    var isProject: Bool
-    var projectDecisionSource: String?
-    var projectProgress: Double?
-    var projectProgressSummary: String?
-    var projectProgressUpdatedAt: Date?
-    var projectDescription: String?
-    var planningBackground: String?
-    var planningResearchPrompt: String?
-    var planningResearchPromptReason: String?
-    var projectRecommendationContextUpdatedAt: Date?
-    var projectRecommendationSummary: String?
-    var projectRecommendationSummaryGeneratedAt: Date?
-    var projectRecommendationSummarySourceUpdatedAt: Date?
     var deadline: Date?
+
     @Transient
     var ideaStatus: IdeaStatus {
         get { IdeaStatus(rawValue: status) ?? .pending }
@@ -84,19 +72,6 @@ final class IdeaEntity {
         updatedAt: Date = .now,
         attempted: Bool = false,
         note: String? = nil,
-        isProject: Bool = false,
-        projectDecisionSource: String? = nil,
-        projectProgress: Double? = nil,
-        projectProgressSummary: String? = nil,
-        projectProgressUpdatedAt: Date? = nil,
-        projectDescription: String? = nil,
-        planningBackground: String? = nil,
-        planningResearchPrompt: String? = nil,
-        planningResearchPromptReason: String? = nil,
-        projectRecommendationContextUpdatedAt: Date? = nil,
-        projectRecommendationSummary: String? = nil,
-        projectRecommendationSummaryGeneratedAt: Date? = nil,
-        projectRecommendationSummarySourceUpdatedAt: Date? = nil,
         deadline: Date? = nil
     ) {
         self.id = id
@@ -112,19 +87,6 @@ final class IdeaEntity {
         self.updatedAt = updatedAt
         self.attempted = attempted
         self.note = note
-        self.isProject = isProject
-        self.projectDecisionSource = projectDecisionSource
-        self.projectProgress = projectProgress
-        self.projectProgressSummary = projectProgressSummary
-        self.projectProgressUpdatedAt = projectProgressUpdatedAt
-        self.projectDescription = projectDescription
-        self.planningBackground = planningBackground
-        self.planningResearchPrompt = planningResearchPrompt
-        self.planningResearchPromptReason = planningResearchPromptReason
-        self.projectRecommendationContextUpdatedAt = projectRecommendationContextUpdatedAt
-        self.projectRecommendationSummary = projectRecommendationSummary
-        self.projectRecommendationSummaryGeneratedAt = projectRecommendationSummaryGeneratedAt
-        self.projectRecommendationSummarySourceUpdatedAt = projectRecommendationSummarySourceUpdatedAt
         self.deadline = deadline
     }
 }

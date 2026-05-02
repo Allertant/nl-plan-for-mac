@@ -343,11 +343,21 @@ private struct RecommendationRow: View {
 
                     if let sourceIdea {
                         Menu {
-                            Text(sourceIdea.isProject ? "项目：\(sourceIdea.title)" : "想法：\(sourceIdea.title)")
+                            Text("想法：\(sourceIdea.title)")
                         } label: {
                             Image(systemName: "link")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                    } else if task.sourceProjectId != nil {
+                        Menu {
+                            Text("项目链接")
+                        } label: {
+                            Image(systemName: "link")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.indigo)
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
@@ -626,7 +636,7 @@ struct MustDoTaskRow: View {
 
             if let sourceIdea {
                 Menu {
-                    Text(sourceIdea.isProject ? "项目：\(sourceIdea.title)" : "想法：\(sourceIdea.title)")
+                    Text("想法：\(sourceIdea.title)")
                 } label: {
                     Image(systemName: "link")
                         .font(.system(size: 11))
@@ -634,6 +644,10 @@ struct MustDoTaskRow: View {
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
+            } else if task.sourceProjectId != nil {
+                Image(systemName: "link")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.indigo)
             }
         }
     }

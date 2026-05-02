@@ -74,10 +74,8 @@ final class TaskManager {
 
     /// 将已解析的任务保存到想法池或项目表
     func saveParsedTasks(parsedTasks: [ParsedTask], rawText: String) async throws -> [UUID] {
-        // 1. 保存原始想法
         let thought = try thoughtRepo.create(rawText: rawText)
 
-        // 2. 按 isProject 分流保存
         var createdIds: [UUID] = []
         for (index, parsed) in parsedTasks.enumerated() {
             let isProject = parsed.isProject ?? false
@@ -105,9 +103,7 @@ final class TaskManager {
             }
         }
 
-        // 3. 标记想法已处理
         try thoughtRepo.markProcessed(thought)
-
         return createdIds
     }
 
@@ -144,7 +140,7 @@ final class TaskManager {
         return try await saveParsedTasks(parsedTasks: parsedTasks, rawText: rawText)
     }
 
-    /// 从想法池中挑选任务加入必做项
+    /// 从想法池中挑选普通想法加入必做项
     func promoteToMustDo(
         ideaId: UUID,
         priority: TaskPriority? = nil,
@@ -156,36 +152,31 @@ final class TaskManager {
         }
         guard idea.ideaStatus != .completed, idea.ideaStatus != .archived else { return }
 
-        if !idea.isProject {
-            let estimatedMinutes = estimatedMinutesOverride ?? idea.estimatedMinutes
-            guard estimatedMinutes != nil else {
-                throw NLPlanError.invalidData(message: "普通想法缺少预估时长，无法加入必做项")
-            }
-            let activeLinkedTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: idea.id)
-            guard activeLinkedTasks.isEmpty else { return }
+        let estimatedMinutes = estimatedMinutesOverride ?? idea.estimatedMinutes
+        guard estimatedMinutes != nil else {
+            throw NLPlanError.invalidData(message: "普通想法缺少预估时长，无法加入必做项")
         }
+        let activeLinkedTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: idea.id)
+        guard activeLinkedTasks.isEmpty else { return }
 
         _ = try dailyTaskRepo.create(
             title: idea.title,
             category: idea.category,
-            estimatedMinutes: estimatedMinutesOverride ?? idea.estimatedMinutes ?? 30,
+            estimatedMinutes: estimatedMinutes ?? 30,
             priority: priority ?? idea.taskPriority,
             aiRecommended: idea.aiRecommended,
             recommendationReason: idea.recommendationReason,
             sortOrder: sortOrder ?? idea.sortOrder,
             date: .now,
             sourceIdeaId: idea.id,
-            sourceType: idea.isProject ? .project : .idea
+            sourceType: .idea
         )
 
-        if idea.isProject {
-            try ideaRepo.touchProjectRecommendationContext(idea)
-        }
         idea.ideaStatus = .inProgress
         try ideaRepo.update(idea)
     }
 
-    /// 创建新的必做项（用于项目切片）
+    /// 创建新的必做项（用于项目切片/推荐）
     func createMustDoTask(
         title: String,
         category: String,
@@ -200,8 +191,10 @@ final class TaskManager {
         let sourceType: DailyTaskSourceType
         if sourceProjectId != nil {
             sourceType = .project
+        } else if sourceIdeaId != nil {
+            sourceType = .idea
         } else {
-            sourceType = try dailyTaskSourceType(sourceIdeaId: sourceIdeaId)
+            sourceType = .none
         }
 
         let task = try dailyTaskRepo.create(
@@ -221,11 +214,9 @@ final class TaskManager {
 
         if let sourceProjectId {
             try? await touchProjectRecommendationContext(projectId: sourceProjectId)
-        } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), !idea.isProject {
+        } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId) {
             idea.ideaStatus = .inProgress
             try ideaRepo.update(idea)
-        } else if let sourceIdeaId, let idea = try ideaRepo.fetchById(sourceIdeaId), idea.isProject {
-            try ideaRepo.touchProjectRecommendationContext(idea)
         }
         return task
     }
@@ -236,12 +227,10 @@ final class TaskManager {
             throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
 
-        // 暂停计时（如果正在运行）
         if dailyTask.taskStatus == .running {
             try commitRunningTime(dailyTask)
         }
 
-        // 恢复安排状态为 pending
         if let arrangementId = dailyTask.arrangementId,
            let arrangement = try arrangementRepo.fetchById(arrangementId) {
             arrangement.status = ArrangementStatus.pending.rawValue
@@ -255,7 +244,6 @@ final class TaskManager {
             sourceIdea.ideaStatus = markAttempted ? .attempted : .pending
             sourceIdea.attempted = markAttempted || sourceIdea.attempted
             try ideaRepo.update(sourceIdea)
-            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
         }
     }
 
@@ -275,31 +263,6 @@ final class TaskManager {
         try projectRepo.delete(project)
     }
 
-    /// 为项目想法添加备注记录
-    func addProjectNote(ideaId: UUID, content: String) async throws {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let idea = try ideaRepo.fetchById(ideaId) else {
-            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
-        }
-        guard idea.isProject else { return }
-        _ = try ideaRepo.createProjectNote(ideaId: idea.id, content: trimmed)
-        try ideaRepo.touchProjectRecommendationContext(idea)
-    }
-
-    /// 编辑项目备注记录
-    func updateProjectNote(noteId: UUID, content: String) async throws {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let note = try ideaRepo.fetchProjectNoteById(noteId) else {
-            throw NLPlanError.dataNotFound(entity: "ProjectNote", id: noteId)
-        }
-        try ideaRepo.updateProjectNote(note, content: trimmed)
-        if let ideaId = note.ideaId, let idea = try ideaRepo.fetchById(ideaId) {
-            try ideaRepo.touchProjectRecommendationContext(idea)
-        }
-    }
-
     // MARK: - 必做项操作
 
     /// 开始执行任务
@@ -309,7 +272,6 @@ final class TaskManager {
         }
         guard dailyTask.taskStatus != .done else { return }
 
-        // 1. 暂停其他运行中的任务（并行控制）
         let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
         let toPause = await timerEngine.tasksToPauseBeforeStart(
             runningTaskIds: runningTasks.map { $0.id },
@@ -321,15 +283,12 @@ final class TaskManager {
             }
         }
 
-        // 2. 初始化计时状态
         dailyTask.timerAccumulatedSeconds = 0
         dailyTask.timerLastStartedAt = .now
         dailyTask.taskStatus = .running
         try dailyTaskRepo.update(dailyTask)
 
-        // 3. 创建 session log
         _ = try sessionLogRepo.create(taskId: taskId, startedAt: .now, date: .now)
-
         touchSourceContext(dailyTask)
     }
 
@@ -339,7 +298,6 @@ final class TaskManager {
             throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
         guard dailyTask.taskStatus == .running else { return }
-
         try pauseRunningTask(dailyTask)
     }
 
@@ -350,7 +308,6 @@ final class TaskManager {
         }
         guard dailyTask.taskStatus == .paused else { return }
 
-        // 并行控制：暂停其他运行中的任务
         let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
         let toPause = await timerEngine.tasksToPauseBeforeStart(
             runningTaskIds: runningTasks.map { $0.id },
@@ -440,7 +397,7 @@ final class TaskManager {
         try projectRepo.touchRecommendationContext(project)
     }
 
-    // MARK: - 项目备注（ProjectEntity 路径）
+    // MARK: - 项目备注
 
     func addProjectNote(projectId: UUID, content: String) async throws {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -453,15 +410,25 @@ final class TaskManager {
         try projectRepo.fetchProjectNotes(projectId: projectId)
     }
 
+    /// 编辑项目备注记录
+    func updateProjectNote(noteId: UUID, content: String) async throws {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let note = try projectRepo.fetchProjectNoteById(noteId) else {
+            throw NLPlanError.dataNotFound(entity: "ProjectNote", id: noteId)
+        }
+        try projectRepo.updateProjectNote(note, content: trimmed)
+        try? await touchProjectRecommendationContext(projectId: note.projectId)
+    }
+
     func generatePlanningBackgroundPrompt(projectId: UUID) async throws {
         guard let project = try projectRepo.fetchById(projectId) else { return }
         let activeTasks = try await fetchMustDo(sourceIdeaId: projectId)
         let settledTasks = try await fetchSettledTasks(sourceIdeaId: projectId)
         let notes = try await fetchProjectNotesByProjectId(projectId: projectId)
-        let aiService = self.aiService
 
         let result = try await aiExecutionCoordinator.run {
-            try await aiService.generatePlanningBackgroundPrompt(
+            try await self.aiService.generatePlanningBackgroundPrompt(
                 input: PlanningBackgroundPromptInput(
                     title: project.title,
                     category: project.category,
@@ -497,38 +464,37 @@ final class TaskManager {
         try ideaRepo.update(idea)
     }
 
-    /// 为单个项目生成推荐阶段使用的状态摘要，并写回项目
-    func refreshProjectRecommendationSummary(ideaId: UUID) async throws {
-        guard let job = try await makeProjectRecommendationSummaryJob(ideaId: ideaId) else { return }
+    /// 为项目生成推荐摘要
+    func refreshProjectRecommendationSummary(projectId: UUID) async throws {
+        guard let job = try await makeProjectRecommendationSummaryJob(projectId: projectId) else { return }
         let result = try await aiExecutionCoordinator.run {
             try await self.aiService.generateProjectRecommendationSummary(input: job.input)
         }
         _ = try await saveProjectRecommendationSummary(
-            ideaId: ideaId,
+            projectId: projectId,
             summary: result.summary,
             sourceUpdatedAt: job.contextUpdatedAt
         )
     }
 
-    func makeProjectRecommendationSummaryJob(ideaId: UUID) async throws -> ProjectRecommendationSummaryJob? {
-        guard let idea = try ideaRepo.fetchById(ideaId) else {
-            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+    func makeProjectRecommendationSummaryJob(projectId: UUID) async throws -> ProjectRecommendationSummaryJob? {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
         }
-        guard idea.isProject else { return nil }
 
-        let notes = try ideaRepo.fetchProjectNotes(ideaId: ideaId)
-        let activeTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: ideaId).filter { !$0.isSettled }
-        let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: ideaId)
-        let contextUpdatedAt = idea.projectRecommendationContextUpdatedAt ?? idea.updatedAt
+        let notes = try projectRepo.fetchProjectNotes(projectId: projectId)
+        let activeTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: projectId).filter { !$0.isSettled }
+        let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: projectId)
+        let contextUpdatedAt = project.projectRecommendationContextUpdatedAt ?? project.updatedAt
 
         return ProjectRecommendationSummaryJob(
-            ideaId: ideaId,
+            ideaId: projectId,
             input: ProjectRecommendationSummaryInput(
-                title: idea.title,
-                category: idea.category,
-                projectDescription: idea.projectDescription,
-                planningBackground: idea.planningBackground,
-                projectProgressSummary: idea.projectProgressSummary,
+                title: project.title,
+                category: project.category,
+                projectDescription: project.projectDescription,
+                planningBackground: project.planningBackground,
+                projectProgressSummary: project.projectProgressSummary,
                 notes: notes.map(\.content),
                 activeTasks: activeTasks.map { task in
                     let note = task.note?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -546,20 +512,19 @@ final class TaskManager {
     }
 
     func saveProjectRecommendationSummary(
-        ideaId: UUID,
+        projectId: UUID,
         summary: String,
         sourceUpdatedAt: Date
-    ) async throws -> IdeaEntity? {
-        guard let idea = try ideaRepo.fetchById(ideaId) else {
-            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
+    ) async throws -> ProjectEntity? {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
         }
-        guard idea.isProject else { return nil }
 
-        idea.projectRecommendationSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        idea.projectRecommendationSummaryGeneratedAt = .now
-        idea.projectRecommendationSummarySourceUpdatedAt = sourceUpdatedAt
-        try ideaRepo.update(idea)
-        return idea
+        project.projectRecommendationSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        project.projectRecommendationSummaryGeneratedAt = .now
+        project.projectRecommendationSummarySourceUpdatedAt = sourceUpdatedAt
+        try projectRepo.update(project)
+        return project
     }
 
     /// 获取指定日期的必做项
@@ -567,12 +532,12 @@ final class TaskManager {
         try dailyTaskRepo.fetchTasks(date: date)
     }
 
-    /// 获取绑定到指定项目想法的全部必做项
+    /// 获取绑定到指定来源的全部必做项
     func fetchMustDo(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
     }
 
-    /// 获取绑定到指定项目想法的已归档任务
+    /// 获取绑定到指定来源的已归档任务
     func fetchSettledTasks(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: sourceIdeaId)
     }
@@ -591,9 +556,8 @@ final class TaskManager {
     /// 更新必做项实体
     func updateDailyTask(_ task: DailyTaskEntity) async throws {
         try dailyTaskRepo.update(task)
-        if let sourceIdeaId = task.sourceIdeaId,
-           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
-            try ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        if let sourceProjectId = task.sourceProjectId {
+            try? await touchProjectRecommendationContext(projectId: sourceProjectId)
         }
     }
 
@@ -603,27 +567,15 @@ final class TaskManager {
         }
         let previousSourceIdeaId = task.sourceIdeaId
         task.sourceIdeaId = sourceIdeaId
-        task.sourceType = try dailyTaskSourceType(sourceIdeaId: sourceIdeaId).rawValue
+        task.sourceType = (sourceIdeaId != nil) ? DailyTaskSourceType.idea.rawValue : DailyTaskSourceType.none.rawValue
         try dailyTaskRepo.update(task)
 
         let affectedIdeaIds = Set([previousSourceIdeaId, sourceIdeaId].compactMap { $0 })
         for ideaId in affectedIdeaIds {
             if let idea = try ideaRepo.fetchById(ideaId) {
-                try ideaRepo.touchProjectRecommendationContext(idea)
+                try ideaRepo.update(idea)
             }
         }
-    }
-
-    func touchProjectRecommendationContext(ideaId: UUID) async throws {
-        guard let idea = try ideaRepo.fetchById(ideaId) else {
-            throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
-        }
-        try ideaRepo.touchProjectRecommendationContext(idea)
-    }
-
-    /// 获取项目备注列表
-    func fetchProjectNotes(ideaId: UUID) async throws -> [ProjectNoteEntity] {
-        try ideaRepo.fetchProjectNotes(ideaId: ideaId)
     }
 
     // MARK: - 项目安排
@@ -675,19 +627,13 @@ final class TaskManager {
         guard arrangement.arrangementStatus != .done else { return nil }
 
         let projectEntity = try projectRepo.fetchById(arrangement.projectId)
-        let ideaEntity = try ideaRepo.fetchById(arrangement.projectId)
-        let category = projectEntity?.category ?? ideaEntity?.category ?? ""
+        let category = projectEntity?.category ?? ""
         let projectId = arrangement.projectId
 
         if let existingTask = try dailyTaskRepo.fetchActiveTask(arrangementId: arrangementId) {
             if arrangement.arrangementStatus != .inProgress {
                 arrangement.status = ArrangementStatus.inProgress.rawValue
                 try arrangementRepo.update(arrangement)
-            }
-            if let ideaEntity, ideaEntity.ideaStatus != .inProgress {
-                ideaEntity.ideaStatus = .inProgress
-                try ideaRepo.touchProjectRecommendationContext(ideaEntity)
-                try ideaRepo.update(ideaEntity)
             }
             return existingTask
         }
@@ -702,8 +648,7 @@ final class TaskManager {
             sortOrder: sortOrder ?? arrangement.sortOrder,
             date: .now,
             note: nil,
-            sourceIdeaId: projectEntity == nil ? projectId : nil,
-            sourceProjectId: projectEntity != nil ? projectId : nil,
+            sourceProjectId: projectId,
             arrangementId: arrangement.id,
             sourceType: .project
         )
@@ -713,10 +658,6 @@ final class TaskManager {
 
         if let projectEntity {
             try projectRepo.touchRecommendationContext(projectEntity)
-        } else if let ideaEntity {
-            ideaEntity.ideaStatus = .inProgress
-            try ideaRepo.touchProjectRecommendationContext(ideaEntity)
-            try ideaRepo.update(ideaEntity)
         }
 
         return task
@@ -733,13 +674,12 @@ final class TaskManager {
     private func dailyTaskSourceType(sourceIdeaId: UUID?) throws -> DailyTaskSourceType {
         guard let sourceIdeaId else { return .none }
         if try projectRepo.fetchById(sourceIdeaId) != nil { return .project }
-        guard let idea = try ideaRepo.fetchById(sourceIdeaId) else { return .idea }
-        return idea.isProject ? .project : .idea
+        if try ideaRepo.fetchById(sourceIdeaId) != nil { return .idea }
+        return .none
     }
 
     // MARK: - Timer Helpers
 
-    /// 将运行中任务的已计时时长 commit 到 accumulatedSeconds
     private func commitRunningTime(_ task: DailyTaskEntity) throws {
         if let lastStarted = task.timerLastStartedAt {
             task.timerAccumulatedSeconds += Int(Date.now.timeIntervalSince(lastStarted))
@@ -747,7 +687,6 @@ final class TaskManager {
         task.timerLastStartedAt = nil
     }
 
-    /// 暂停一个运行中的任务：commit 时间 + 结束 session + 更新状态
     private func pauseRunningTask(_ task: DailyTaskEntity) throws {
         try commitRunningTime(task)
         task.taskStatus = .paused
@@ -759,15 +698,14 @@ final class TaskManager {
     }
 
     private func touchSourceContext(_ task: DailyTaskEntity) {
-        if let sourceIdeaId = task.sourceIdeaId,
-           let sourceIdea = try? ideaRepo.fetchById(sourceIdeaId) {
-            try? ideaRepo.touchProjectRecommendationContext(sourceIdea)
+        if let sourceProjectId = task.sourceProjectId,
+           let project = try? projectRepo.fetchById(sourceProjectId) {
+            try? projectRepo.touchRecommendationContext(project)
         }
     }
 
     // MARK: - Checkpoint & Recovery
 
-    /// 定期保存运行中任务的计时进度（每 60 秒调用一次）
     func checkpointRunningTasks() async throws {
         let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
         for task in runningTasks {
@@ -777,24 +715,19 @@ final class TaskManager {
         }
     }
 
-    /// 启动时恢复：将所有 running 状态的任务转为 paused
-    /// 不计算从崩溃到现在的时长，直接使用最后一次 checkpoint 的值
     func recoverRunningTasksOnStartup() async throws {
         let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
         for task in runningTasks {
-            // 不 commit，直接使用持久化的 timerAccumulatedSeconds
             task.timerLastStartedAt = nil
             task.taskStatus = .paused
             try dailyTaskRepo.update(task)
 
-            // 结束可能残留的 open session
             if let openLog = try sessionLogRepo.fetchOpenSession(taskId: task.id) {
                 try sessionLogRepo.endSession(openLog, endedAt: openLog.startedAt.addingTimeInterval(TimeInterval(task.timerAccumulatedSeconds)))
             }
         }
     }
 
-    /// 停止所有运行中的任务（供 DayManager 结算使用）
     func stopAllRunningTasks() async throws {
         let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
         for task in runningTasks {

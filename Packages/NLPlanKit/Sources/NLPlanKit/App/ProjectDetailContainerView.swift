@@ -134,17 +134,9 @@ private struct ProjectDetailPageView: View {
     // MARK: - Data
 
     private func loadProjectDetail() async {
-        // 先尝试 ProjectEntity，再回退 IdeaEntity
         if let project = await viewModel.fetchProject(projectId: projectId) {
             projectDetail = ProjectDetailSnapshot(project: project)
             async let projectNotes = viewModel.fetchProjectNotesByProjectId(projectId: projectId)
-            async let projectArrangements = viewModel.fetchArrangements(projectId: projectId)
-            await refreshAllTasks()
-            notes = await projectNotes
-            _ = await projectArrangements
-        } else if let idea = await viewModel.fetchIdea(ideaId: projectId) {
-            projectDetail = ProjectDetailSnapshot(idea: idea)
-            async let projectNotes = viewModel.fetchProjectNotes(ideaId: projectId)
             async let projectArrangements = viewModel.fetchArrangements(projectId: projectId)
             await refreshAllTasks()
             notes = await projectNotes
@@ -156,8 +148,6 @@ private struct ProjectDetailPageView: View {
     private func reloadDetail() async {
         if let project = await viewModel.fetchProject(projectId: projectId) {
             projectDetail = ProjectDetailSnapshot(project: project)
-        } else if let idea = await viewModel.fetchIdea(ideaId: projectId) {
-            projectDetail = ProjectDetailSnapshot(idea: idea)
         }
     }
 
@@ -177,11 +167,7 @@ private struct ProjectDetailPageView: View {
         let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != projectDetail?.title else { return }
         Task {
-            if projectDetail?.isFromProjectEntity == true {
-                await viewModel.updateProjectTitle(projectId: projectId, title: trimmed)
-            } else {
-                await viewModel.updateIdea(ideaId: projectId, title: trimmed)
-            }
+            await viewModel.updateProjectTitle(projectId: projectId, title: trimmed)
             await reloadDetail()
         }
     }
@@ -265,11 +251,7 @@ private struct ProjectDetailPageView: View {
         let current = projectDetail?.projectDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard trimmed != current else { return }
         Task {
-            if projectDetail?.isFromProjectEntity == true {
-                await viewModel.updateProjectDescription(projectId: projectId, description: trimmed.isEmpty ? nil : trimmed)
-            } else {
-                await viewModel.updateProjectDescription(ideaId: projectId, description: trimmed.isEmpty ? nil : trimmed)
-            }
+            await viewModel.updateProjectDescription(projectId: projectId, description: trimmed.isEmpty ? nil : trimmed)
             await reloadDetail()
         }
     }
@@ -379,11 +361,7 @@ private struct ProjectDetailPageView: View {
         let current = projectDetail?.planningBackground?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard trimmed != current else { return }
         Task {
-            if projectDetail?.isFromProjectEntity == true {
-                await viewModel.updatePlanningBackground(projectId: projectId, planningBackground: trimmed.isEmpty ? nil : trimmed)
-            } else {
-                await viewModel.updatePlanningBackground(ideaId: projectId, planningBackground: trimmed.isEmpty ? nil : trimmed)
-            }
+            await viewModel.updatePlanningBackground(projectId: projectId, planningBackground: trimmed.isEmpty ? nil : trimmed)
             await reloadDetail()
         }
     }
@@ -542,7 +520,7 @@ private struct ProjectDetailPageView: View {
                         onUpdate: { content in
                             Task {
                                 await viewModel.updateProjectNote(noteId: note.id, content: content)
-                                notes = await fetchNotes()
+                                notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
                             }
                         }
                     )
@@ -572,30 +550,14 @@ private struct ProjectDetailPageView: View {
         let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         Task {
-            if projectDetail?.isFromProjectEntity == true {
-                await viewModel.addProjectNote(projectId: projectId, content: text)
-            } else {
-                await viewModel.addProjectNote(ideaId: projectId, content: text)
-            }
-            notes = await fetchNotes()
+            await viewModel.addProjectNote(projectId: projectId, content: text)
+            notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
         }
         newNoteText = ""
     }
 
-    private func fetchNotes() async -> [ProjectNoteEntity] {
-        if projectDetail?.isFromProjectEntity == true {
-            return await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
-        } else {
-            return await viewModel.fetchProjectNotes(ideaId: projectId)
-        }
-    }
-
     private func generatePlanningPrompt() async {
-        if projectDetail?.isFromProjectEntity == true {
-            await viewModel.generatePlanningBackgroundPrompt(projectId: projectId)
-        } else {
-            await viewModel.generatePlanningBackgroundPrompt(ideaId: projectId)
-        }
+        await viewModel.generatePlanningBackgroundPrompt(projectId: projectId)
     }
 }
 
@@ -613,35 +575,8 @@ struct ProjectDetailSnapshot {
     var planningBackground: String?
     var planningResearchPrompt: String?
     var planningResearchPromptReason: String?
-    let source: Source
-
-    enum Source {
-        case idea(IdeaEntity)
-        case project(ProjectEntity)
-    }
-
-    var isFromProjectEntity: Bool {
-        if case .project = source { return true }
-        return false
-    }
-
-    init(idea: IdeaEntity) {
-        self.source = .idea(idea)
-        id = idea.id
-        title = idea.title
-        category = idea.category
-        createdDate = idea.createdDate
-        projectProgress = idea.projectProgress
-        projectProgressSummary = idea.projectProgressSummary
-        projectProgressUpdatedAt = idea.projectProgressUpdatedAt
-        projectDescription = idea.projectDescription
-        planningBackground = idea.planningBackground
-        planningResearchPrompt = idea.planningResearchPrompt
-        planningResearchPromptReason = idea.planningResearchPromptReason
-    }
 
     init(project: ProjectEntity) {
-        self.source = .project(project)
         id = project.id
         title = project.title
         category = project.category

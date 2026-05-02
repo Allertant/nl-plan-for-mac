@@ -123,6 +123,19 @@ final class ProjectRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchProjectNoteById(_ id: UUID) throws -> ProjectNoteEntity? {
+        let descriptor = FetchDescriptor<ProjectNoteEntity>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try modelContext.fetch(descriptor).first
+    }
+
+    func updateProjectNote(_ note: ProjectNoteEntity, content: String) throws {
+        note.content = content
+        note.updatedAt = .now
+        try modelContext.save()
+    }
+
     // MARK: - Project Planning
 
     func updateDescription(_ project: ProjectEntity, description: String?) throws {

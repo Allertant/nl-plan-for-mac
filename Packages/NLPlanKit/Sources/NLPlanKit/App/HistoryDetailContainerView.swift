@@ -89,6 +89,7 @@ private struct HistoryDetailPageView: View {
 
         let dayMgr = DayManager(
             ideaRepo: ideaRepo,
+            projectRepo: projectRepo,
             dailyTaskRepo: dailyTaskRepo,
             summaryRepo: summaryRepo,
             sessionLogRepo: sessionLogRepo,
@@ -264,18 +265,14 @@ private struct HistoryDetailPageView: View {
             if let ideaId = task.sourceIdeaId, let idea = sourceIdeas[ideaId] {
                 HStack {
                     Spacer()
-                    if idea.isProject {
-                        ProjectNavLink(ideaId: ideaId, returnTo: .historyDetail(date))
-                    } else {
-                        Button {
-                            showingIdeaPopover = idea
-                        } label: {
-                            Label("查看想法", systemImage: "lightbulb.fill")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
+                    Button {
+                        showingIdeaPopover = idea
+                    } label: {
+                        Label("查看想法", systemImage: "lightbulb.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.blue)
                     }
+                    .buttonStyle(.plain)
                 }
             } else if task.sourceProjectId != nil {
                 HStack {

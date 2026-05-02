@@ -22,19 +22,6 @@ final class IdeaRepository {
         status: IdeaStatus = .pending,
         attempted: Bool = false,
         note: String? = nil,
-        isProject: Bool = false,
-        projectDecisionSource: String? = nil,
-        projectProgress: Double? = nil,
-        projectProgressSummary: String? = nil,
-        projectProgressUpdatedAt: Date? = nil,
-        projectDescription: String? = nil,
-        planningBackground: String? = nil,
-        planningResearchPrompt: String? = nil,
-        planningResearchPromptReason: String? = nil,
-        projectRecommendationContextUpdatedAt: Date? = nil,
-        projectRecommendationSummary: String? = nil,
-        projectRecommendationSummaryGeneratedAt: Date? = nil,
-        projectRecommendationSummarySourceUpdatedAt: Date? = nil,
         deadline: Date? = nil,
         createdDate: Date = .now
     ) throws -> IdeaEntity {
@@ -52,19 +39,6 @@ final class IdeaRepository {
             updatedAt: .now,
             attempted: attempted,
             note: note,
-            isProject: isProject,
-            projectDecisionSource: projectDecisionSource,
-            projectProgress: projectProgress,
-            projectProgressSummary: projectProgressSummary,
-            projectProgressUpdatedAt: projectProgressUpdatedAt,
-            projectDescription: projectDescription,
-            planningBackground: planningBackground,
-            planningResearchPrompt: planningResearchPrompt,
-            planningResearchPromptReason: planningResearchPromptReason,
-            projectRecommendationContextUpdatedAt: isProject ? (projectRecommendationContextUpdatedAt ?? .now) : projectRecommendationContextUpdatedAt,
-            projectRecommendationSummary: projectRecommendationSummary,
-            projectRecommendationSummaryGeneratedAt: projectRecommendationSummaryGeneratedAt,
-            projectRecommendationSummarySourceUpdatedAt: projectRecommendationSummarySourceUpdatedAt,
             deadline: deadline
         )
         modelContext.insert(idea)
@@ -76,9 +50,7 @@ final class IdeaRepository {
         let descriptor = FetchDescriptor<IdeaEntity>(
             predicate: #Predicate { $0.id == id }
         )
-        let idea = try modelContext.fetch(descriptor).first
-        try normalizeProjectEstimatedMinutes(in: idea.map { [$0] } ?? [])
-        return idea
+        return try modelContext.fetch(descriptor).first
     }
 
     func fetchVisibleIdeas() throws -> [IdeaEntity] {
@@ -90,9 +62,7 @@ final class IdeaRepository {
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
-        let ideas = try modelContext.fetch(descriptor)
-        try normalizeProjectEstimatedMinutes(in: ideas)
-        return ideas
+        return try modelContext.fetch(descriptor)
     }
 
     func fetchAll() throws -> [IdeaEntity] {
@@ -111,9 +81,7 @@ final class IdeaRepository {
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
-        let ideas = try modelContext.fetch(descriptor)
-        try normalizeProjectEstimatedMinutes(in: ideas)
-        return ideas
+        return try modelContext.fetch(descriptor)
     }
 
     func update(_ idea: IdeaEntity) throws {
@@ -121,67 +89,8 @@ final class IdeaRepository {
         try modelContext.save()
     }
 
-    func touchProjectRecommendationContext(_ idea: IdeaEntity, at date: Date = .now) throws {
-        guard idea.isProject else { return }
-        idea.projectRecommendationContextUpdatedAt = date
-        idea.updatedAt = date
-        try modelContext.save()
-    }
-
     func delete(_ idea: IdeaEntity) throws {
         modelContext.delete(idea)
         try modelContext.save()
-    }
-
-    // MARK: - Project Notes
-
-    func createProjectNote(ideaId: UUID, content: String) throws -> ProjectNoteEntity {
-        let note = ProjectNoteEntity(content: content, ideaId: ideaId)
-        modelContext.insert(note)
-        try modelContext.save()
-        return note
-    }
-
-    func fetchProjectNotes(ideaId: UUID) throws -> [ProjectNoteEntity] {
-        let targetId = ideaId
-        let descriptor = FetchDescriptor<ProjectNoteEntity>(
-            predicate: #Predicate { $0.ideaId == targetId },
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor)
-    }
-
-    func fetchProjectNoteById(_ id: UUID) throws -> ProjectNoteEntity? {
-        let descriptor = FetchDescriptor<ProjectNoteEntity>(
-            predicate: #Predicate { $0.id == id }
-        )
-        return try modelContext.fetch(descriptor).first
-    }
-
-    func updateProjectNote(_ note: ProjectNoteEntity, content: String) throws {
-        note.content = content
-        note.updatedAt = .now
-        try modelContext.save()
-    }
-
-    private func normalizeProjectEstimatedMinutes(in ideas: [IdeaEntity]) throws {
-        let now = Date()
-        var requiresSave = false
-
-        for idea in ideas where idea.isProject {
-            if idea.estimatedMinutes != nil {
-                idea.estimatedMinutes = nil
-                idea.updatedAt = now
-                requiresSave = true
-            }
-            if idea.projectRecommendationContextUpdatedAt == nil {
-                idea.projectRecommendationContextUpdatedAt = idea.updatedAt
-                requiresSave = true
-            }
-        }
-
-        if requiresSave {
-            try modelContext.save()
-        }
     }
 }

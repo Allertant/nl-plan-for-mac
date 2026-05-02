@@ -72,6 +72,7 @@ struct MainContentView: View {
         let context = appState.modelContainer.mainContext
         return DayManager(
             ideaRepo: IdeaRepository(modelContext: context),
+            projectRepo: ProjectRepository(modelContext: context),
             dailyTaskRepo: DailyTaskRepository(modelContext: context),
             summaryRepo: SummaryRepository(modelContext: context),
             sessionLogRepo: SessionLogRepository(modelContext: context),

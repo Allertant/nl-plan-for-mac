@@ -8,22 +8,19 @@ final class ProjectNoteEntity {
     var content: String
     var createdAt: Date
     var updatedAt: Date
-    var ideaId: UUID?
-    var projectId: UUID?
+    var projectId: UUID
 
     init(
         id: UUID = UUID(),
         content: String,
+        projectId: UUID,
         createdAt: Date = .now,
-        updatedAt: Date = .now,
-        ideaId: UUID? = nil,
-        projectId: UUID? = nil
+        updatedAt: Date = .now
     ) {
         self.id = id
         self.content = content
+        self.projectId = projectId
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.ideaId = ideaId
-        self.projectId = projectId
     }
 }

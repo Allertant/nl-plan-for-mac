@@ -244,9 +244,9 @@ final class AppState {
             await self?.ideaPoolViewModel?.refresh()
         }
 
-        mustDoViewModel?.onProjectLinkChanged = { [weak self] ideaId in
-            guard let ideaId else { return }
-            await self?.ideaPoolViewModel?.refreshProjectAnalyses(ideaId: ideaId)
+        mustDoViewModel?.onProjectLinkChanged = { [weak self] projectId in
+            guard let projectId else { return }
+            await self?.ideaPoolViewModel?.refreshProjectAnalyses(projectId: projectId)
         }
 
         // 迁移旧项目数据
@@ -273,50 +273,24 @@ final class AppState {
         guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
 
         do {
-            let allIdeas = try ideaRepo.fetchAll()
-            let projectIdeas = allIdeas.filter { $0.isProject }
+            // 迁移 DailyTaskEntity: 对 sourceProjectId 为 nil 但 sourceIdeaId 指向 ProjectEntity 的必做项，
+            // 将 sourceIdeaId 转移到 sourceProjectId
+            let allProjects = try projectRepo.fetchVisibleProjects()
+            let projectIds = Set(allProjects.map(\.id))
 
-            for idea in projectIdeas {
-                // 创建 ProjectEntity
-                _ = try projectRepo.create(
-                    id: idea.id,
-                    title: idea.title,
-                    category: idea.category,
-                    priority: idea.taskPriority,
-                    sortOrder: idea.sortOrder,
-                    status: .pending,
-                    projectDecisionSource: idea.projectDecisionSource,
-                    projectProgress: idea.projectProgress,
-                    projectProgressSummary: idea.projectProgressSummary,
-                    projectProgressUpdatedAt: idea.projectProgressUpdatedAt,
-                    projectDescription: idea.projectDescription,
-                    planningBackground: idea.planningBackground,
-                    planningResearchPrompt: idea.planningResearchPrompt,
-                    planningResearchPromptReason: idea.planningResearchPromptReason,
-                    projectRecommendationContextUpdatedAt: idea.projectRecommendationContextUpdatedAt,
-                    projectRecommendationSummary: idea.projectRecommendationSummary,
-                    projectRecommendationSummaryGeneratedAt: idea.projectRecommendationSummaryGeneratedAt,
-                    projectRecommendationSummarySourceUpdatedAt: idea.projectRecommendationSummarySourceUpdatedAt,
-                    deadline: idea.deadline
-                )
-
-                // 更新项目备注的 projectId
-                let notes = try ideaRepo.fetchProjectNotes(ideaId: idea.id)
-                for note in notes {
-                    note.projectId = idea.id
+            for projectId in projectIds {
+                let tasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: projectId)
+                for task in tasks where task.sourceProjectId == nil {
+                    task.sourceProjectId = projectId
+                    task.sourceIdeaId = nil
+                    task.sourceType = DailyTaskSourceType.project.rawValue
                 }
-
-                // 删除旧的 IdeaEntity
-                try ideaRepo.delete(idea)
             }
 
-            if !projectIdeas.isEmpty {
-                try context.save()
-            }
-
+            try context.save()
             UserDefaults.standard.set(true, forKey: migrationKey)
         } catch {
-            print("项目迁移失败：\(error)")
+            print("数据迁移失败：\(error)")
         }
     }
 }

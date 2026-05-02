@@ -103,7 +103,6 @@ final class IdeaPoolViewModel {
 
     func promoteProjectToMustDo(projectId: UUID, priority: TaskPriority = .medium) async {
         do {
-            // 创建项目切片必做项
             _ = try await taskManager.createMustDoTask(
                 title: projects.first(where: { $0.id == projectId })?.title ?? "项目任务",
                 category: projects.first(where: { $0.id == projectId })?.category ?? "",
@@ -138,22 +137,16 @@ final class IdeaPoolViewModel {
 
     var cleanupState: CleanupState = .idle
 
-    /// 待确认删除的清理项 ID
     var pendingDeleteCleanupId: UUID?
 
-    /// 待确认删除的清理项标题
     var pendingDeleteCleanupTitle: String? {
         guard let id = pendingDeleteCleanupId else { return nil }
         return ideas.first(where: { $0.id == id })?.title
     }
 
-    /// 延迟删除栈：已从 UI 移除但未从数据库删除的清理项（支持撤销）
     private var removedCleanupItems: [CleanupSuggestion] = []
-
-    /// 高亮清除 Task（持有引用，新调用时取消旧的）
     private var highlightClearTask: Task<Void, Never>?
 
-    /// 是否可以撤销
     var canUndoCleanup: Bool { !removedCleanupItems.isEmpty }
 
     var showCleanupPanel: Bool {
@@ -220,83 +213,13 @@ final class IdeaPoolViewModel {
     func updateIdea(ideaId: UUID, title: String? = nil, category: String? = nil, estimatedMinutes: Int? = nil, note: String? = nil, deadline: Date? = nil) async {
         do {
             if let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) {
-                let shouldTouchRecommendationContext = idea.isProject && (title != nil || category != nil || note != nil)
                 if let title { idea.title = title }
                 if let category { idea.category = category }
-                if let estimatedMinutes, !idea.isProject { idea.estimatedMinutes = estimatedMinutes }
+                if let estimatedMinutes { idea.estimatedMinutes = estimatedMinutes }
                 if let note { idea.note = note }
                 if let deadline { idea.deadline = deadline }
                 try await taskManager.updateIdea(idea)
-                if shouldTouchRecommendationContext {
-                    try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
-                }
             }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func updateProjectDescription(ideaId: UUID, description: String?) async {
-        do {
-            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
-            idea.projectDescription = normalizeOptionalText(description)
-            try await taskManager.updateIdea(idea)
-            try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func updatePlanningBackground(ideaId: UUID, planningBackground: String?) async {
-        do {
-            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
-            idea.planningBackground = normalizeOptionalText(planningBackground)
-            try await taskManager.updateIdea(idea)
-            try await taskManager.touchProjectRecommendationContext(ideaId: idea.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func generatePlanningBackgroundPrompt(ideaId: UUID) async {
-        guard !generatingPlanningPromptIdeaIds.contains(ideaId) else { return }
-        generatingPlanningPromptIdeaIds.insert(ideaId)
-        defer { generatingPlanningPromptIdeaIds.remove(ideaId) }
-
-        do {
-            guard let idea = try await taskManager.fetchIdeaPoolTask(ideaId: ideaId) else { return }
-            let activeTasks = try await taskManager.fetchMustDo(sourceIdeaId: ideaId)
-            let settledTasks = try await taskManager.fetchSettledTasks(sourceIdeaId: ideaId)
-            let notes = try await taskManager.fetchProjectNotes(ideaId: ideaId)
-            let aiService = await makeAIService()
-
-            let result = try await aiExecutionCoordinator.run {
-                try await aiService.generatePlanningBackgroundPrompt(
-                    input: PlanningBackgroundPromptInput(
-                        title: idea.title,
-                        category: idea.category,
-                        estimatedMinutes: idea.estimatedMinutes,
-                        attempted: idea.attempted,
-                        projectDescription: idea.projectDescription,
-                        planningBackground: idea.planningBackground,
-                        notes: notes.map(\.content),
-                        activeTasks: activeTasks.map { task in
-                            "\(task.title) - \(task.taskStatus.displayName) - 预估\(task.estimatedMinutes)分钟"
-                        },
-                        settledTasks: settledTasks.map { task in
-                            let reason = {
-                                let t = task.incompletionReason?.trimmingCharacters(in: .whitespacesAndNewlines)
-                                return (t != nil && !t!.isEmpty) ? t! : "无说明"
-                            }()
-                            return "\(task.title) - \(task.taskStatus == .done ? "已完成" : "未完成") - 未完成原因：\(reason)"
-                        }
-                    )
-                )
-            }
-
-            idea.planningResearchPrompt = normalizeOptionalText(result.researchPrompt)
-            idea.planningResearchPromptReason = normalizeOptionalText(result.reason)
-            try await taskManager.updateIdea(idea)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -320,9 +243,9 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func refreshProjectRecommendationSummary(ideaId: UUID) async {
+    func refreshProjectRecommendationSummary(projectId: UUID) async {
         do {
-            try await taskManager.refreshProjectRecommendationSummary(ideaId: ideaId)
+            try await taskManager.refreshProjectRecommendationSummary(projectId: projectId)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -337,23 +260,6 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func fetchProjectNotes(ideaId: UUID) async -> [ProjectNoteEntity] {
-        do {
-            return try await taskManager.fetchProjectNotes(ideaId: ideaId)
-        } catch {
-            errorMessage = error.localizedDescription
-            return []
-        }
-    }
-
-    func addProjectNote(ideaId: UUID, content: String) async {
-        do {
-            try await taskManager.addProjectNote(ideaId: ideaId, content: content)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func updateProjectNote(noteId: UUID, content: String) async {
         do {
             try await taskManager.updateProjectNote(noteId: noteId, content: content)
@@ -362,10 +268,10 @@ final class IdeaPoolViewModel {
         }
     }
 
-    func refreshProjectAnalyses(ideaId: UUID? = nil) async {
-        if let ideaId {
-            guard !isRefreshingProjects, !refreshingProjectIds.contains(ideaId) else { return }
-            refreshingProjectIds.insert(ideaId)
+    func refreshProjectAnalyses(projectId: UUID? = nil) async {
+        if let projectId {
+            guard !isRefreshingProjects, !refreshingProjectIds.contains(projectId) else { return }
+            refreshingProjectIds.insert(projectId)
         } else {
             guard !isRefreshingProjects, refreshingProjectIds.isEmpty else { return }
             isRefreshingProjects = true
@@ -373,33 +279,31 @@ final class IdeaPoolViewModel {
         let startedAt = Date()
 
         do {
-            let allIdeas = try await taskManager.fetchIdeaPool()
+            let allProjects = projects
             let allMustDos = try await taskManager.fetchMustDo()
             let aiService = await makeAIService()
 
-            let targetIdeas = allIdeas.filter { idea in
-                guard let ideaId else { return true }
-                return idea.id == ideaId
+            let targetProjects = allProjects.filter { project in
+                guard let projectId else { return true }
+                return project.id == projectId
             }
 
-            let progressTargets = targetIdeas.compactMap { idea -> ProjectProgressInput? in
-                guard idea.isProject else { return nil }
-
-                let linkedMustDos = allMustDos.filter { $0.sourceIdeaId == idea.id }
+            let progressTargets = targetProjects.compactMap { project -> ProjectProgressInput? in
+                let linkedMustDos = allMustDos.filter { $0.sourceProjectId == project.id || $0.sourceIdeaId == project.id }
                 let completed = linkedMustDos.filter { $0.taskStatus == .done }
                 let pending = linkedMustDos.filter { $0.taskStatus != .done }
 
                 guard !completed.isEmpty else {
-                    idea.projectProgress = 0
-                    idea.projectProgressSummary = nil
-                    idea.projectProgressUpdatedAt = nil
+                    project.projectProgress = 0
+                    project.projectProgressSummary = nil
+                    project.projectProgressUpdatedAt = nil
                     return nil
                 }
 
                 return ProjectProgressInput(
-                    ideaId: idea.id,
-                    title: idea.title,
-                    category: idea.category,
+                    ideaId: project.id,
+                    title: project.title,
+                    category: project.category,
                     completedTasks: completed.map {
                         ProjectLinkedTaskInput(
                             id: $0.id,
@@ -427,23 +331,23 @@ final class IdeaPoolViewModel {
                 }
                 let analysisMap = Dictionary(uniqueKeysWithValues: analyses.map { ($0.ideaId, $0) })
 
-                for idea in targetIdeas where idea.isProject {
-                    guard let analysis = analysisMap[idea.id] else { continue }
-                    idea.projectProgress = min(max(analysis.progress, 0), 100)
-                    idea.projectProgressSummary = analysis.summary
-                    idea.projectProgressUpdatedAt = .now
+                for project in targetProjects {
+                    guard let analysis = analysisMap[project.id] else { continue }
+                    project.projectProgress = min(max(analysis.progress, 0), 100)
+                    project.projectProgressSummary = analysis.summary
+                    project.projectProgressUpdatedAt = .now
                 }
             }
 
-            if let first = targetIdeas.first {
-                try await taskManager.updateIdea(first)
+            if let first = targetProjects.first {
+                try await taskManager.updateProject(first)
             }
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
 
-        await finishProjectRefresh(ideaId: ideaId, startedAt: startedAt)
+        await finishProjectRefresh(projectId: projectId, startedAt: startedAt)
     }
 
     // MARK: - AI 清理
@@ -461,10 +365,10 @@ final class IdeaPoolViewModel {
                 estimatedMinutes: idea.estimatedMinutes,
                 attempted: idea.attempted,
                 status: idea.status,
-                isProject: idea.isProject,
-                projectDescription: idea.projectDescription,
-                planningBackground: idea.planningBackground,
-                projectRecommendationSummary: idea.projectRecommendationSummary,
+                isProject: false,
+                projectDescription: nil,
+                planningBackground: nil,
+                projectRecommendationSummary: nil,
                 deadlineDisplay: idea.deadlineDisplayString,
                 note: idea.note,
                 projectNotes: [],
@@ -502,7 +406,6 @@ final class IdeaPoolViewModel {
         guard let ideaId = pendingDeleteCleanupId else { return }
         pendingDeleteCleanupId = nil
 
-        // 延迟删除：从 UI 列表移除并存入撤销栈，不立即删数据库
         if case .loaded(let result) = cleanupState {
             let removed = result.items.filter { $0.taskId == ideaId }
             removedCleanupItems.append(contentsOf: removed)
@@ -525,7 +428,6 @@ final class IdeaPoolViewModel {
         }
     }
 
-    /// 离开页面：提交所有已确认的删除，真正从数据库删除
     func commitCleanupDeletes() async {
         let idsToDelete = removedCleanupItems.map(\.taskId)
         removedCleanupItems = []
@@ -730,7 +632,6 @@ final class IdeaPoolViewModel {
 
     // MARK: - Private
 
-    /// 修复状态为 .inProgress 但无关联活跃必做项的想法
     private func repairStaleInProgressIdeas() async throws {
         for idea in ideas where idea.ideaStatus == .inProgress {
             let tasks = try await taskManager.fetchMustDo(sourceIdeaId: idea.id)
@@ -745,12 +646,6 @@ final class IdeaPoolViewModel {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
         let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
         return DeepSeekAIService(apiKey: apiKey, model: model)
-    }
-
-    private func normalizeOptionalText(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else { return nil }
-        return trimmed
     }
 
     private func withProjectAnalysisTimeout<T: Sendable>(
@@ -774,14 +669,14 @@ final class IdeaPoolViewModel {
         }
     }
 
-    private func finishProjectRefresh(ideaId: UUID?, startedAt: Date) async {
+    private func finishProjectRefresh(projectId: UUID?, startedAt: Date) async {
         let elapsed = Date().timeIntervalSince(startedAt)
         if elapsed < minimumRefreshAnimationDuration {
             try? await Task.sleep(for: .seconds(minimumRefreshAnimationDuration - elapsed))
         }
 
-        if let ideaId {
-            refreshingProjectIds.remove(ideaId)
+        if let projectId {
+            refreshingProjectIds.remove(projectId)
         } else {
             isRefreshingProjects = false
         }
