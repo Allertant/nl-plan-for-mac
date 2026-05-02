@@ -223,6 +223,14 @@ final class AppState {
         ideaPoolViewModel = IdeaPoolViewModel(taskManager: taskMgr)
         mustDoViewModel = MustDoViewModel(taskManager: taskMgr)
 
+        // 重启后暂停进行中的计时
+        let pauseOnRestart = UserDefaults.standard.object(forKey: AppConstants.pauseOnRestartKey) as? Bool ?? true
+        if pauseOnRestart {
+            Task { [weak self] in
+                try? await self?.mustDoViewModel?.recoverRunningTasks()
+            }
+        }
+
         // 连接回调：提交成功后刷新想法池
         inputViewModel?.onSubmitSuccess = { [weak self] ideaIds in
             guard let ideaPoolVM = self?.ideaPoolViewModel else { return }
