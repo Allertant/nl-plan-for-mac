@@ -571,13 +571,23 @@ final class TaskManager {
         }
     }
 
-    func rebindTaskSource(taskId: UUID, sourceIdeaId: UUID?) async throws {
+    func rebindTaskSource(taskId: UUID, sourceIdeaId: UUID?, sourceProjectId: UUID?) async throws {
         guard let task = try dailyTaskRepo.fetchById(taskId) else {
             throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
         }
         let previousSourceIdeaId = task.sourceIdeaId
+        let previousSourceProjectId = task.sourceProjectId
         task.sourceIdeaId = sourceIdeaId
-        task.sourceType = (sourceIdeaId != nil) ? DailyTaskSourceType.idea.rawValue : DailyTaskSourceType.none.rawValue
+        task.sourceProjectId = sourceProjectId
+        if sourceProjectId != nil {
+            task.sourceIdeaId = nil
+            task.sourceType = DailyTaskSourceType.project.rawValue
+        } else if sourceIdeaId != nil {
+            task.sourceProjectId = nil
+            task.sourceType = DailyTaskSourceType.idea.rawValue
+        } else {
+            task.sourceType = DailyTaskSourceType.none.rawValue
+        }
         try dailyTaskRepo.update(task)
 
         let affectedIdeaIds = Set([previousSourceIdeaId, sourceIdeaId].compactMap { $0 })
@@ -585,6 +595,11 @@ final class TaskManager {
             if let idea = try ideaRepo.fetchById(ideaId) {
                 try ideaRepo.update(idea)
             }
+        }
+
+        let affectedProjectIds = Set([previousSourceProjectId, task.sourceProjectId].compactMap { $0 })
+        for projectId in affectedProjectIds {
+            try? await touchProjectRecommendationContext(projectId: projectId)
         }
     }
 

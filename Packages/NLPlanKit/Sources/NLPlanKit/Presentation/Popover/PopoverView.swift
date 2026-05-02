@@ -42,7 +42,8 @@ struct PopoverView: View {
                         // 必做项
                         MustDoSection(
                             viewModel: mustDoViewModel,
-                            ideaPoolIdeas: ideaPoolViewModel.ideas
+                            ideaPoolIdeas: ideaPoolViewModel.ideas,
+                            projects: ideaPoolViewModel.projects
                         )
                     }
                     .frame(minHeight: 440, alignment: .top)

@@ -4,6 +4,7 @@ import SwiftUI
 struct MustDoSection: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
+    let projects: [ProjectEntity]
 
     var body: some View {
         VStack(spacing: 4) {
@@ -40,6 +41,7 @@ struct MustDoSection: View {
                         MustDoTaskRow(
                             task: task,
                             ideaPoolIdeas: ideaPoolIdeas,
+                            projects: projects,
                             elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0,
                             onStart: { Task { await viewModel.startTask(taskId: task.id) } },
                             onPause: { Task { await viewModel.pauseTask(taskId: task.id) } },
@@ -75,7 +77,7 @@ struct MustDoSection: View {
 
             // AI 推荐面板
             if viewModel.showRecommendationPanel {
-                AIRecommendPanel(viewModel: viewModel, ideaPoolIdeas: ideaPoolIdeas)
+                AIRecommendPanel(viewModel: viewModel, ideaPoolIdeas: ideaPoolIdeas, projects: projects)
             }
 
             if let error = viewModel.errorMessage {
@@ -163,6 +165,7 @@ private func formatTokenCount(_ count: Int) -> String {
 private struct AIRecommendPanel: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
+    let projects: [ProjectEntity]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -227,6 +230,7 @@ private struct AIRecommendPanel: View {
                             canEditCategory: viewModel.recommendationStrategy == .suggest,
                             canEditMinutes: true,
                             ideaPoolIdeas: ideaPoolIdeas,
+                            projects: projects,
                             selectedPriority: Binding(
                                 get: { viewModel.selectedPriorities[rec.id] ?? .medium },
                                 set: { viewModel.selectedPriorities[rec.id] = $0 }
@@ -302,6 +306,7 @@ private struct RecommendationRow: View {
     let canEditCategory: Bool
     let canEditMinutes: Bool
     let ideaPoolIdeas: [IdeaEntity]
+    let projects: [ProjectEntity]
     @Binding var selectedPriority: TaskPriority
     let onAccept: () -> Void
 
@@ -323,6 +328,11 @@ private struct RecommendationRow: View {
     private var sourceIdea: IdeaEntity? {
         guard let sourceIdeaId = task.sourceIdeaId else { return nil }
         return ideaPoolIdeas.first(where: { $0.id == sourceIdeaId })
+    }
+
+    private var sourceProject: ProjectEntity? {
+        guard let sourceProjectId = task.sourceProjectId else { return nil }
+        return projects.first(where: { $0.id == sourceProjectId })
     }
 
     var body: some View {
@@ -351,9 +361,9 @@ private struct RecommendationRow: View {
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
-                    } else if task.sourceProjectId != nil {
+                    } else if let sourceProject {
                         Menu {
-                            Text("项目链接")
+                            Text("项目：\(sourceProject.title)")
                         } label: {
                             Image(systemName: "link")
                                 .font(.system(size: 11))
@@ -494,6 +504,7 @@ private struct RecommendationRow: View {
 struct MustDoTaskRow: View {
     let task: DailyTaskEntity
     let ideaPoolIdeas: [IdeaEntity]
+    let projects: [ProjectEntity]
     var elapsedSeconds: Int = 0
     let onStart: () -> Void
     let onPause: () -> Void
@@ -512,6 +523,11 @@ struct MustDoTaskRow: View {
     private var sourceIdea: IdeaEntity? {
         guard let sourceIdeaId = task.sourceIdeaId else { return nil }
         return ideaPoolIdeas.first(where: { $0.id == sourceIdeaId })
+    }
+
+    private var sourceProject: ProjectEntity? {
+        guard let sourceProjectId = task.sourceProjectId else { return nil }
+        return projects.first(where: { $0.id == sourceProjectId })
     }
 
     var body: some View {
@@ -644,10 +660,16 @@ struct MustDoTaskRow: View {
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-            } else if task.sourceProjectId != nil {
-                Image(systemName: "link")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.indigo)
+            } else if let sourceProject {
+                Menu {
+                    Text("项目：\(sourceProject.title)")
+                } label: {
+                    Image(systemName: "link")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.indigo)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
             }
         }
     }

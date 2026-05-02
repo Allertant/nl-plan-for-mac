@@ -881,15 +881,19 @@ final class MustDoViewModel {
         return sourceUpdatedAt < contextUpdatedAt
     }
 
-    func updateSource(taskId: UUID, sourceIdeaId: UUID?) async {
+    func updateSource(taskId: UUID, sourceIdeaId: UUID?, sourceProjectId: UUID?) async {
         do {
             guard let task = try await taskManager.fetchMustDo(date: .now).first(where: { $0.id == taskId }) else { return }
-            let previousSourceIdeaId = task.sourceIdeaId
-            try await taskManager.rebindTaskSource(taskId: taskId, sourceIdeaId: sourceIdeaId)
+            let previousSourceProjectId = task.sourceProjectId
+            try await taskManager.rebindTaskSource(
+                taskId: taskId,
+                sourceIdeaId: sourceIdeaId,
+                sourceProjectId: sourceProjectId
+            )
             await refresh()
-            await onProjectLinkChanged?(previousSourceIdeaId)
-            if sourceIdeaId != previousSourceIdeaId {
-                await onProjectLinkChanged?(sourceIdeaId)
+            await onProjectLinkChanged?(previousSourceProjectId)
+            if sourceProjectId != previousSourceProjectId {
+                await onProjectLinkChanged?(sourceProjectId)
             }
         } catch {
             errorMessage = error.localizedDescription
