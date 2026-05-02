@@ -39,6 +39,11 @@ final class SettingsViewModel {
             }
         }
     }
+    var pauseOnRestart: Bool = true {
+        didSet {
+            UserDefaults.standard.set(pauseOnRestart, forKey: AppConstants.pauseOnRestartKey)
+        }
+    }
     var syncToNotes: Bool = true
     var workEndHour: Double = AppConstants.defaultWorkEndHour
 
@@ -122,6 +127,7 @@ final class SettingsViewModel {
         loadWorkEndTime()
         loadTags()
         loadAllowParallel()
+        loadPauseOnRestart()
     }
 
     // MARK: - Lifecycle
@@ -208,6 +214,10 @@ final class SettingsViewModel {
 
     func loadAllowParallel() {
         allowParallel = UserDefaults.standard.bool(forKey: AppConstants.allowParallelKey)
+    }
+
+    func loadPauseOnRestart() {
+        pauseOnRestart = UserDefaults.standard.object(forKey: AppConstants.pauseOnRestartKey) as? Bool ?? true
     }
 
     func saveSelectedModel(_ model: String) {

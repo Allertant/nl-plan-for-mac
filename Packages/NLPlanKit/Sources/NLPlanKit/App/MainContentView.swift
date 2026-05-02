@@ -59,9 +59,20 @@ struct MainContentView: View {
         do {
             appState.pendingSettlementDate = try dayMgr.pendingSettlementDate()
 
-            // 恢复崩溃/关闭前的运行中任务为暂停状态
-            if let mustDoVM = appState.mustDoViewModel {
-                try await mustDoVM.recoverRunningTasks()
+            let pauseOnRestart = UserDefaults.standard.object(forKey: AppConstants.pauseOnRestartKey) as? Bool ?? true
+            if pauseOnRestart {
+                let context = appState.modelContainer.mainContext
+                let dailyTaskRepo = DailyTaskRepository(modelContext: context)
+                let sessionLogRepo = SessionLogRepository(modelContext: context)
+                let runningTasks = try dailyTaskRepo.fetchActiveRunningTasks()
+                for task in runningTasks {
+                    task.timerLastStartedAt = nil
+                    task.taskStatus = .paused
+                    try dailyTaskRepo.update(task)
+                    if let openLog = try sessionLogRepo.fetchOpenSession(taskId: task.id) {
+                        try sessionLogRepo.endSession(openLog, endedAt: openLog.startedAt.addingTimeInterval(TimeInterval(task.timerAccumulatedSeconds)))
+                    }
+                }
             }
         } catch {
             print("启动检查失败：\(error)")

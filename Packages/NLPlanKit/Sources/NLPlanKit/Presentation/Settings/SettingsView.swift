@@ -74,6 +74,9 @@ struct SettingsView: View {
                     Toggle("允许并行计时", isOn: $viewModel.allowParallel)
                         .font(.system(size: 12))
 
+                    Toggle("重启后暂停计时", isOn: $viewModel.pauseOnRestart)
+                        .font(.system(size: 12))
+
                     Toggle("开机自启", isOn: $viewModel.launchAtLogin)
                         .font(.system(size: 12))
                         .disabled(viewModel.isLaunchAtLoginDisabled)

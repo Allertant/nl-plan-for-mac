@@ -41,6 +41,9 @@ enum AppConstants {
     /// 并行计时持久化 key
     static let allowParallelKey = "nlplan_allow_parallel"
 
+    /// 重启后暂停计时持久化 key
+    static let pauseOnRestartKey = "nlplan_pause_on_restart"
+
     /// 自定义标签持久化 key
     static let tagsKey = "nlplan_custom_tags"
 
