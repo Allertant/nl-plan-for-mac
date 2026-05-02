@@ -423,8 +423,8 @@ final class TaskManager {
 
     func generatePlanningBackgroundPrompt(projectId: UUID) async throws {
         guard let project = try projectRepo.fetchById(projectId) else { return }
-        let activeTasks = try await fetchMustDo(sourceIdeaId: projectId)
-        let settledTasks = try await fetchSettledTasks(sourceIdeaId: projectId)
+        let activeTasks = try await fetchMustDo(sourceProjectId: projectId)
+        let settledTasks = try await fetchSettledTasks(sourceProjectId: projectId)
         let notes = try await fetchProjectNotesByProjectId(projectId: projectId)
 
         let result = try await aiExecutionCoordinator.run {
@@ -483,8 +483,8 @@ final class TaskManager {
         }
 
         let notes = try projectRepo.fetchProjectNotes(projectId: projectId)
-        let activeTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: projectId).filter { !$0.isSettled }
-        let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: projectId)
+        let activeTasks = try dailyTaskRepo.fetchTasks(sourceProjectId: projectId).filter { !$0.isSettled }
+        let settledTasks = try dailyTaskRepo.fetchSettledTasks(sourceProjectId: projectId)
         let contextUpdatedAt = project.projectRecommendationContextUpdatedAt ?? project.updatedAt
 
         return ProjectRecommendationSummaryJob(
