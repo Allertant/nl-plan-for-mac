@@ -137,8 +137,14 @@ final class AppState {
     /// 创建当前配置的 AI Service 实例
     func makeAIService() -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
-        let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
-        return DeepSeekAIService(apiKey: apiKey, model: model)
+        let model = AppConstants.normalizedModel(
+            UserDefaults.standard.string(forKey: AppConstants.selectedModelKey)
+        )
+        let reasoningEffort = AppConstants.normalizedReasoningEffort(
+            UserDefaults.standard.string(forKey: AppConstants.selectedReasoningEffortKey)
+        )
+        let thinkingEnabled = UserDefaults.standard.object(forKey: AppConstants.thinkingModeKey) as? Bool ?? true
+        return DeepSeekAIService(apiKey: apiKey, model: model, reasoningEffort: reasoningEffort, thinkingEnabled: thinkingEnabled)
     }
 
     // MARK: - Private

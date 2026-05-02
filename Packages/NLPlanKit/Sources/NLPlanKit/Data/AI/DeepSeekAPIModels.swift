@@ -7,6 +7,8 @@ struct DeepSeekAPIRequest: Encodable {
     let messages: [DeepSeekMessage]
     let temperature: Double
     let responseFormat: ResponseFormat?
+    let thinking: Thinking?
+    let reasoningEffort: String?
 
     struct DeepSeekMessage: Encodable {
         let role: String
@@ -15,6 +17,16 @@ struct DeepSeekAPIRequest: Encodable {
 
     struct ResponseFormat: Encodable {
         let type: String
+    }
+
+    struct Thinking: Encodable {
+        let type: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case model, messages, temperature, thinking
+        case responseFormat = "response_format"
+        case reasoningEffort = "reasoning_effort"
     }
 }
 

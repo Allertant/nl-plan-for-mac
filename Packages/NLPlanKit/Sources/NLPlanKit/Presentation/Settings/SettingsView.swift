@@ -195,6 +195,25 @@ struct SettingsView: View {
                     viewModel.saveSelectedModel(newValue)
                 }
 
+                Text("推理等级")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Toggle("启用推理模式", isOn: $viewModel.thinkingMode)
+                    .font(.system(size: 12))
+
+                Picker("选择推理等级", selection: $viewModel.selectedReasoningEffort) {
+                    ForEach(AppConstants.availableReasoningEfforts, id: \.id) { effort in
+                        Text("\(effort.name) – \(effort.description)")
+                            .font(.system(size: 12))
+                            .tag(effort.id)
+                    }
+                }
+                .font(.system(size: 12))
+                .disabled(!viewModel.thinkingMode)
+                .onChange(of: viewModel.selectedReasoningEffort) { _, newValue in
+                    viewModel.saveSelectedReasoningEffort(newValue)
+                }
+
                 Spacer(minLength: 0)
             }
             .padding(12)

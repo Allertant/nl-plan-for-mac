@@ -12,6 +12,7 @@ enum LegacyPreferencesMigrator {
 
         let directKeysToMigrate: Set<String> = [
             AppConstants.selectedModelKey,
+            AppConstants.selectedReasoningEffortKey,
             AppConstants.appearanceModeKey,
             AppConstants.workEndTimeKey,
             AppConstants.tagsKey

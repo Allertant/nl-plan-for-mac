@@ -44,6 +44,11 @@ final class SettingsViewModel {
             UserDefaults.standard.set(pauseOnRestart, forKey: AppConstants.pauseOnRestartKey)
         }
     }
+    var thinkingMode: Bool = true {
+        didSet {
+            UserDefaults.standard.set(thinkingMode, forKey: AppConstants.thinkingModeKey)
+        }
+    }
     var syncToNotes: Bool = true
     var workEndHour: Double = AppConstants.defaultWorkEndHour
 
@@ -115,6 +120,7 @@ final class SettingsViewModel {
     // MARK: - 模型选择
 
     var selectedModel: String = AppConstants.defaultModel
+    var selectedReasoningEffort: String = AppConstants.defaultReasoningEffort
 
     // MARK: - Dependencies
 
@@ -124,10 +130,12 @@ final class SettingsViewModel {
         LegacyPreferencesMigrator.migrateIfNeeded()
         loadAPIKey()
         loadSelectedModel()
+        loadSelectedReasoningEffort()
         loadWorkEndTime()
         loadTags()
         loadAllowParallel()
         loadPauseOnRestart()
+        loadThinkingMode()
     }
 
     // MARK: - Lifecycle
@@ -167,7 +175,12 @@ final class SettingsViewModel {
         validationMessage = ""
 
         Task {
-            let service = DeepSeekAIService(apiKey: trimmedKey, model: selectedModel)
+            let service = DeepSeekAIService(
+                apiKey: trimmedKey,
+                model: selectedModel,
+                reasoningEffort: selectedReasoningEffort,
+                thinkingEnabled: thinkingMode
+            )
 
             do {
                 _ = try await service.parseThoughts(
@@ -209,7 +222,15 @@ final class SettingsViewModel {
     // MARK: - 模型选择
 
     func loadSelectedModel() {
-        selectedModel = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
+        selectedModel = AppConstants.normalizedModel(
+            UserDefaults.standard.string(forKey: AppConstants.selectedModelKey)
+        )
+    }
+
+    func loadSelectedReasoningEffort() {
+        selectedReasoningEffort = AppConstants.normalizedReasoningEffort(
+            UserDefaults.standard.string(forKey: AppConstants.selectedReasoningEffortKey)
+        )
     }
 
     func loadAllowParallel() {
@@ -220,9 +241,21 @@ final class SettingsViewModel {
         pauseOnRestart = UserDefaults.standard.object(forKey: AppConstants.pauseOnRestartKey) as? Bool ?? true
     }
 
+    func loadThinkingMode() {
+        thinkingMode = UserDefaults.standard.object(forKey: AppConstants.thinkingModeKey) as? Bool ?? true
+    }
+
     func saveSelectedModel(_ model: String) {
-        selectedModel = model
-        UserDefaults.standard.set(model, forKey: AppConstants.selectedModelKey)
+        let normalized = AppConstants.normalizedModel(model)
+        selectedModel = normalized
+        UserDefaults.standard.set(normalized, forKey: AppConstants.selectedModelKey)
+        validationMessage = ""
+    }
+
+    func saveSelectedReasoningEffort(_ effort: String) {
+        let normalized = AppConstants.normalizedReasoningEffort(effort)
+        selectedReasoningEffort = normalized
+        UserDefaults.standard.set(normalized, forKey: AppConstants.selectedReasoningEffortKey)
         validationMessage = ""
     }
 

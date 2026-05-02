@@ -23,14 +23,17 @@ enum AppConstants {
     /// AI 调用超时（秒）
     static let aiTimeoutInterval: TimeInterval = 60
 
-    /// DeepSeek Reasoner 的额外超时宽限（秒）
-    static let reasonerTimeoutInterval: TimeInterval = 180
+    /// 深度推理请求的额外超时宽限（秒）
+    static let extendedReasoningTimeoutInterval: TimeInterval = 180
 
     /// 计时器刷新间隔（秒）
     static let timerRefreshInterval: TimeInterval = 1.0
 
     /// 模型选择持久化 key
     static let selectedModelKey = "nlplan_selected_model"
+
+    /// 推理等级持久化 key
+    static let selectedReasoningEffortKey = "nlplan_selected_reasoning_effort"
 
     /// 外观模式持久化 key
     static let appearanceModeKey = "nlplan_appearance_mode"
@@ -44,6 +47,9 @@ enum AppConstants {
     /// 重启后暂停计时持久化 key
     static let pauseOnRestartKey = "nlplan_pause_on_restart"
 
+    /// 推理模式持久化 key
+    static let thinkingModeKey = "nlplan_thinking_mode"
+
     /// 自定义标签持久化 key
     static let tagsKey = "nlplan_custom_tags"
 
@@ -54,11 +60,46 @@ enum AppConstants {
     static let defaultWorkEndHour: Double = 18.0
 
     /// 默认模型
-    static let defaultModel = "deepseek-chat"
+    static let defaultModel = "deepseek-v4-pro"
 
     /// 可选文本模型列表（id, 显示名称, 描述）
     static let availableModels: [(id: String, name: String, description: String)] = [
-        ("deepseek-chat",     "DeepSeek Chat",     "DeepSeek-V3 对话模式"),
-        ("deepseek-reasoner", "DeepSeek Reasoner", "DeepSeek-V3 深度推理模式"),
+        ("deepseek-v4-pro", "DeepSeek V4 Pro", "高质量推理与复杂任务"),
+        ("deepseek-v4-flash", "DeepSeek V4 Flash", "更快响应与更低成本"),
     ]
+
+    /// 默认推理等级
+    static let defaultReasoningEffort = "high"
+
+    /// 可选推理等级列表（id, 显示名称, 描述）
+    static let availableReasoningEfforts: [(id: String, name: String, description: String)] = [
+        ("high", "标准推理", "适合日常任务与稳定输出"),
+        ("max", "深度推理", "适合复杂任务与更强思考"),
+    ]
+
+    static func normalizedModel(_ model: String?) -> String {
+        switch model {
+        case "deepseek-v4-pro", "deepseek-v4-flash":
+            return model!
+        case "deepseek-reasoner":
+            return "deepseek-v4-pro"
+        case "deepseek-chat":
+            return "deepseek-v4-flash"
+        default:
+            return defaultModel
+        }
+    }
+
+    static func normalizedReasoningEffort(_ effort: String?) -> String {
+        switch effort {
+        case "high", "max":
+            return effort!
+        case "low", "medium":
+            return "high"
+        case "xhigh":
+            return "max"
+        default:
+            return defaultReasoningEffort
+        }
+    }
 }

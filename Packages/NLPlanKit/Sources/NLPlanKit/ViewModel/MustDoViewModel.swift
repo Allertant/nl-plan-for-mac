@@ -835,8 +835,13 @@ final class MustDoViewModel {
 
     private func makeAIService() async -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
-        let model = UserDefaults.standard.string(forKey: AppConstants.selectedModelKey) ?? AppConstants.defaultModel
-        return DeepSeekAIService(apiKey: apiKey, model: model)
+        let model = AppConstants.normalizedModel(
+            UserDefaults.standard.string(forKey: AppConstants.selectedModelKey)
+        )
+        let reasoningEffort = AppConstants.normalizedReasoningEffort(
+            UserDefaults.standard.string(forKey: AppConstants.selectedReasoningEffortKey)
+        )
+        return DeepSeekAIService(apiKey: apiKey, model: model, reasoningEffort: reasoningEffort)
     }
 
     private func applyRecommendation(_ recommendation: TaskRecommendation, priority: TaskPriority, sortOrder: Int) async throws {

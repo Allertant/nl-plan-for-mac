@@ -5,26 +5,32 @@ import Foundation
 /// DeepSeek API 兼容 OpenAI 格式：
 /// - 端点：https://api.deepseek.com/chat/completions
 /// - 认证：Bearer Token
-/// - 两种模式：deepseek-chat（普通对话）、deepseek-reasoner（深度推理）
+/// - 当前模型：deepseek-v4-pro / deepseek-v4-flash
 final class DeepSeekAIService: AIServiceProtocol {
 
     private let apiKey: String
     private let endpoint: URL
     private let urlSession: URLSession
     private let model: String
+    private let reasoningEffort: String
+    private let thinkingEnabled: Bool
     private(set) var lastTokenUsage: TokenUsage?
 
     init(
         apiKey: String,
         endpoint: URL = URL(string: "https://api.deepseek.com/chat/completions")!,
-        model: String = "deepseek-chat"
+        model: String = AppConstants.defaultModel,
+        reasoningEffort: String = AppConstants.defaultReasoningEffort,
+        thinkingEnabled: Bool = true
     ) {
         self.apiKey = apiKey
         self.endpoint = endpoint
         self.model = model
+        self.reasoningEffort = reasoningEffort
+        self.thinkingEnabled = thinkingEnabled
 
         let config = URLSessionConfiguration.default
-        let timeoutInterval = Self.timeoutInterval(for: model)
+        let timeoutInterval = Self.timeoutInterval(for: reasoningEffort, thinkingEnabled: thinkingEnabled)
         config.timeoutIntervalForRequest = timeoutInterval
         config.timeoutIntervalForResource = timeoutInterval + 30
         self.urlSession = URLSession(configuration: config)
@@ -462,7 +468,7 @@ final class DeepSeekAIService: AIServiceProtocol {
     private func sendRequest(systemPrompt: String, userPrompt: String) async throws -> String {
         try Task.checkCancellation()
 
-        let timeoutInterval = Self.timeoutInterval(for: model)
+        let timeoutInterval = Self.timeoutInterval(for: reasoningEffort, thinkingEnabled: thinkingEnabled)
         let request = DeepSeekAPIRequest(
             model: model,
             messages: [
@@ -470,7 +476,9 @@ final class DeepSeekAIService: AIServiceProtocol {
                 .init(role: "user", content: userPrompt)
             ],
             temperature: 0.3,
-            responseFormat: .init(type: "json_object")
+            responseFormat: .init(type: "json_object"),
+            thinking: thinkingEnabled ? .init(type: "enabled") : .init(type: "disabled"),
+            reasoningEffort: thinkingEnabled ? reasoningEffort : nil
         )
 
         var urlRequest = URLRequest(url: endpoint)
@@ -541,9 +549,9 @@ final class DeepSeekAIService: AIServiceProtocol {
         throw lastError ?? NLPlanError.aiRequestTimeout
     }
 
-    private static func timeoutInterval(for model: String) -> TimeInterval {
-        if model == "deepseek-reasoner" {
-            return AppConstants.reasonerTimeoutInterval
+    private static func timeoutInterval(for reasoningEffort: String, thinkingEnabled: Bool) -> TimeInterval {
+        if thinkingEnabled && reasoningEffort == "max" {
+            return AppConstants.extendedReasoningTimeoutInterval
         }
         return AppConstants.aiTimeoutInterval
     }
