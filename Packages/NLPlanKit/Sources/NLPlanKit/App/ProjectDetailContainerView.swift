@@ -33,6 +33,7 @@ private struct ProjectDetailPageView: View {
     @State private var allTasks: [DailyTaskEntity] = []
     @State private var notes: [ProjectNoteEntity] = []
     @State private var isLoading = true
+    @State private var scrollRestoreTarget: ProjectDetailSection?
 
     // 项目描述编辑
     @State private var isEditingDescription = false
@@ -82,26 +83,37 @@ private struct ProjectDetailPageView: View {
                 ProgressView("加载中...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let project = projectDetail {
-                if viewModel.pendingArrangementId != nil {
-                    arrangementConfirmPage
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            summaryCard(project)
-                            descriptionCard(project)
-                            planningBackgroundCard(project)
-                            tasksCard
-                            arrangementCard
-                            noteCard
+                ScrollViewReader { proxy in
+                    ZStack {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 12) {
+                                summaryCard(project)
+                                descriptionCard(project)
+                                planningBackgroundCard(project)
+                                tasksCard
+                                arrangementCard
+                                noteCard
+                            }
+                            .padding(12)
+                            .background(
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { dismissAllEditing() }
+                            )
                         }
-                        .padding(12)
-                        .background(
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture { dismissAllEditing() }
-                        )
+                        .scrollIndicators(.automatic)
+
+                        if viewModel.pendingArrangementId != nil {
+                            arrangementConfirmOverlay
+                        }
                     }
-                    .scrollIndicators(.automatic)
+                    .onChange(of: scrollRestoreTarget) { _, target in
+                        guard let target else { return }
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo(target, anchor: .top)
+                        }
+                        scrollRestoreTarget = nil
+                    }
                 }
             }
         }
@@ -160,6 +172,10 @@ private struct ProjectDetailPageView: View {
         allTasks = active.filter { !settledIds.contains($0.id) } + settledList
     }
 
+    private func requestScrollRestore(_ section: ProjectDetailSection) {
+        scrollRestoreTarget = section
+    }
+
     // MARK: - Cards
 
     private func commitTitleEdit() {
@@ -168,7 +184,8 @@ private struct ProjectDetailPageView: View {
         guard !trimmed.isEmpty, trimmed != projectDetail?.title else { return }
         Task {
             await viewModel.updateProjectTitle(projectId: projectId, title: trimmed)
-            await reloadDetail()
+            projectDetail?.title = trimmed
+            requestScrollRestore(.summary)
         }
     }
 
@@ -215,6 +232,7 @@ private struct ProjectDetailPageView: View {
                 }
             }
         }
+        .id(ProjectDetailSection.summary)
     }
 
     private func descriptionCard(_ project: ProjectDetailSnapshot) -> some View {
@@ -243,6 +261,7 @@ private struct ProjectDetailPageView: View {
                 }
             }
         }
+        .id(ProjectDetailSection.description)
     }
 
     private func commitDescriptionEdit() {
@@ -252,7 +271,8 @@ private struct ProjectDetailPageView: View {
         guard trimmed != current else { return }
         Task {
             await viewModel.updateProjectDescription(projectId: projectId, description: trimmed.isEmpty ? nil : trimmed)
-            await reloadDetail()
+            projectDetail?.projectDescription = trimmed.isEmpty ? nil : trimmed
+            requestScrollRestore(.description)
         }
     }
 
@@ -316,6 +336,7 @@ private struct ProjectDetailPageView: View {
                                 await generatePlanningPrompt()
                                 await reloadDetail()
                                 isGeneratingPlanningPrompt = false
+                                requestScrollRestore(.planningBackground)
                             }
                         } label: {
                             if isGeneratingPlanningPrompt {
@@ -338,6 +359,7 @@ private struct ProjectDetailPageView: View {
                                 await generatePlanningPrompt()
                                 await reloadDetail()
                                 isGeneratingPlanningPrompt = false
+                                requestScrollRestore(.planningBackground)
                             }
                         } label: {
                             if isGeneratingPlanningPrompt {
@@ -353,6 +375,7 @@ private struct ProjectDetailPageView: View {
                 }
             }
         }
+        .id(ProjectDetailSection.planningBackground)
     }
 
     private func commitPlanningBackgroundEdit() {
@@ -362,7 +385,8 @@ private struct ProjectDetailPageView: View {
         guard trimmed != current else { return }
         Task {
             await viewModel.updatePlanningBackground(projectId: projectId, planningBackground: trimmed.isEmpty ? nil : trimmed)
-            await reloadDetail()
+            projectDetail?.planningBackground = trimmed.isEmpty ? nil : trimmed
+            requestScrollRestore(.planningBackground)
         }
     }
 
@@ -389,6 +413,7 @@ private struct ProjectDetailPageView: View {
                 }
             }
         }
+        .id(ProjectDetailSection.tasks)
     }
 
     private func taskOrder(_ task: DailyTaskEntity) -> Int {
@@ -411,6 +436,11 @@ private struct ProjectDetailPageView: View {
     }
 
     // MARK: - Arrangement
+
+    private var arrangementConfirmOverlay: some View {
+        arrangementConfirmPage
+            .background(.ultraThinMaterial)
+    }
 
     private var arrangementConfirmPage: some View {
         let isDelete = viewModel.pendingArrangementAction == .delete
@@ -436,10 +466,14 @@ private struct ProjectDetailPageView: View {
                             Task {
                                 await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
                                 await refreshAllTasks()
+                                requestScrollRestore(.arrangements)
                             }
                         },
                         onUpdate: { content, minutes, deadline in
-                            Task { await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline) }
+                            Task {
+                                await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
+                                requestScrollRestore(.arrangements)
+                            }
                         },
                         onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
                         onRevive: { viewModel.requestReviveArrangement(id: item.id) }
@@ -489,6 +523,7 @@ private struct ProjectDetailPageView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
+        .id(ProjectDetailSection.arrangements)
     }
 
     private func addArrangement() {
@@ -500,6 +535,7 @@ private struct ProjectDetailPageView: View {
         let deadline = cal.date(bySettingHour: 23, minute: 59, second: 0, of: tomorrow)
         Task {
             await viewModel.addArrangement(projectId: projectId, content: text, estimatedMinutes: newArrangementMinutes, deadline: deadline)
+            requestScrollRestore(.arrangements)
         }
         newArrangementText = ""
         newArrangementMinutes = 30
@@ -521,6 +557,7 @@ private struct ProjectDetailPageView: View {
                             Task {
                                 await viewModel.updateProjectNote(noteId: note.id, content: content)
                                 notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
+                                requestScrollRestore(.notes)
                             }
                         }
                     )
@@ -544,6 +581,7 @@ private struct ProjectDetailPageView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
+        .id(ProjectDetailSection.notes)
     }
 
     private func addNote() {
@@ -552,6 +590,7 @@ private struct ProjectDetailPageView: View {
         Task {
             await viewModel.addProjectNote(projectId: projectId, content: text)
             notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
+            requestScrollRestore(.notes)
         }
         newNoteText = ""
     }
@@ -565,7 +604,7 @@ private struct ProjectDetailPageView: View {
 
 struct ProjectDetailSnapshot {
     let id: UUID
-    let title: String
+    var title: String
     let category: String
     let createdDate: Date
     let projectProgress: Double?
@@ -589,6 +628,15 @@ struct ProjectDetailSnapshot {
         planningResearchPrompt = project.planningResearchPrompt
         planningResearchPromptReason = project.planningResearchPromptReason
     }
+}
+
+private enum ProjectDetailSection: Hashable {
+    case summary
+    case description
+    case planningBackground
+    case tasks
+    case arrangements
+    case notes
 }
 
 // MARK: - Helper Views
