@@ -417,7 +417,7 @@ final class DayManager {
 
     private func refreshProjectStatusesAfterSettlement(_ projectIds: Set<UUID>) throws {
         for projectId in projectIds {
-            let activeTasks = try dailyTaskRepo.fetchActiveTasks(sourceIdeaId: projectId)
+            let activeTasks = try dailyTaskRepo.fetchActiveTasks(sourceProjectId: projectId)
             guard activeTasks.isEmpty else { continue }
 
             if let project = try projectRepo.fetchById(projectId) {
