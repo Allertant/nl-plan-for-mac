@@ -153,6 +153,28 @@ final class DailyTaskRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchTasks(sourceProjectId: UUID) throws -> [DailyTaskEntity] {
+        let sourceId = sourceProjectId
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                task.sourceProjectId == sourceId
+            },
+            sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchSettledTasks(sourceProjectId: UUID) throws -> [DailyTaskEntity] {
+        let sourceId = sourceProjectId
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                task.sourceProjectId == sourceId && task.isSettled == true
+            },
+            sortBy: [SortDescriptor(\.settledAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func save() throws {
         try modelContext.save()
     }

@@ -546,7 +546,7 @@ final class MustDoViewModel {
             }
 
             // 历史记录
-            let settled = (try? await taskManager.fetchSettledTasks(sourceIdeaId: project.id)) ?? []
+            let settled = (try? await taskManager.fetchSettledTasks(sourceProjectId: project.id)) ?? []
             for task in settled {
                 allSettledInputs.append(TaskRecommendationInput(
                     id: task.id,
@@ -569,7 +569,7 @@ final class MustDoViewModel {
             }
 
             // 关联活跃必做项（未结算的）
-            let activeMustDos = (try? await taskManager.fetchMustDo(sourceIdeaId: project.id)) ?? []
+            let activeMustDos = (try? await taskManager.fetchMustDo(sourceProjectId: project.id)) ?? []
             for task in activeMustDos where !task.isSettled {
                 allActiveMustDoInputs.append(TaskRecommendationInput(
                     id: task.id,
@@ -611,14 +611,14 @@ final class MustDoViewModel {
 
         let projectTitleById = Dictionary(uniqueKeysWithValues: selectedProjects.map { ($0.id, $0.title) })
         let validRecs = sliceResult.recommendations.filter { rec in
-            rec.sourceIdeaId != nil && selectedIds.contains(rec.sourceIdeaId!)
+            rec.sourceProjectId != nil && selectedIds.contains(rec.sourceProjectId!)
         }.map { rec in
-            guard let sourceIdeaId = rec.sourceIdeaId,
-                  let projectTitle = projectTitleById[sourceIdeaId] else { return rec }
+            guard let sourceProjectId = rec.sourceProjectId,
+                  let projectTitle = projectTitleById[sourceProjectId] else { return rec }
             return TaskRecommendation(
                 taskId: rec.taskId,
                 sourceIdeaId: nil,
-                sourceProjectId: sourceIdeaId,
+                sourceProjectId: sourceProjectId,
                 arrangementId: rec.arrangementId,
                 title: self.normalizedProjectRecommendationTitle(rec.title, projectTitle: projectTitle),
                 category: rec.category,

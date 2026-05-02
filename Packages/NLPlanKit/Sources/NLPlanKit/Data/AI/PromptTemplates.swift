@@ -972,7 +972,7 @@ enum PromptTemplates {
           "recommendations": [
             {
               "task_id": null,
-              "source_idea_id": "来源项目 UUID",
+              "source_project_id": "来源项目 UUID",
               "title": "精简项目名: 切片内容",
               "category": "分类",
               "estimated_minutes": 60,

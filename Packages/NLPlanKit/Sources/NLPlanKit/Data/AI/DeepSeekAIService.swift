@@ -337,12 +337,12 @@ final class DeepSeekAIService: AIServiceProtocol {
         )
         let recommendations = response.recommendations.compactMap { dto -> TaskRecommendation? in
             let taskId = dto.taskId.flatMap(UUID.init(uuidString:))
-            let sourceIdeaId = dto.sourceIdeaId.flatMap(UUID.init(uuidString:))
-            guard sourceIdeaId != nil else { return nil }
+            let sourceProjectId = (dto.sourceProjectId ?? dto.sourceIdeaId).flatMap(UUID.init(uuidString:))
+            guard sourceProjectId != nil else { return nil }
             return TaskRecommendation(
                 taskId: taskId,
-                sourceIdeaId: sourceIdeaId,
-                sourceProjectId: nil,
+                sourceIdeaId: nil,
+                sourceProjectId: sourceProjectId,
                 arrangementId: nil,
                 title: dto.title,
                 category: dto.category,

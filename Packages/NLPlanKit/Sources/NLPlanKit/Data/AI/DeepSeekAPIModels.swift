@@ -114,6 +114,7 @@ struct RecommendationResponse: Decodable {
 struct RecommendationDTO: Decodable {
     let taskId: String?
     let sourceIdeaId: String?
+    let sourceProjectId: String?
     let title: String
     let category: String
     let estimatedMinutes: Int
@@ -122,6 +123,7 @@ struct RecommendationDTO: Decodable {
     enum CodingKeys: String, CodingKey {
         case taskId = "task_id"
         case sourceIdeaId = "source_idea_id"
+        case sourceProjectId = "source_project_id"
         case title, category, reason
         case estimatedMinutes = "estimated_minutes"
     }

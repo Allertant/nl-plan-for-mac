@@ -542,6 +542,16 @@ final class TaskManager {
         try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: sourceIdeaId)
     }
 
+    /// 获取绑定到指定项目的全部必做项
+    func fetchMustDo(sourceProjectId: UUID) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchTasks(sourceProjectId: sourceProjectId)
+    }
+
+    /// 获取绑定到指定项目的已归档任务
+    func fetchSettledTasks(sourceProjectId: UUID) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchSettledTasks(sourceProjectId: sourceProjectId)
+    }
+
     /// 获取活跃的正在运行的任务
     func fetchRunningTasks() async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchActiveRunningTasks()
