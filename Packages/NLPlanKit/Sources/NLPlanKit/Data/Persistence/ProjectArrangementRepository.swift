@@ -79,4 +79,13 @@ final class ProjectArrangementRepository {
         let items = try fetchByProject(projectId: projectId)
         return (items.map(\.sortOrder).max() ?? -1) + 1
     }
+
+    func fetchAllPending() throws -> [ProjectArrangementEntity] {
+        let pendingRaw = ArrangementStatus.pending.rawValue
+        var descriptor = FetchDescriptor<ProjectArrangementEntity>(
+            predicate: #Predicate { $0.status == pendingRaw }
+        )
+        descriptor.fetchLimit = 200
+        return try modelContext.fetch(descriptor)
+    }
 }

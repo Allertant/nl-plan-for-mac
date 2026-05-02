@@ -67,6 +67,15 @@ final class IdeaPoolViewModel {
     var ideas: [IdeaEntity] = []
     var projects: [ProjectEntity] = []
     var isExpanded: Bool = false
+
+    /// pending 项目安排总数（由 refresh() 更新）
+    private var pendingArrangementCount: Int = 0
+
+    /// 待处理数量：pending 想法（实时计算）+ pending 项目安排
+    var pendingCount: Int {
+        ideas.filter { $0.status == IdeaStatus.pending.rawValue }.count
+        + pendingArrangementCount
+    }
     var errorMessage: String?
     var newlyAddedIdeaIds: Set<UUID> = []
     var isRefreshingProjects: Bool = false
@@ -189,14 +198,17 @@ final class IdeaPoolViewModel {
         do {
             let fetchedIdeas = try await taskManager.fetchIdeaPool()
             let fetchedProjects = (try? await taskManager.fetchVisibleProjects()) ?? []
+            let fetchedPendingArrangementCount = (try? await taskManager.fetchAllPendingArrangements().count) ?? 0
             if animated {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                     ideas = fetchedIdeas
                     projects = fetchedProjects
+                    pendingArrangementCount = fetchedPendingArrangementCount
                 }
             } else {
                 ideas = fetchedIdeas
                 projects = fetchedProjects
+                pendingArrangementCount = fetchedPendingArrangementCount
             }
             try? await repairStaleInProgressIdeas()
             if !newIdeaIds.isEmpty {
@@ -556,6 +568,7 @@ final class IdeaPoolViewModel {
                 deadline: deadline
             )
             arrangements.append(item)
+            await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -627,6 +640,7 @@ final class IdeaPoolViewModel {
             do {
                 try await taskManager.deleteArrangement(item)
                 arrangements.removeAll { $0.id == id }
+                await refresh()
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -635,6 +649,7 @@ final class IdeaPoolViewModel {
             guard let item = arrangements.first(where: { $0.id == id }) else { return }
             do {
                 try await taskManager.updateArrangementStatus(item, status: .pending)
+                await refresh()
             } catch {
                 errorMessage = error.localizedDescription
             }

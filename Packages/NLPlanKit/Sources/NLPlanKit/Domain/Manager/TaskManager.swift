@@ -676,6 +676,10 @@ final class TaskManager {
         try arrangementRepo.fetchByProject(projectId: projectId)
     }
 
+    func fetchAllPendingArrangements() async throws -> [ProjectArrangementEntity] {
+        try arrangementRepo.fetchAllPending()
+    }
+
     func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int, deadline: Date? = nil) async throws -> ProjectArrangementEntity {
         let order = try arrangementRepo.nextSortOrder(projectId: projectId)
         return try arrangementRepo.create(
