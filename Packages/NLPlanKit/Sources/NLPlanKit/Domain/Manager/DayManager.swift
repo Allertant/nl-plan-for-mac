@@ -382,10 +382,12 @@ final class DayManager {
             task.incompletionReason = note
             try dailyTaskRepo.update(task)
 
-            // 更新关联安排状态为 done
+            // 更新关联安排状态
             if let arrangementId = task.arrangementId,
                let arrangement = try arrangementRepo.fetchById(arrangementId) {
-                arrangement.status = ArrangementStatus.done.rawValue
+                arrangement.status = (task.taskStatus == .done)
+                    ? ArrangementStatus.done.rawValue
+                    : ArrangementStatus.pending.rawValue
                 try arrangementRepo.update(arrangement)
             }
 
