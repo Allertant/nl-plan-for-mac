@@ -19,10 +19,14 @@ extension String {
 
     /// 根据标签名称获取固定颜色
     var tagColor: Color {
+        let allTags = (UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags).sorted()
+        if allTags.count <= Self.tagColorPalette.count,
+           let index = allTags.firstIndex(of: self) {
+            return Self.tagColorPalette[index]
+        }
         let hash = unicodeScalars.reduce(0) { partialResult, scalar in
             (partialResult * 31 + Int(scalar.value)) % 10_000
         }
-        let index = hash % Self.tagColorPalette.count
-        return Self.tagColorPalette[index]
+        return Self.tagColorPalette[hash % Self.tagColorPalette.count]
     }
 }
