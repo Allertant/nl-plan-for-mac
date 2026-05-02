@@ -238,6 +238,12 @@ final class MustDoViewModel {
         return tasks
             .filter { $0.taskStatus != .done }
             .sorted {
+                let inProgress0 = $0.taskStatus == .running || $0.taskStatus == .paused
+                let inProgress1 = $1.taskStatus == .running || $1.taskStatus == .paused
+                if inProgress0 != inProgress1 { return inProgress0 }
+                if inProgress0 && inProgress1 {
+                    return ($0.timerLastStartedAt ?? .distantPast) > ($1.timerLastStartedAt ?? .distantPast)
+                }
                 let p0 = priorityOrder[$0.priority] ?? 1
                 let p1 = priorityOrder[$1.priority] ?? 1
                 if p0 != p1 { return p0 < p1 }
