@@ -234,6 +234,15 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func fetchLinkedMustDoTasks(sourceProjectId: UUID) async -> [DailyTaskEntity] {
+        do {
+            return try await taskManager.fetchMustDo(sourceProjectId: sourceProjectId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func fetchIdea(ideaId: UUID) async -> IdeaEntity? {
         do {
             return try await taskManager.fetchIdeaPoolTask(ideaId: ideaId)
@@ -254,6 +263,15 @@ final class IdeaPoolViewModel {
     func fetchSettledTasks(sourceIdeaId: UUID) async -> [DailyTaskEntity] {
         do {
             return try await taskManager.fetchSettledTasks(sourceIdeaId: sourceIdeaId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func fetchSettledTasks(sourceProjectId: UUID) async -> [DailyTaskEntity] {
+        do {
+            return try await taskManager.fetchSettledTasks(sourceProjectId: sourceProjectId)
         } catch {
             errorMessage = error.localizedDescription
             return []

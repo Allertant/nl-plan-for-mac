@@ -152,8 +152,8 @@ private struct ProjectDetailPageView: View {
     }
 
     private func refreshAllTasks() async {
-        async let tasks = viewModel.fetchLinkedMustDoTasks(sourceIdeaId: projectId)
-        async let settled = viewModel.fetchSettledTasks(sourceIdeaId: projectId)
+        async let tasks = viewModel.fetchLinkedMustDoTasks(sourceProjectId: projectId)
+        async let settled = viewModel.fetchSettledTasks(sourceProjectId: projectId)
         let active = await tasks
         let settledList = await settled
         let settledIds = Set(settledList.map(\.id))
