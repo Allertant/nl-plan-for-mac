@@ -653,7 +653,7 @@ final class TaskManager {
         }
 
         let task = try dailyTaskRepo.create(
-            title: titleOverride ?? arrangement.content,
+            title: titleOverride ?? formattedArrangementTitle(arrangement.content, projectTitle: projectEntity?.title),
             category: category,
             estimatedMinutes: estimatedMinutesOverride ?? arrangement.estimatedMinutes,
             priority: priority ?? .medium,
@@ -675,6 +675,11 @@ final class TaskManager {
         }
 
         return task
+    }
+
+    private func formattedArrangementTitle(_ content: String, projectTitle: String?) -> String {
+        let prefix = projectTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "项目"
+        return "\(prefix): \(content)"
     }
 
     func fetchPendingArrangements(projectId: UUID) async throws -> [ProjectArrangementEntity] {
