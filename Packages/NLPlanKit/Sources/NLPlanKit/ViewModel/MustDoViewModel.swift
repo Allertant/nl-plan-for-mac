@@ -841,7 +841,11 @@ final class MustDoViewModel {
                 arrangementId: arrangementId,
                 priority: priority,
                 sortOrder: sortOrder,
-                estimatedMinutesOverride: minutes
+                estimatedMinutesOverride: minutes,
+                titleOverride: recommendation.title,
+                categoryOverride: category,
+                aiRecommended: true,
+                recommendationReason: recommendation.reason
             )
         } else if let taskId = recommendation.taskId {
             try await taskManager.promoteToMustDo(

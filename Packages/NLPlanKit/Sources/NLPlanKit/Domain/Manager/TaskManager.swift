@@ -629,7 +629,11 @@ final class TaskManager {
         arrangementId: UUID,
         priority: TaskPriority? = nil,
         sortOrder: Int? = nil,
-        estimatedMinutesOverride: Int? = nil
+        estimatedMinutesOverride: Int? = nil,
+        titleOverride: String? = nil,
+        categoryOverride: String? = nil,
+        aiRecommended: Bool = false,
+        recommendationReason: String? = nil
     ) async throws -> DailyTaskEntity? {
         guard let arrangement = try arrangementRepo.fetchById(arrangementId) else {
             throw NLPlanError.dataNotFound(entity: "ProjectArrangement", id: arrangementId)
@@ -637,7 +641,7 @@ final class TaskManager {
         guard arrangement.arrangementStatus != .done else { return nil }
 
         let projectEntity = try projectRepo.fetchById(arrangement.projectId)
-        let category = projectEntity?.category ?? ""
+        let category = categoryOverride ?? projectEntity?.category ?? ""
         let projectId = arrangement.projectId
 
         if let existingTask = try dailyTaskRepo.fetchActiveTask(arrangementId: arrangementId) {
@@ -649,12 +653,12 @@ final class TaskManager {
         }
 
         let task = try dailyTaskRepo.create(
-            title: arrangement.content,
+            title: titleOverride ?? arrangement.content,
             category: category,
             estimatedMinutes: estimatedMinutesOverride ?? arrangement.estimatedMinutes,
             priority: priority ?? .medium,
-            aiRecommended: false,
-            recommendationReason: nil,
+            aiRecommended: aiRecommended,
+            recommendationReason: recommendationReason,
             sortOrder: sortOrder ?? arrangement.sortOrder,
             date: .now,
             note: nil,
