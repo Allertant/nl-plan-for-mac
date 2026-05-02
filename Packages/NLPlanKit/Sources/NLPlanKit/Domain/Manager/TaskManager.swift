@@ -4,6 +4,13 @@ import SwiftData
 /// 任务生命周期管理
 @MainActor
 final class TaskManager {
+    struct DailyTaskSourceLookup {
+        let idea: IdeaEntity?
+        let project: ProjectEntity?
+
+        static let empty = DailyTaskSourceLookup(idea: nil, project: nil)
+    }
+
 
     private let ideaRepo: IdeaRepository
     private let projectRepo: ProjectRepository
@@ -252,6 +259,12 @@ final class TaskManager {
         guard let idea = try ideaRepo.fetchById(ideaId) else {
             throw NLPlanError.dataNotFound(entity: "Idea", id: ideaId)
         }
+        let linkedTasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: ideaId)
+        for task in linkedTasks {
+            task.sourceIdeaId = nil
+            task.sourceType = DailyTaskSourceType.none.rawValue
+            try dailyTaskRepo.update(task)
+        }
         try ideaRepo.delete(idea)
     }
 
@@ -260,6 +273,15 @@ final class TaskManager {
         guard let project = try projectRepo.fetchById(projectId) else {
             throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
         }
+        let linkedTasks = try dailyTaskRepo.fetchTasks(sourceProjectId: projectId)
+        for task in linkedTasks {
+            task.sourceProjectId = nil
+            task.arrangementId = nil
+            task.sourceType = DailyTaskSourceType.none.rawValue
+            try dailyTaskRepo.update(task)
+        }
+        try arrangementRepo.deleteByProject(projectId: projectId)
+        try projectRepo.deleteProjectNotes(projectId: projectId)
         try projectRepo.delete(project)
     }
 
@@ -457,6 +479,31 @@ final class TaskManager {
     /// 获取想法池中的单个任务
     func fetchIdeaPoolTask(ideaId: UUID) async throws -> IdeaEntity? {
         try ideaRepo.fetchById(ideaId)
+    }
+
+    func fetchTaskSourceLookup(task: DailyTaskEntity) async -> DailyTaskSourceLookup {
+        let hasIdeaSource = task.sourceIdeaId != nil
+        let hasProjectSource = task.sourceProjectId != nil
+
+        if hasIdeaSource && hasProjectSource {
+            return .empty
+        }
+
+        if let sourceProjectId = task.sourceProjectId {
+            return DailyTaskSourceLookup(
+                idea: nil,
+                project: (try? projectRepo.fetchById(sourceProjectId)) ?? nil
+            )
+        }
+
+        if let sourceIdeaId = task.sourceIdeaId {
+            return DailyTaskSourceLookup(
+                idea: (try? ideaRepo.fetchById(sourceIdeaId)) ?? nil,
+                project: nil
+            )
+        }
+
+        return .empty
     }
 
     /// 更新想法实体

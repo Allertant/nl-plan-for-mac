@@ -86,6 +86,7 @@ private struct HistoryDetailPageView: View {
         let summaryRepo = SummaryRepository(modelContext: context)
         let arrangementRepo = ProjectArrangementRepository(modelContext: context)
         let aiService = appState.makeAIService()
+        let thoughtRepo = ThoughtRepository(modelContext: context)
 
         let dayMgr = DayManager(
             ideaRepo: ideaRepo,
@@ -97,6 +98,16 @@ private struct HistoryDetailPageView: View {
             timerEngine: appState.timerEngine,
             aiService: aiService
         )
+        let taskMgr = TaskManager(
+            ideaRepo: ideaRepo,
+            projectRepo: projectRepo,
+            dailyTaskRepo: dailyTaskRepo,
+            thoughtRepo: thoughtRepo,
+            sessionLogRepo: sessionLogRepo,
+            arrangementRepo: arrangementRepo,
+            aiService: aiService,
+            timerEngine: appState.timerEngine
+        )
 
         do {
             summary = try await dayMgr.fetchSummary(date: date)
@@ -107,15 +118,12 @@ private struct HistoryDetailPageView: View {
         }
 
         for task in tasks {
-            if let ideaId = task.sourceIdeaId, sourceIdeas[ideaId] == nil {
-                if let idea = try? ideaRepo.fetchById(ideaId) {
-                    sourceIdeas[ideaId] = idea
-                }
+            let sourceLookup = await taskMgr.fetchTaskSourceLookup(task: task)
+            if let idea = sourceLookup.idea {
+                sourceIdeas[idea.id] = idea
             }
-            if let projectId = task.sourceProjectId, sourceProjects[projectId] == nil {
-                if let project = try? projectRepo.fetchById(projectId) {
-                    sourceProjects[projectId] = project
-                }
+            if let project = sourceLookup.project {
+                sourceProjects[project.id] = project
             }
         }
 
@@ -274,10 +282,10 @@ private struct HistoryDetailPageView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } else if task.sourceProjectId != nil {
+            } else if let projectId = task.sourceProjectId, sourceProjects[projectId] != nil {
                 HStack {
                     Spacer()
-                    ProjectNavLink(ideaId: task.sourceProjectId!, returnTo: .historyDetail(date))
+                    ProjectNavLink(ideaId: projectId, returnTo: .historyDetail(date))
                 }
             }
         }

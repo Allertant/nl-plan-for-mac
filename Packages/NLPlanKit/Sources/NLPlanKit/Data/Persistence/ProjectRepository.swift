@@ -136,6 +136,14 @@ final class ProjectRepository {
         try modelContext.save()
     }
 
+    func deleteProjectNotes(projectId: UUID) throws {
+        let notes = try fetchProjectNotes(projectId: projectId)
+        for note in notes {
+            modelContext.delete(note)
+        }
+        try modelContext.save()
+    }
+
     // MARK: - Project Planning
 
     func updateDescription(_ project: ProjectEntity, description: String?) throws {

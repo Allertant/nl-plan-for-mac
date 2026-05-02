@@ -121,6 +121,7 @@ final class IdeaPoolViewModel {
         do {
             try await taskManager.deleteProject(projectId: projectId)
             await refresh()
+            await onPromotedToMustDo?()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -204,6 +205,7 @@ final class IdeaPoolViewModel {
         do {
             try await taskManager.deleteFromIdeaPool(ideaId: ideaId)
             await refresh()
+            await onPromotedToMustDo?()
         } catch {
             errorMessage = error.localizedDescription
         }

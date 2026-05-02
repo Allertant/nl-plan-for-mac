@@ -67,6 +67,14 @@ final class ProjectArrangementRepository {
         try modelContext.save()
     }
 
+    func deleteByProject(projectId: UUID) throws {
+        let items = try fetchByProject(projectId: projectId)
+        for item in items {
+            modelContext.delete(item)
+        }
+        try modelContext.save()
+    }
+
     func nextSortOrder(projectId: UUID) throws -> Int {
         let items = try fetchByProject(projectId: projectId)
         return (items.map(\.sortOrder).max() ?? -1) + 1
