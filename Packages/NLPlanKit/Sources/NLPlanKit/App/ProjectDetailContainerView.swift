@@ -535,7 +535,6 @@ private struct ProjectDetailPageView: View {
         let deadline = cal.date(bySettingHour: 23, minute: 59, second: 0, of: tomorrow)
         Task {
             await viewModel.addArrangement(projectId: projectId, content: text, estimatedMinutes: newArrangementMinutes, deadline: deadline)
-            requestScrollRestore(.arrangements)
         }
         newArrangementText = ""
         newArrangementMinutes = 30
