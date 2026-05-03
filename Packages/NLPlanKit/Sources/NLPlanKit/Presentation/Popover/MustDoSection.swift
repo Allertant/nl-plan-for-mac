@@ -538,7 +538,6 @@ struct MustDoTaskRow: View {
 
                 Text(task.title)
                     .font(.system(size: 12, weight: .medium))
-                    .lineLimit(2)
                     .layoutPriority(1)
 
                 Spacer(minLength: 4)
