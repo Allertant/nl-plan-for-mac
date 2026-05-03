@@ -6,6 +6,8 @@ struct ProjectNavLink: View {
     let ideaId: UUID
     var returnTo: AppState.Page? = nil
 
+    @State private var isHovered = false
+
     var body: some View {
         Button {
             if let returnTo { appState.returnPage = returnTo }
@@ -14,7 +16,16 @@ struct ProjectNavLink: View {
             Label("查看项目", systemImage: "folder.fill")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.indigo)
+                .padding(.horizontal, 4).padding(.vertical, 2)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }

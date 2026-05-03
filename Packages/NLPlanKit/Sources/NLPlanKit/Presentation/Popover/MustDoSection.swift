@@ -609,46 +609,21 @@ struct MustDoTaskRow: View {
     private var actionButtons: some View {
         HStack(spacing: 4) {
             if isRunning {
-                Button(action: onPause) {
-                    Image(systemName: "pause.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange)
-                }
-                .buttonStyle(.plain)
-                .help("暂停")
+                HoverIconButton(icon: "pause.fill", color: .orange, action: onPause)
+                    .help("暂停")
             } else if task.taskStatus == .paused {
-                Button(action: onResume) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.green)
-                }
-                .buttonStyle(.plain)
-                .help("继续")
+                HoverIconButton(icon: "play.fill", color: .green, action: onResume)
+                    .help("继续")
             } else {
-                Button(action: onStart) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.green)
-                }
-                .buttonStyle(.plain)
-                .help("开始执行")
+                HoverIconButton(icon: "play.fill", color: .green, action: onStart)
+                    .help("开始执行")
             }
 
-            Button(action: onComplete) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.blue)
-            }
-            .buttonStyle(.plain)
-            .help("标记完成")
+            HoverIconButton(icon: "checkmark", color: .blue, action: onComplete)
+                .help("标记完成")
 
-            Button(action: onDemote) {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("移回想法池")
+            HoverIconButton(icon: "arrow.uturn.backward", iconSize: 11, action: onDemote)
+                .help("移回想法池")
 
             if let sourceIdea {
                 Menu {

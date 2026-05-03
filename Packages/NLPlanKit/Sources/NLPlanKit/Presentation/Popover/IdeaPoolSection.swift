@@ -189,17 +189,12 @@ struct IdeaPoolSection: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
 
-                            Button {
-                                Task { await viewModel.refreshProjectAnalyses() }
-                            } label: {
-                                RefreshingIcon(
-                                    systemName: "arrow.triangle.2.circlepath",
-                                    isAnimating: viewModel.isRefreshingProjects
-                                )
-                                .font(.system(size: 11))
-                                .foregroundStyle(.indigo)
-                            }
-                            .buttonStyle(.plain)
+                            HoverIconButton(
+                                icon: "arrow.triangle.2.circlepath",
+                                iconSize: 11,
+                                color: .indigo,
+                                action: { Task { await viewModel.refreshProjectAnalyses() } }
+                            )
                             .disabled(viewModel.isRefreshingProjects || !viewModel.refreshingProjectIds.isEmpty)
                             .help("刷新项目分析")
 
@@ -406,14 +401,9 @@ struct IdeaPoolSection: View {
         Group {
             switch viewModel.cleanupState {
             case .idle:
-                Button {
+                HoverIconButton(icon: "flask", iconSize: 11, color: .teal) {
                     Task { await viewModel.fetchCleanupSuggestions() }
-                } label: {
-                    Image(systemName: "flask")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.teal)
                 }
-                .buttonStyle(.plain)
                 .help("AI 清理")
 
             case .loading:
@@ -422,25 +412,15 @@ struct IdeaPoolSection: View {
                     .frame(width: 16, height: 16)
 
             case .loaded:
-                Button {
+                HoverIconButton(icon: "flask", iconSize: 11, color: .teal) {
                     appState.currentPage = .cleanupDetail
-                } label: {
-                    Image(systemName: "flask")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.teal)
                 }
-                .buttonStyle(.plain)
                 .help("查看清理建议")
 
             case .error:
-                Button {
+                HoverIconButton(icon: "exclamationmark.triangle", iconSize: 11, color: .red) {
                     Task { await viewModel.fetchCleanupSuggestions() }
-                } label: {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.red)
                 }
-                .buttonStyle(.plain)
                 .help("重试 AI 清理")
             }
         }

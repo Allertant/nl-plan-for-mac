@@ -53,6 +53,7 @@ private struct ProjectDetailPageView: View {
     // 研究提示词
     @State private var isGeneratingPlanningPrompt = false
     @State private var showCopyPromptToast = false
+    @State private var isCopyButtonHovered = false
 
     // 笔记
     @State private var newNoteText = ""
@@ -69,6 +70,8 @@ private struct ProjectDetailPageView: View {
     // 折叠状态
     @State private var isArrangementHistoryExpanded = false
     @State private var isSettledTasksExpanded = false
+    @State private var settledToggleHovered = false
+    @State private var arrangementToggleHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -322,11 +325,18 @@ private struct ProjectDetailPageView: View {
                         } label: {
                             if showCopyPromptToast {
                                 Label("已复制", systemImage: "checkmark").font(.system(size: 10)).foregroundStyle(.green)
+                                    .padding(4).contentShape(Rectangle())
                             } else {
                                 Image(systemName: "doc.on.clipboard").font(.system(size: 10)).foregroundStyle(.secondary)
+                                    .padding(4).contentShape(Rectangle())
                             }
                         }
                         .buttonStyle(.plain)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(isCopyButtonHovered && !showCopyPromptToast ? Color.primary.opacity(0.08) : .clear)
+                        )
+                        .onHover { isCopyButtonHovered = $0 }
                         .animation(.easeInOut(duration: 0.2), value: showCopyPromptToast)
                     }
                     Text(prompt).font(.system(size: 10)).foregroundStyle(.tertiary).lineLimit(1)
@@ -431,8 +441,15 @@ private struct ProjectDetailPageView: View {
                                 .font(.system(size: 11))
                         }
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(settledToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { settledToggleHovered = $0 }
 
                     if isSettledTasksExpanded {
                         ForEach(settledTasks, id: \.id) { task in
@@ -577,8 +594,15 @@ private struct ProjectDetailPageView: View {
                                 .font(.system(size: 11))
                         }
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(arrangementToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { arrangementToggleHovered = $0 }
 
                     if isArrangementHistoryExpanded {
                         ForEach(historyItems, id: \.id) { item in

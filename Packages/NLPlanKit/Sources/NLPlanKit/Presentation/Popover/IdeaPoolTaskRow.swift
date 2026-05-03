@@ -52,8 +52,8 @@ struct IdeaPoolTaskRow: View {
                 Text(cachedRelativeTime).font(.system(size: 10)).foregroundStyle(.tertiary)
                 deadlineView
                 Spacer(minLength: 8)
-                Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
-                    .buttonStyle(.plain).help("删除")
+                HoverIconButton(icon: "trash", color: .red.opacity(0.6), action: onDelete)
+                    .help("删除")
             }
 
             // 行 3：备注
@@ -126,12 +126,12 @@ struct IdeaPoolTaskRow: View {
     }
 
     private var pinButton: some View {
-        Button(action: onTogglePin) {
-            Image(systemName: idea.isPinned ? "pin.fill" : "pin")
-                .font(.system(size: 14))
-                .foregroundStyle(idea.isPinned ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
+        HoverIconButton(
+            icon: idea.isPinned ? "pin.fill" : "pin",
+            iconSize: 14,
+            color: idea.isPinned ? Color.accentColor : Color.secondary,
+            action: onTogglePin
+        )
         .help(idea.isPinned ? "取消置顶" : "置顶")
     }
 
@@ -327,6 +327,7 @@ struct ProjectPoolRow: View {
     @State private var editingDeadline = false
     @State private var draftTitle: String = ""
     @State private var draftDeadline: String = ""
+    @State private var projectRefreshHovered = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable { case title, deadline }
@@ -354,12 +355,12 @@ struct ProjectPoolRow: View {
                 Text("项目").font(.system(size: 9, weight: .medium)).foregroundStyle(.indigo).padding(.horizontal, 5).padding(.vertical, 1).background(Color.indigo.opacity(0.12)).cornerRadius(4)
                 if project.isPinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.indigo) }
                 Spacer(minLength: 8)
-                Button(action: onTogglePin) {
-                    Image(systemName: project.isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 14))
-                        .foregroundStyle(project.isPinned ? .indigo : .secondary)
-                }
-                .buttonStyle(.plain)
+                HoverIconButton(
+                    icon: project.isPinned ? "pin.fill" : "pin",
+                    iconSize: 14,
+                    color: project.isPinned ? .indigo : .secondary,
+                    action: onTogglePin
+                )
                 .help(project.isPinned ? "取消置顶" : "置顶")
                 Menu {
                     ForEach(TaskPriority.allCases, id: \.self) { priority in
@@ -399,15 +400,18 @@ struct ProjectPoolRow: View {
                         .onTapGesture { startEditingDeadline() }
                 }
                 Spacer(minLength: 8)
-                Button(action: onDelete) { Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.6)) }
-                    .buttonStyle(.plain).help("删除")
+                HoverIconButton(icon: "trash", color: .red.opacity(0.6), action: onDelete)
+                    .help("删除")
             }
 
             HStack(spacing: 6) {
                 ProgressView(value: (project.projectProgress ?? 0) / 100).progressViewStyle(.linear).tint(.indigo)
                 Text("\(Int(project.projectProgress ?? 0))%").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                Button(action: onRefresh) { RefreshingIcon(systemName: "arrow.clockwise", isAnimating: isRefreshing).font(.system(size: 10)).foregroundStyle(.indigo) }
-                    .buttonStyle(.plain).disabled(isRefreshing).help("刷新项目进度")
+                Button(action: onRefresh) { RefreshingIcon(systemName: "arrow.clockwise", isAnimating: isRefreshing).font(.system(size: 10)).foregroundStyle(.indigo).padding(4).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(projectRefreshHovered ? Color.primary.opacity(0.08) : .clear))
+                    .onHover { projectRefreshHovered = $0 }
+                    .disabled(isRefreshing).help("刷新项目进度")
                 Spacer(minLength: 8)
                 Button("详情") { onOpenDetail() }
                     .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.blue)
