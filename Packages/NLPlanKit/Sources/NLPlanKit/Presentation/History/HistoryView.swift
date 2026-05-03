@@ -4,6 +4,7 @@ import SwiftUI
 struct HistoryView: View {
     @State private var viewModel: HistoryViewModel
     @State private var returnToTodayRotation: Double = 0
+    @State private var returnTodayHovered = false
     @Environment(AppState.self) private var appState
 
     init(dayManager: DayManager) {
@@ -130,11 +131,15 @@ struct HistoryView: View {
                 .rotationEffect(.degrees(returnToTodayRotation))
                 .frame(width: 30, height: 30)
                 .contentShape(RoundedRectangle(cornerRadius: 7))
-                .background(Color(nsColor: .controlBackgroundColor).opacity(0.65))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(returnTodayHovered ? Color.primary.opacity(0.08) : Color(nsColor: .controlBackgroundColor).opacity(0.65))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .onHover { returnTodayHovered = $0 }
         .opacity(viewModel.isDisplayingCurrentMonth ? 0.42 : 1)
         .disabled(viewModel.isLoadingMonth)
         .help("回到当前月份")
@@ -309,6 +314,8 @@ struct HistoryDetailView: View {
     let onClose: () -> Void
     let onViewDetail: () -> Void
 
+    @State private var detailButtonHovered = false
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -319,6 +326,13 @@ struct HistoryDetailView: View {
                     .font(.system(size: 11))
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .contentShape(Rectangle())
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(detailButtonHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { detailButtonHovered = $0 }
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle")
                         .font(.system(size: 14))
