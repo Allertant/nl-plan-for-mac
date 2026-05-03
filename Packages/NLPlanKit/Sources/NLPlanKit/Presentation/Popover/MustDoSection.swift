@@ -655,14 +655,12 @@ struct MustDoTaskRow: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .focused($focusedField, equals: .note)
-                    .onKeyPress(keys: [.return]) { press in
-                        if press.modifiers.contains(.shift) {
-                            (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                                .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                            return .handled
+                    .onSubmit {
+                        if NSEvent.modifierFlags.contains(.shift) {
+                            draftNote += "\n"
+                            return
                         }
                         commitNoteEdit()
-                        return .handled
                     }
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)

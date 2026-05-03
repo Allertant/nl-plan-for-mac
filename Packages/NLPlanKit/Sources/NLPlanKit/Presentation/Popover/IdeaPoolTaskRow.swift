@@ -59,14 +59,12 @@ struct IdeaPoolTaskRow: View {
             // 行 3：备注
             if editingNote {
                 TextField("添加备注...", text: $draftNote, axis: .vertical).textFieldStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
-                    .focused($focusedField, equals: .note).onKeyPress(keys: [.return]) { press in
-                        if press.modifiers.contains(.shift) {
-                            (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                                .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                            return .handled
+                    .focused($focusedField, equals: .note).onSubmit {
+                        if NSEvent.modifierFlags.contains(.shift) {
+                            draftNote += "\n"
+                            return
                         }
                         commitNoteEdit()
-                        return .handled
                     }
                     .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
             } else {

@@ -114,14 +114,12 @@ struct SummaryView: View {
                                     TextField("告诉 AI 你的想法...", text: $viewModel.appealText, axis: .vertical)
                                         .textFieldStyle(.plain)
                                         .font(.system(size: 12))
-                                        .onKeyPress(keys: [.return]) { press in
-                                            if press.modifiers.contains(.shift) {
-                                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                                                return .handled
+                                        .onSubmit {
+                                            if NSEvent.modifierFlags.contains(.shift) {
+                                                viewModel.appealText += "\n"
+                                                return
                                             }
                                             Task { await viewModel.appealGrade() }
-                                            return .handled
                                         }
                                         .padding(8)
                                         .background(Color(nsColor: .textBackgroundColor))
@@ -372,11 +370,7 @@ struct SettlementTaskRow: View {
                 )
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
-                .onKeyPress(keys: [.return]) { _ in
-                    (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                        .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                    return .handled
-                }
+                .onSubmit { noteText += "\n" }
                 .padding(8)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 6))

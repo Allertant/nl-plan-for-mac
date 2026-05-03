@@ -539,14 +539,12 @@ private struct ProjectDetailPageView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .focused($newArrangementFocused)
-                        .onKeyPress(keys: [.return]) { press in
-                            if press.modifiers.contains(.shift) {
-                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                                return .handled
+                        .onSubmit {
+                            if NSEvent.modifierFlags.contains(.shift) {
+                                newArrangementText += "\n"
+                                return
                             }
                             addArrangement()
-                            return .handled
                         }
 
                     Group {
@@ -672,14 +670,12 @@ private struct ProjectDetailPageView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .focused($newNoteFocused)
-                        .onKeyPress(keys: [.return]) { press in
-                            if press.modifiers.contains(.shift) {
-                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
-                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
-                                return .handled
+                        .onSubmit {
+                            if NSEvent.modifierFlags.contains(.shift) {
+                                newNoteText += "\n"
+                                return
                             }
                             addNote()
-                            return .handled
                         }
                     Button {
                         addNote()
