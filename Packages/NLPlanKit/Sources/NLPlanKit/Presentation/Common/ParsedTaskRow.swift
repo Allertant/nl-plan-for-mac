@@ -142,7 +142,15 @@ struct ParsedTaskRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .focused($focusedField, equals: .note)
-                        .onSubmit { commitNoteEdit() }
+                        .onKeyPress(keys: [.return]) { press in
+                            if press.modifiers.contains(.shift) {
+                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                                return .handled
+                            }
+                            commitNoteEdit()
+                            return .handled
+                        }
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.1))

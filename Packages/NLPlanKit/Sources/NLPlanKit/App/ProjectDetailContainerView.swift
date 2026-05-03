@@ -539,7 +539,15 @@ private struct ProjectDetailPageView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .focused($newArrangementFocused)
-                        .onSubmit { addArrangement() }
+                        .onKeyPress(keys: [.return]) { press in
+                            if press.modifiers.contains(.shift) {
+                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                                return .handled
+                            }
+                            addArrangement()
+                            return .handled
+                        }
 
                     Group {
                         if editingNewArrangementMinutes {
@@ -664,7 +672,15 @@ private struct ProjectDetailPageView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .focused($newNoteFocused)
-                        .onSubmit { addNote() }
+                        .onKeyPress(keys: [.return]) { press in
+                            if press.modifiers.contains(.shift) {
+                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                                return .handled
+                            }
+                            addNote()
+                            return .handled
+                        }
                     Button {
                         addNote()
                     } label: {

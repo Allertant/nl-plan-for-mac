@@ -10,8 +10,14 @@ struct InputSection: View {
                 TextField("输入你的想法和计划...", text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .onSubmit {
+                    .onKeyPress(keys: [.return]) { press in
+                        if press.modifiers.contains(.shift) {
+                            (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                            return .handled
+                        }
                         Task { await viewModel.submit() }
+                        return .handled
                     }
 
                 Button {

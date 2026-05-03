@@ -154,8 +154,14 @@ struct QueueDetailView: View {
                         TextField("告诉 AI 你想怎么调整...", text: $viewModel.chatInput, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 12))
-                            .onSubmit {
+                            .onKeyPress(keys: [.return]) { press in
+                                if press.modifiers.contains(.shift) {
+                                    (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                        .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                                    return .handled
+                                }
                                 Task { await viewModel.sendModification(queueItemID: queueItem.id) }
+                                return .handled
                             }
 
                         Button {

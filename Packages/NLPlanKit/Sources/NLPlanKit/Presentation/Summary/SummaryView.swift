@@ -114,6 +114,15 @@ struct SummaryView: View {
                                     TextField("告诉 AI 你的想法...", text: $viewModel.appealText, axis: .vertical)
                                         .textFieldStyle(.plain)
                                         .font(.system(size: 12))
+                                        .onKeyPress(keys: [.return]) { press in
+                                            if press.modifiers.contains(.shift) {
+                                                (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                                                    .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                                                return .handled
+                                            }
+                                            Task { await viewModel.appealGrade() }
+                                            return .handled
+                                        }
                                         .padding(8)
                                         .background(Color(nsColor: .textBackgroundColor))
                                         .cornerRadius(6)
@@ -363,6 +372,11 @@ struct SettlementTaskRow: View {
                 )
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+                .onKeyPress(keys: [.return]) { _ in
+                    (NSApp.keyWindow?.firstResponder as? NSTextView)?
+                        .insertText("\n", replacementRange: ((NSApp.keyWindow?.firstResponder as? NSTextView)?.selectedRange())!)
+                    return .handled
+                }
                 .padding(8)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
