@@ -66,6 +66,10 @@ private struct ProjectDetailPageView: View {
     @FocusState private var newArrangementFocused: Bool
     @FocusState private var newArrangementMinutesFocused: Bool
 
+    // 折叠状态
+    @State private var isArrangementHistoryExpanded = false
+    @State private var isSettledTasksExpanded = false
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -392,12 +396,14 @@ private struct ProjectDetailPageView: View {
 
     private var tasksCard: some View {
         let sorted = allTasks.sorted { taskOrder($0) < taskOrder($1) }
+        let activeTasks = sorted.filter { !$0.isSettled }
+        let settledTasks = sorted.filter { $0.isSettled }
         return DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 6) {
-                if sorted.isEmpty {
+                if activeTasks.isEmpty && settledTasks.isEmpty {
                     Text("暂无关联必做项").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
-                ForEach(sorted, id: \.id) { task in
+                ForEach(activeTasks, id: \.id) { task in
                     HStack(spacing: 6) {
                         Text(taskStatusLabel(task))
                             .font(.system(size: 9, weight: .medium))
@@ -409,6 +415,40 @@ private struct ProjectDetailPageView: View {
                         Spacer()
                         Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
                             .font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                }
+
+                if !settledTasks.isEmpty {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSettledTasksExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isSettledTasksExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("已结算 \(settledTasks.count) 项")
+                                .font(.system(size: 11))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    if isSettledTasksExpanded {
+                        ForEach(settledTasks, id: \.id) { task in
+                            HStack(spacing: 6) {
+                                Text(taskStatusLabel(task))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5).padding(.vertical, 2)
+                                    .background(taskStatusTint(task))
+                                    .clipShape(Capsule())
+                                Text(task.title).font(.system(size: 11)).lineLimit(1)
+                                Spacer()
+                                Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
+                                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
             }
@@ -456,9 +496,11 @@ private struct ProjectDetailPageView: View {
     }
 
     private var arrangementCard: some View {
-        DetailSectionCard(title: "我的安排", systemImage: "calendar.badge.clock", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22), onBackgroundTap: dismissAllEditing) {
+        let pendingItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.pending.rawValue }
+        let historyItems = viewModel.arrangements.filter { $0.status != ArrangementStatus.pending.rawValue }
+        return DetailSectionCard(title: "我的安排", systemImage: "calendar.badge.clock", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22), onBackgroundTap: dismissAllEditing) {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(viewModel.arrangements, id: \.id) { item in
+                ForEach(pendingItems, id: \.id) { item in
                     ArrangementRow(
                         item: item,
                         isPromoting: viewModel.promotingArrangementIds.contains(item.id),
@@ -480,7 +522,7 @@ private struct ProjectDetailPageView: View {
                     )
                 }
 
-                if viewModel.arrangements.isEmpty {
+                if pendingItems.isEmpty && historyItems.isEmpty {
                     Text("暂无安排").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
 
@@ -521,6 +563,47 @@ private struct ProjectDetailPageView: View {
                 .padding(8)
                 .background(Color(nsColor: .windowBackgroundColor).contentShape(Rectangle()).onTapGesture { newArrangementMinutesFocused = false })
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                if !historyItems.isEmpty {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isArrangementHistoryExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isArrangementHistoryExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("已完成 \(historyItems.count) 项")
+                                .font(.system(size: 11))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    if isArrangementHistoryExpanded {
+                        ForEach(historyItems, id: \.id) { item in
+                            ArrangementRow(
+                                item: item,
+                                isPromoting: viewModel.promotingArrangementIds.contains(item.id),
+                                onPromote: { priority in
+                                    Task {
+                                        await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
+                                        await refreshAllTasks()
+                                        requestScrollRestore(.arrangements)
+                                    }
+                                },
+                                onUpdate: { content, minutes, deadline in
+                                    Task {
+                                        await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
+                                        requestScrollRestore(.arrangements)
+                                    }
+                                },
+                                onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
+                                onRevive: { viewModel.requestReviveArrangement(id: item.id) }
+                            )
+                        }
+                    }
+                }
             }
         }
         .id(ProjectDetailSection.arrangements)
