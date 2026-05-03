@@ -16,9 +16,6 @@ struct ProjectDetailContainerView: View {
                         appState.currentPage = returnTo
                     }
                 )
-            } else {
-                ProgressView("加载中...")
-                    .frame(width: 360, height: 520)
             }
         }
     }
@@ -32,7 +29,6 @@ private struct ProjectDetailPageView: View {
     @State private var projectDetail: ProjectDetailSnapshot?
     @State private var allTasks: [DailyTaskEntity] = []
     @State private var notes: [ProjectNoteEntity] = []
-    @State private var isLoading = true
     @State private var scrollRestoreTarget: ProjectDetailSection?
 
     // 项目描述编辑
@@ -86,10 +82,7 @@ private struct ProjectDetailPageView: View {
 
             Divider()
 
-            if isLoading {
-                ProgressView("加载中...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let project = projectDetail {
+            if let project = projectDetail {
                 ScrollViewReader { proxy in
                     ZStack {
                         ScrollView {
@@ -161,7 +154,6 @@ private struct ProjectDetailPageView: View {
             notes = await projectNotes
             _ = await projectArrangements
         }
-        isLoading = false
     }
 
     private func reloadDetail() async {

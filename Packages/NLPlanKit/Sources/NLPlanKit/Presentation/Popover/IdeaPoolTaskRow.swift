@@ -328,6 +328,7 @@ struct ProjectPoolRow: View {
     @State private var draftTitle: String = ""
     @State private var draftDeadline: String = ""
     @State private var projectRefreshHovered = false
+    @State private var detailButtonHovered = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable { case title, deadline }
@@ -414,7 +415,15 @@ struct ProjectPoolRow: View {
                     .disabled(isRefreshing).help("刷新项目进度")
                 Spacer(minLength: 8)
                 Button("详情") { onOpenDetail() }
-                    .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(.blue)
+                    .font(.system(size: 10)).foregroundStyle(.blue)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(detailButtonHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { detailButtonHovered = $0 }
             }
             if let summary = project.projectProgressSummary, !summary.isEmpty {
                 Text(summary).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
