@@ -5,6 +5,8 @@ struct MustDoSection: View {
     @Bindable var viewModel: MustDoViewModel
     let ideaPoolIdeas: [IdeaEntity]
     let projects: [ProjectEntity]
+    @State private var completedVisibleCount = 2
+    @State private var completedToggleHovered = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -63,15 +65,76 @@ struct MustDoSection: View {
 
                 // 已完成任务
                 if !viewModel.completedTasks.isEmpty {
+                    let totalCount = viewModel.completedTasks.count
+                    let visibleTasks = Array(viewModel.completedTasks.prefix(completedVisibleCount))
+                    let hasMore = totalCount > completedVisibleCount
+
                     Divider()
                         .padding(.horizontal, 12)
 
                     LazyVStack(spacing: 4) {
-                        ForEach(viewModel.completedTasks, id: \.id) { task in
+                        ForEach(visibleTasks, id: \.id) { task in
                             CompletedTaskRow(task: task, elapsedSeconds: viewModel.elapsedSecondsCache[task.id] ?? 0)
                         }
                     }
                     .padding(.horizontal, 8)
+
+                    if hasMore || completedVisibleCount > 2 {
+                        HStack {
+                            if hasMore {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        completedVisibleCount += 5
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("还有 \(totalCount - completedVisibleCount) 项")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(completedToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { completedToggleHovered = $0 }
+                            }
+
+                            Spacer()
+
+                            if completedVisibleCount > 2 {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        completedVisibleCount = 2
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.up")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("收起")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(completedToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { completedToggleHovered = $0 }
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                    }
                 }
             }
 
