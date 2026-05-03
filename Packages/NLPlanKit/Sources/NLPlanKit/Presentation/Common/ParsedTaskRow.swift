@@ -137,7 +137,7 @@ struct ParsedTaskRow: View {
 
                 // 备注
                 if editingNote {
-                    TextField("添加备注...", text: $draftNote)
+                    TextField("添加备注...", text: $draftNote, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)

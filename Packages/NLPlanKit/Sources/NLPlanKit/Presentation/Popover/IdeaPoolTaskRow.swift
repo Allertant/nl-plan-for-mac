@@ -58,7 +58,7 @@ struct IdeaPoolTaskRow: View {
 
             // 行 3：备注
             if editingNote {
-                TextField("添加备注...", text: $draftNote).textFieldStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
+                TextField("添加备注...", text: $draftNote, axis: .vertical).textFieldStyle(.plain).font(.system(size: 10)).foregroundStyle(.secondary)
                     .focused($focusedField, equals: .note).onSubmit { commitNoteEdit() }
                     .padding(.horizontal, 4).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).cornerRadius(3)
             } else {

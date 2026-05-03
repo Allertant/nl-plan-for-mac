@@ -195,7 +195,6 @@ private struct ProjectDetailPageView: View {
                     TextField("项目标题", text: $draftTitle, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1...3)
                         .focused($titleFocused)
                         .onSubmit { titleFocused = false }
                         .padding(.horizontal, 4)
@@ -539,7 +538,6 @@ private struct ProjectDetailPageView: View {
                     TextField("按 Enter 添加安排...", text: $newArrangementText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
-                        .lineLimit(1...3)
                         .focused($newArrangementFocused)
                         .onSubmit { addArrangement() }
 
@@ -662,7 +660,7 @@ private struct ProjectDetailPageView: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField("添加笔记...", text: $newNoteText)
+                    TextField("添加笔记...", text: $newNoteText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .focused($newNoteFocused)
@@ -844,7 +842,6 @@ private struct ArrangementRow: View {
                     TextField("安排内容", text: $draftTitle, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
-                        .lineLimit(1...3)
                         .focused($focusedField, equals: .title)
                         .onSubmit { focusedField = nil }
                         .padding(.horizontal, 4).padding(.vertical, 2)

@@ -153,7 +153,6 @@ struct QueueDetailView: View {
                     HStack(alignment: .top) {
                         TextField("告诉 AI 你想怎么调整...", text: $viewModel.chatInput, axis: .vertical)
                             .textFieldStyle(.plain)
-                            .lineLimit(1...3)
                             .font(.system(size: 12))
                             .onSubmit {
                                 Task { await viewModel.sendModification(queueItemID: queueItem.id) }

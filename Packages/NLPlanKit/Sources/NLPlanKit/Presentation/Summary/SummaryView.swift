@@ -113,7 +113,6 @@ struct SummaryView: View {
                                 VStack(spacing: 8) {
                                     TextField("告诉 AI 你的想法...", text: $viewModel.appealText, axis: .vertical)
                                         .textFieldStyle(.plain)
-                                        .lineLimit(2...4)
                                         .font(.system(size: 12))
                                         .padding(8)
                                         .background(Color(nsColor: .textBackgroundColor))
@@ -363,7 +362,6 @@ struct SettlementTaskRow: View {
                     axis: .vertical
                 )
                 .textFieldStyle(.plain)
-                .lineLimit(2...4)
                 .font(.system(size: 12))
                 .padding(8)
                 .background(Color(nsColor: .textBackgroundColor))

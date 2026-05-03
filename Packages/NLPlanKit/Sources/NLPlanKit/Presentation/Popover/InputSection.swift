@@ -9,7 +9,6 @@ struct InputSection: View {
             HStack(alignment: .bottom) {
                 TextField("输入你的想法和计划...", text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .lineLimit(2...5)
                     .font(.system(size: 13))
                     .onSubmit {
                         Task { await viewModel.submit() }

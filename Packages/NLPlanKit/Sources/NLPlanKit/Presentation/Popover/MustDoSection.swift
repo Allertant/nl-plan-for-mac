@@ -662,7 +662,7 @@ struct MustDoTaskRow: View {
     private var noteArea: some View {
         Group {
             if isEditingNote {
-                TextField("添加备注...", text: $draftNote)
+                TextField("添加备注...", text: $draftNote, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
