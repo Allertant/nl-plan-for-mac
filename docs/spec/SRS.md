@@ -78,18 +78,16 @@
 |------|------|--------|
 | F-SETTLE-01 | 结算时必做项标记为已归档（isSettled=true），计算实际耗时 | 必须 |
 | F-SETTLE-02 | 已归档必做项不在活跃列表中显示，但在项目详情中可见 | 必须 |
-| F-SETTLE-03 | 完成的必做项对应的想法状态更新为已完成 | 必须 |
-| F-SETTLE-04 | 未完成的必做项对应的想法状态更新为已尝试 | 必须 |
-| F-SETTLE-05 | 项目无活跃绑定任务时状态回退为待处理 | 必须 |
-| F-SETTLE-06 | 结算后刷新项目推荐上下文时间 | 必须 |
+| F-SETTLE-03 | 任务完成时：想法/安排状态为 completed 或 inProgress 则归档为 archived | 必须 |
+| F-SETTLE-04 | 任务未完成时：想法/安排状态更新为 attempted | 必须 |
+| F-SETTLE-05 | 结算后刷新项目推荐上下文时间 | 必须 |
 
 ### 2.7 跨天处理
 
 | 编号 | 需求 | 优先级 |
 |------|------|--------|
-| F-DAY-01 | 昨日未完成的必做项自动移回想法池 | 必须 |
-| F-DAY-02 | 昨日未评分时，今天提示补结算 | 必须 |
-| F-DAY-03 | 支持结算历史日期 | 必须 |
+| F-DAY-01 | 昨日未评分时，系统提醒用户手动补结算 | 必须 |
+| F-DAY-02 | 支持结算历史日期 | 必须 |
 
 ### 2.8 历史记录
 
@@ -126,7 +124,10 @@
 ```
 ThoughtEntity ──── 1:1 ──── IdeaEntity (通过 saveParsedTasks 关联)
 IdeaEntity ──── 1:N ──── DailyTaskEntity (通过 sourceIdeaId)
-IdeaEntity ──── 1:N ──── ProjectNoteEntity (通过 ideaId)
+ProjectEntity ──── 1:N ──── DailyTaskEntity (通过 sourceProjectId)
+ProjectEntity ──── 1:N ──── ProjectArrangementEntity (通过 projectId)
+ProjectArrangementEntity ──── 1:N ──── DailyTaskEntity (通过 arrangementId)
+ProjectEntity ──── 1:N ──── ProjectNoteEntity (通过 ideaId/projectId)
 DailyTaskEntity ──── 1:N ──── SessionLogEntity (通过 taskId)
 DailySummaryEntity (独立，按日期索引)
 ```
