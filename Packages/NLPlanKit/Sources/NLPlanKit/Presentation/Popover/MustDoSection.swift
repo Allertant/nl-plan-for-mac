@@ -7,6 +7,7 @@ struct MustDoSection: View {
     let projects: [ProjectEntity]
     @State private var completedVisibleCount = 2
     @State private var completedToggleHovered = false
+    @State private var completedCollapseHovered = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -128,9 +129,9 @@ struct MustDoSection: View {
                                 .buttonStyle(.plain)
                                 .background(
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(completedToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                                        .fill(completedCollapseHovered ? Color.primary.opacity(0.08) : .clear)
                                 )
-                                .onHover { completedToggleHovered = $0 }
+                                .onHover { completedCollapseHovered = $0 }
                             }
                         }
                         .padding(.horizontal, 8)

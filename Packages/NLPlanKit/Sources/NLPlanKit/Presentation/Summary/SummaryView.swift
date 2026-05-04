@@ -176,6 +176,25 @@ struct SummaryView: View {
             } else {
                 // 未评分 — 任务列表 + 备注 + 提交
                 VStack(spacing: 0) {
+                    // 时间汇总
+                    let totalEstimated = viewModel.sortedTasks.reduce(0) { $0 + $1.estimatedMinutes }
+                    let totalActual = viewModel.sortedTasks.reduce(0) { $0 + (viewModel.elapsedSecondsCache[$1.id] ?? 0) / 60 }
+                    HStack(spacing: 16) {
+                        Label("计划 \(totalEstimated.hourMinuteString)", systemImage: "clock")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Label("实际 \(totalActual.hourMinuteString)", systemImage: "timer")
+                            .font(.system(size: 11))
+                            .foregroundStyle(totalActual > totalEstimated ? .red : .green)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(viewModel.sortedTasks, id: \.id) { task in

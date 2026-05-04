@@ -64,10 +64,12 @@ private struct ProjectDetailPageView: View {
     @FocusState private var newArrangementMinutesFocused: Bool
 
     // 折叠状态
-    @State private var isArrangementHistoryExpanded = false
-    @State private var isSettledTasksExpanded = false
+    @State private var arrangementHistoryVisibleCount = 0
+    @State private var settledTasksVisibleCount = 2
     @State private var settledToggleHovered = false
+    @State private var settledCollapseHovered = false
     @State private var arrangementToggleHovered = false
+    @State private var arrangementCollapseHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -120,6 +122,10 @@ private struct ProjectDetailPageView: View {
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await loadProjectDetail() }
+        .onChange(of: projectId) { _, _ in
+            arrangementHistoryVisibleCount = 0
+            settledTasksVisibleCount = 2
+        }
         .onChange(of: titleFocused) { _, focused in
             if !focused && isEditingTitle { commitTitleEdit() }
         }
@@ -150,6 +156,8 @@ private struct ProjectDetailPageView: View {
             projectDetail = ProjectDetailSnapshot(project: project)
             async let projectNotes = viewModel.fetchProjectNotesByProjectId(projectId: projectId)
             async let projectArrangements = viewModel.fetchArrangements(projectId: projectId)
+            arrangementHistoryVisibleCount = 0
+            settledTasksVisibleCount = 2
             await refreshAllTasks()
             notes = await projectNotes
             _ = await projectArrangements
@@ -398,63 +406,79 @@ private struct ProjectDetailPageView: View {
     private var tasksCard: some View {
         let sorted = allTasks.sorted { taskOrder($0) < taskOrder($1) }
         let activeTasks = sorted.filter { !$0.isSettled }
+        let inProgressTasks = activeTasks.filter { $0.taskStatus != .done }
+        let completedNotSettled = activeTasks.filter { $0.taskStatus == .done }
         let settledTasks = sorted.filter { $0.isSettled }
+        let finishedTasks = completedNotSettled + settledTasks
         return DetailSectionCard(title: "关联必做项", systemImage: "list.bullet", tint: .green, background: Color.green.opacity(0.08), border: Color.green.opacity(0.22)) {
             VStack(alignment: .leading, spacing: 6) {
-                if activeTasks.isEmpty && settledTasks.isEmpty {
+                if inProgressTasks.isEmpty && finishedTasks.isEmpty {
                     Text("暂无关联必做项").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
-                ForEach(activeTasks, id: \.id) { task in
-                    HStack(spacing: 6) {
-                        Text(taskStatusLabel(task))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5).padding(.vertical, 2)
-                            .background(taskStatusTint(task))
-                            .clipShape(Capsule())
-                        Text(task.title).font(.system(size: 11)).lineLimit(1)
-                        Spacer()
-                        Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
+
+                ForEach(inProgressTasks, id: \.id) { task in
+                    taskRow(task)
                 }
 
-                if !settledTasks.isEmpty {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isSettledTasksExpanded.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isSettledTasksExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text("已结算 \(settledTasks.count) 项")
-                                .font(.system(size: 11))
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6).padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(settledToggleHovered ? Color.primary.opacity(0.08) : .clear)
-                    )
-                    .onHover { settledToggleHovered = $0 }
+                if !finishedTasks.isEmpty {
+                    let finishedTotal = finishedTasks.count
+                    let finishedHasMore = finishedTotal > settledTasksVisibleCount
+                    let finishedVisible = Array(finishedTasks.prefix(settledTasksVisibleCount))
 
-                    if isSettledTasksExpanded {
-                        ForEach(settledTasks, id: \.id) { task in
-                            HStack(spacing: 6) {
-                                Text(taskStatusLabel(task))
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5).padding(.vertical, 2)
-                                    .background(taskStatusTint(task))
-                                    .clipShape(Capsule())
-                                Text(task.title).font(.system(size: 11)).lineLimit(1)
-                                Spacer()
-                                Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
-                                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    ForEach(finishedVisible, id: \.id) { task in
+                        taskRow(task)
+                    }
+
+                    if finishedHasMore || settledTasksVisibleCount > 2 {
+                        HStack {
+                            if finishedHasMore {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        settledTasksVisibleCount += 5
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("还有 \(finishedTotal - settledTasksVisibleCount) 项")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(settledToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { settledToggleHovered = $0 }
+                            }
+
+                            Spacer()
+
+                            if settledTasksVisibleCount > 2 {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        settledTasksVisibleCount = 2
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.up")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("收起")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(settledCollapseHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { settledCollapseHovered = $0 }
                             }
                         }
                     }
@@ -462,6 +486,21 @@ private struct ProjectDetailPageView: View {
             }
         }
         .id(ProjectDetailSection.tasks)
+    }
+
+    private func taskRow(_ task: DailyTaskEntity) -> some View {
+        HStack(spacing: 6) {
+            Text(taskStatusLabel(task))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5).padding(.vertical, 2)
+                .background(taskStatusTint(task))
+                .clipShape(Capsule())
+            Text(task.title).font(.system(size: 11)).lineLimit(1)
+            Spacer()
+            Text(task.isSettled ? "\(task.actualMinutes ?? 0)分钟" : "\(task.estimatedMinutes)分钟")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
     }
 
     private func taskOrder(_ task: DailyTaskEntity) -> Int {
@@ -505,35 +544,18 @@ private struct ProjectDetailPageView: View {
 
     private var arrangementCard: some View {
         let pendingItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.pending.rawValue }
-        let historyItems = viewModel.arrangements.filter { $0.status != ArrangementStatus.pending.rawValue }
+        let inProgressItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.inProgress.rawValue }
+        let doneItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.done.rawValue }
+        let activeCount = pendingItems.count + inProgressItems.count
+        let doneDefaultCount = max(2 - activeCount, 0)
+        let doneVisibleCount = doneDefaultCount + arrangementHistoryVisibleCount
+        let doneTotal = doneItems.count
+        let doneHasMore = doneTotal > doneVisibleCount
+        let doneVisible = Array(doneItems.prefix(doneVisibleCount))
+
         return DetailSectionCard(title: "我的安排", systemImage: "calendar.badge.clock", tint: .blue, background: Color.blue.opacity(0.08), border: Color.blue.opacity(0.22), onBackgroundTap: dismissAllEditing) {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(pendingItems, id: \.id) { item in
-                    ArrangementRow(
-                        item: item,
-                        isPromoting: viewModel.promotingArrangementIds.contains(item.id),
-                        onPromote: { priority in
-                            Task {
-                                await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
-                                await refreshAllTasks()
-                                requestScrollRestore(.arrangements)
-                            }
-                        },
-                        onUpdate: { content, minutes, deadline in
-                            Task {
-                                await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
-                                requestScrollRestore(.arrangements)
-                            }
-                        },
-                        onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
-                        onRevive: { viewModel.requestReviveArrangement(id: item.id) }
-                    )
-                }
-
-                if pendingItems.isEmpty && historyItems.isEmpty {
-                    Text("暂无安排").font(.system(size: 11)).foregroundStyle(.tertiary)
-                }
-
+                // 输入框
                 HStack(spacing: 8) {
                     TextField("按 Enter 添加安排...", text: $newArrangementText, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -577,56 +599,105 @@ private struct ProjectDetailPageView: View {
                 .background(Color(nsColor: .windowBackgroundColor).contentShape(Rectangle()).onTapGesture { newArrangementMinutesFocused = false })
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                if !historyItems.isEmpty {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isArrangementHistoryExpanded.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isArrangementHistoryExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text("已完成 \(historyItems.count) 项")
-                                .font(.system(size: 11))
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6).padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(arrangementToggleHovered ? Color.primary.opacity(0.08) : .clear)
-                    )
-                    .onHover { arrangementToggleHovered = $0 }
+                if pendingItems.isEmpty && inProgressItems.isEmpty && doneItems.isEmpty {
+                    Text("暂无安排").font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
 
-                    if isArrangementHistoryExpanded {
-                        ForEach(historyItems, id: \.id) { item in
-                            ArrangementRow(
-                                item: item,
-                                isPromoting: viewModel.promotingArrangementIds.contains(item.id),
-                                onPromote: { priority in
-                                    Task {
-                                        await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
-                                        await refreshAllTasks()
-                                        requestScrollRestore(.arrangements)
+                // 未开始
+                ForEach(pendingItems, id: \.id) { item in
+                    arrangementRow(item)
+                }
+
+                // 进行中（全部展示）
+                ForEach(inProgressItems, id: \.id) { item in
+                    arrangementRow(item)
+                }
+
+                // 已完成
+                if !doneItems.isEmpty {
+                    ForEach(doneVisible, id: \.id) { item in
+                        arrangementRow(item)
+                    }
+
+                    if doneHasMore || doneVisibleCount > doneDefaultCount {
+                        HStack {
+                            if doneHasMore {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        arrangementHistoryVisibleCount += 5
                                     }
-                                },
-                                onUpdate: { content, minutes, deadline in
-                                    Task {
-                                        await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
-                                        requestScrollRestore(.arrangements)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("还有 \(doneTotal - doneVisibleCount) 项")
+                                            .font(.system(size: 11))
                                     }
-                                },
-                                onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
-                                onRevive: { viewModel.requestReviveArrangement(id: item.id) }
-                            )
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(arrangementToggleHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { arrangementToggleHovered = $0 }
+                            }
+
+                            Spacer()
+
+                            if doneVisibleCount > doneDefaultCount {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        arrangementHistoryVisibleCount = 0
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.up")
+                                            .font(.system(size: 9, weight: .semibold))
+                                        Text("收起")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(arrangementCollapseHovered ? Color.primary.opacity(0.08) : .clear)
+                                )
+                                .onHover { arrangementCollapseHovered = $0 }
+                            }
                         }
                     }
                 }
             }
         }
         .id(ProjectDetailSection.arrangements)
+    }
+
+    private func arrangementRow(_ item: ProjectArrangementEntity) -> some View {
+        ArrangementRow(
+            item: item,
+            isPromoting: viewModel.promotingArrangementIds.contains(item.id),
+            onPromote: { priority in
+                Task {
+                    await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
+                    await refreshAllTasks()
+                    requestScrollRestore(.arrangements)
+                }
+            },
+            onUpdate: { content, minutes, deadline in
+                Task {
+                    await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
+                    requestScrollRestore(.arrangements)
+                }
+            },
+            onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
+            onRevive: { viewModel.requestReviveArrangement(id: item.id) }
+        )
     }
 
     private func addArrangement() {
