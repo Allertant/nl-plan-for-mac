@@ -55,22 +55,22 @@ struct IdeaPoolPageView: View {
                     )
                 }
                 .scrollIndicators(.automatic)
-                .overlay {
-                    if viewModel.pendingDeleteIdeaId != nil || viewModel.pendingDeleteProjectId != nil {
-                        ConfirmActionPage(
-                            icon: "trash",
-                            iconTint: .red,
-                            title: viewModel.pendingDeleteIdeaTitle ?? "",
-                            message: viewModel.pendingDeleteProjectId != nil ? "确认删除该项目？" : "确认删除该想法？",
-                            confirmLabel: "确认删除",
-                            onCancel: { viewModel.cancelDelete() },
-                            onConfirm: { Task { await viewModel.executeDelete() } }
-                        )
-                        .background(.ultraThinMaterial)
-                    }
-                }
             }
             .frame(width: 360, height: 520)
+            .overlay {
+                if viewModel.pendingDeleteIdeaId != nil || viewModel.pendingDeleteProjectId != nil {
+                    ConfirmActionPage(
+                        icon: "trash",
+                        iconTint: .red,
+                        title: viewModel.pendingDeleteIdeaTitle ?? "",
+                        message: viewModel.pendingDeleteProjectId != nil ? "确认删除该项目？" : "确认删除该想法？",
+                        confirmLabel: "确认删除",
+                        onCancel: { viewModel.cancelDelete() },
+                        onConfirm: { Task { await viewModel.executeDelete() } }
+                    )
+                    .background(.ultraThinMaterial)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if viewModel.ideas.count >= 5 {
                     ScrollToTopButton {

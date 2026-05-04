@@ -86,29 +86,23 @@ private struct ProjectDetailPageView: View {
 
             if let project = projectDetail {
                 ScrollViewReader { proxy in
-                    ZStack {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 12) {
-                                summaryCard(project)
-                                descriptionCard(project)
-                                planningBackgroundCard(project)
-                                tasksCard
-                                arrangementCard
-                                noteCard
-                            }
-                            .padding(12)
-                            .background(
-                                Color.clear
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { dismissAllEditing() }
-                            )
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            summaryCard(project)
+                            descriptionCard(project)
+                            planningBackgroundCard(project)
+                            tasksCard
+                            arrangementCard
+                            noteCard
                         }
-                        .scrollIndicators(.automatic)
-
-                        if viewModel.pendingArrangementId != nil {
-                            arrangementConfirmOverlay
-                        }
+                        .padding(12)
+                        .background(
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { dismissAllEditing() }
+                        )
                     }
+                    .scrollIndicators(.automatic)
                     .onChange(of: scrollRestoreTarget) { _, target in
                         guard let target else { return }
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -121,6 +115,11 @@ private struct ProjectDetailPageView: View {
         }
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay {
+            if viewModel.pendingArrangementId != nil {
+                arrangementConfirmOverlay
+            }
+        }
         .task { await loadProjectDetail() }
         .onChange(of: projectId) { _, _ in
             arrangementHistoryVisibleCount = 0
