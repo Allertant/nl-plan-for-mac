@@ -68,6 +68,7 @@ struct PopoverView: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "lightbulb.fill")
+                                .foregroundStyle(.yellow)
                             if ideaPoolViewModel.pendingCount > 0 {
                                 Text("\(ideaPoolViewModel.pendingCount)")
                                     .font(.system(size: 9, weight: .medium))
