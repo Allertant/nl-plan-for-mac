@@ -210,7 +210,6 @@ final class IdeaPoolViewModel {
                 projects = fetchedProjects
                 pendingArrangementCount = fetchedPendingArrangementCount
             }
-            try? await repairStaleInProgressIdeas()
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds
                 highlightClearTask?.cancel()
@@ -717,17 +716,6 @@ final class IdeaPoolViewModel {
     }
 
     // MARK: - Private
-
-    private func repairStaleInProgressIdeas() async throws {
-        for idea in ideas where idea.ideaStatus == .inProgress {
-            let tasks = try await taskManager.fetchMustDo(sourceIdeaId: idea.id)
-            let activeTasks = tasks.filter { !$0.isSettled }
-            if !activeTasks.isEmpty { continue }
-            let allDone = tasks.filter { $0.isSettled }.allSatisfy { $0.taskStatus == .done }
-            idea.ideaStatus = allDone && !tasks.isEmpty ? .completed : .pending
-            try await taskManager.updateIdea(idea)
-        }
-    }
 
     private func makeAIService() async -> AIServiceProtocol {
         let apiKey = KeychainStore.shared.load(key: AppConstants.apiKeyKeychainKey) ?? ""
