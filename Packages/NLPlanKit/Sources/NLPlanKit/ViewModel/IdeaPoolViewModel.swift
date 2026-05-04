@@ -554,9 +554,18 @@ final class IdeaPoolViewModel {
         return arrangements.first(where: { $0.id == id })?.content
     }
 
+    /// 安排完成时间缓存：arrangementId → 最近一次完成必做项的 completedAt
+    private(set) var arrangementCompletedAt: [UUID: Date] = [:]
+
     func fetchArrangements(projectId: UUID) async {
         do {
             arrangements = try await taskManager.fetchArrangements(projectId: projectId)
+            arrangementCompletedAt = [:]
+            for arr in arrangements where arr.arrangementStatus == .completed || arr.arrangementStatus == .archived {
+                if let date = try? await taskManager.fetchLatestCompletedAt(arrangementId: arr.id) {
+                    arrangementCompletedAt[arr.id] = date
+                }
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

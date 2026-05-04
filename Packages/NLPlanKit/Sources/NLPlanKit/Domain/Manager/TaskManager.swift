@@ -394,6 +394,10 @@ final class TaskManager {
         try ideaRepo.fetchVisibleIdeas()
     }
 
+    func fetchLatestCompletedAt(arrangementId: UUID) async throws -> Date? {
+        try dailyTaskRepo.fetchLatestCompletedAt(arrangementId: arrangementId)
+    }
+
     // MARK: - 项目查询与更新
 
     func fetchProject(id: UUID) async throws -> ProjectEntity? {

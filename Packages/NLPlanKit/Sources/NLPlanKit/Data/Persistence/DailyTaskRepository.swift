@@ -190,4 +190,16 @@ final class DailyTaskRepository {
     func save() throws {
         try modelContext.save()
     }
+
+    func fetchLatestCompletedAt(arrangementId: UUID) throws -> Date? {
+        let id = arrangementId
+        let doneRaw = TaskStatus.done.rawValue
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                task.arrangementId == id && task.status == doneRaw && task.completedAt != nil
+            },
+            sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).first?.completedAt
+    }
 }

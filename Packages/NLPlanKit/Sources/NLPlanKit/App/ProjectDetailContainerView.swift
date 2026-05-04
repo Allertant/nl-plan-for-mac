@@ -688,6 +688,7 @@ private struct ProjectDetailPageView: View {
     private func arrangementRow(_ item: ProjectArrangementEntity) -> some View {
         ArrangementRow(
             item: item,
+            completedAt: viewModel.arrangementCompletedAt[item.id],
             isPromoting: viewModel.promotingArrangementIds.contains(item.id),
             onPromote: { priority in
                 Task {
@@ -899,6 +900,7 @@ private struct ProjectNoteRow: View {
 
 private struct ArrangementRow: View {
     let item: ProjectArrangementEntity
+    let completedAt: Date?
     let isPromoting: Bool
     let onPromote: (TaskPriority) -> Void
     let onUpdate: (_ content: String?, _ estimatedMinutes: Int?, _ deadline: Date?) -> Void
@@ -1022,9 +1024,11 @@ private struct ArrangementRow: View {
                 Spacer()
 
                 if status == .completed || status == .archived {
-                    Text(item.updatedAt, format: .dateTime.month().day().hour().minute())
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    if let completedAt {
+                        Text(completedAt, format: .dateTime.month().day().hour().minute())
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
 
                     Button(action: onRevive) {
                         Image(systemName: "arrow.uturn.backward")
