@@ -676,8 +676,8 @@ final class TaskManager {
         try arrangementRepo.fetchByProject(projectId: projectId)
     }
 
-    func fetchAllPendingArrangements() async throws -> [ProjectArrangementEntity] {
-        try arrangementRepo.fetchAllPending()
+    func fetchAllActiveArrangements() async throws -> [ProjectArrangementEntity] {
+        try arrangementRepo.fetchAllActive()
     }
 
     func addArrangement(projectId: UUID, content: String, estimatedMinutes: Int, deadline: Date? = nil) async throws -> ProjectArrangementEntity {

@@ -69,7 +69,7 @@ final class IdeaPoolViewModel {
     var isExpanded: Bool = false
 
     /// pending 项目安排总数（由 refresh() 更新）
-    private var pendingArrangementCount: Int = 0
+    private(set) var pendingArrangementCount: Int = 0
 
     /// 待处理数量：pending 想法（实时计算）+ pending 项目安排
     var pendingCount: Int {
@@ -198,17 +198,17 @@ final class IdeaPoolViewModel {
         do {
             let fetchedIdeas = try await taskManager.fetchIdeaPool()
             let fetchedProjects = (try? await taskManager.fetchVisibleProjects()) ?? []
-            let fetchedPendingArrangementCount = (try? await taskManager.fetchAllPendingArrangements().count) ?? 0
+            let fetchedActiveArrangementCount = (try? await taskManager.fetchAllActiveArrangements().count) ?? 0
             if animated {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                     ideas = fetchedIdeas
                     projects = fetchedProjects
-                    pendingArrangementCount = fetchedPendingArrangementCount
+                    pendingArrangementCount = fetchedActiveArrangementCount
                 }
             } else {
                 ideas = fetchedIdeas
                 projects = fetchedProjects
-                pendingArrangementCount = fetchedPendingArrangementCount
+                pendingArrangementCount = fetchedActiveArrangementCount
             }
             if !newIdeaIds.isEmpty {
                 newlyAddedIdeaIds = newIdeaIds

@@ -80,10 +80,12 @@ final class ProjectArrangementRepository {
         return (items.map(\.sortOrder).max() ?? -1) + 1
     }
 
-    func fetchAllPending() throws -> [ProjectArrangementEntity] {
+    func fetchAllActive() throws -> [ProjectArrangementEntity] {
         let pendingRaw = ArrangementStatus.pending.rawValue
+        let inProgressRaw = ArrangementStatus.inProgress.rawValue
+        let attemptedRaw = ArrangementStatus.attempted.rawValue
         var descriptor = FetchDescriptor<ProjectArrangementEntity>(
-            predicate: #Predicate { $0.status == pendingRaw }
+            predicate: #Predicate { $0.status == pendingRaw || $0.status == inProgressRaw || $0.status == attemptedRaw }
         )
         descriptor.fetchLimit = 200
         return try modelContext.fetch(descriptor)

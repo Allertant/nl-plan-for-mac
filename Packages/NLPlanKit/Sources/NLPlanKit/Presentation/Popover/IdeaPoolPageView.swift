@@ -3,6 +3,14 @@ import SwiftUI
 /// 想法池独立页面
 struct IdeaPoolPageView: View {
     @Bindable var viewModel: IdeaPoolViewModel
+
+    private var poolsSummaryText: String {
+        [
+            viewModel.ideas.count,
+            viewModel.pendingArrangementCount,
+            viewModel.projects.count
+        ].map(\.description).joined(separator: " + ")
+    }
     let onBack: () -> Void
 
     var body: some View {
@@ -19,15 +27,13 @@ struct IdeaPoolPageView: View {
                     Text("想法池")
                         .font(.system(size: 13, weight: .semibold))
 
-                    if !viewModel.ideas.isEmpty {
-                        Text("\(viewModel.ideas.count)")
+                    Text(poolsSummaryText)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.accentColor)
                             .clipShape(Capsule())
-                    }
 
                     Spacer()
                 }
