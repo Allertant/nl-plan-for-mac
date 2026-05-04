@@ -4,10 +4,11 @@ import SwiftUI
 struct IdeaPoolPageView: View {
     @Bindable var viewModel: IdeaPoolViewModel
 
+    /// 想法池页面 badge：(pending + inProgress + attempted) 想法 + (pending + inProgress + attempted) 安排 + 可见项目
     private var poolsSummaryText: String {
         [
             viewModel.ideas.count,
-            viewModel.pendingArrangementCount,
+            viewModel.activeArrangementCount,
             viewModel.projects.count
         ].map(\.description).joined(separator: " + ")
     }

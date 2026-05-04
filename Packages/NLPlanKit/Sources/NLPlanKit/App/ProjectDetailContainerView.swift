@@ -1022,6 +1022,10 @@ private struct ArrangementRow: View {
                 Spacer()
 
                 if status == .completed || status == .archived {
+                    Text(item.updatedAt, format: .dateTime.month().day().hour().minute())
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+
                     Button(action: onRevive) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 10))

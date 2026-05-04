@@ -90,4 +90,13 @@ final class ProjectArrangementRepository {
         descriptor.fetchLimit = 200
         return try modelContext.fetch(descriptor)
     }
+
+    func fetchAllPending() throws -> [ProjectArrangementEntity] {
+        let pendingRaw = ArrangementStatus.pending.rawValue
+        var descriptor = FetchDescriptor<ProjectArrangementEntity>(
+            predicate: #Predicate { $0.status == pendingRaw }
+        )
+        descriptor.fetchLimit = 200
+        return try modelContext.fetch(descriptor)
+    }
 }
