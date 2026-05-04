@@ -944,7 +944,6 @@ private struct ArrangementRow: View {
                         .font(.system(size: 11))
                         .foregroundStyle(status == .completed || status == .archived ? .tertiary : .secondary)
                         .strikethrough(status == .completed || status == .archived)
-                        .lineLimit(2)
                         .onTapGesture { if isEditable { startEditingTitle() } }
                 }
 

@@ -32,7 +32,7 @@ final class ProjectArrangementRepository {
     func fetchByProject(projectId: UUID) throws -> [ProjectArrangementEntity] {
         let descriptor = FetchDescriptor<ProjectArrangementEntity>(
             predicate: #Predicate { $0.projectId == projectId },
-            sortBy: [SortDescriptor(\.sortOrder, order: .forward)]
+            sortBy: [SortDescriptor(\.sortOrder, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
     }
