@@ -271,43 +271,6 @@ private struct HistoryDayCircle: View {
 }
 
 /// 历史卡片
-struct HistoryCard: View {
-    let summary: DailySummaryEntity
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // 等级
-                Text(summary.grade)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(summary.gradeEnum.historyColor)
-                    .frame(width: 40)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(summary.date.dateString)
-                        .font(.system(size: 13, weight: .medium))
-
-                    Text(summary.summary)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                Text("\(summary.completedCount)/\(summary.totalCount)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(12)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(8)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 /// 历史详情弹窗
 struct HistoryDetailView: View {
     let summary: DailySummaryEntity
@@ -341,9 +304,18 @@ struct HistoryDetailView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Text(summary.grade)
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(summary.gradeEnum.historyColor)
+            ZStack(alignment: .bottomTrailing) {
+                Text(summary.grade)
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(summary.gradeEnum.historyColor)
+
+                if let userGrade = summary.userGradeEnum {
+                    Text(userGrade.displayName)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(userGrade.historyColor)
+                        .offset(x: 16, y: 16)
+                }
+            }
 
             Text(summary.summary)
                 .font(.system(size: 13))

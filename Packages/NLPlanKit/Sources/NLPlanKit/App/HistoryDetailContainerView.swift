@@ -142,9 +142,18 @@ private struct HistoryDetailPageView: View {
             border: grade.historyColor.opacity(0.22)
         ) {
             VStack(spacing: 8) {
-                Text(grade.displayName)
-                    .font(.system(size: 52, weight: .bold, design: .rounded))
-                    .foregroundStyle(grade.historyColor)
+                ZStack(alignment: .bottomTrailing) {
+                    Text(grade.displayName)
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .foregroundStyle(grade.historyColor)
+
+                    if let userGrade = summary.userGradeEnum {
+                        Text(userGrade.displayName)
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundStyle(userGrade.historyColor)
+                            .offset(x: 18, y: 18)
+                    }
+                }
 
                 HStack(spacing: 12) {
                     Label("\(summary.completedCount)/\(summary.totalCount) 完成", systemImage: "checkmark.circle")

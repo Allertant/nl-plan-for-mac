@@ -44,7 +44,7 @@ final class DayManager {
     }
 
     /// 结算指定日期。今天结算成功后会停止当前运行任务；历史日期只结算对应日期数据。
-    func settleDay(date: Date, incompleteNotes: [UUID: String] = [:]) async throws -> DailySummaryEntity {
+    func settleDay(date: Date, incompleteNotes: [UUID: String] = [:], userGrade: Grade? = nil) async throws -> DailySummaryEntity {
         let settlementDate = Calendar.current.startOfDay(for: date)
         let isToday = Calendar.current.isDateInToday(settlementDate)
 
@@ -86,7 +86,8 @@ final class DayManager {
             totalActualMinutes: grade.stats.totalActualMinutes,
             completedCount: grade.stats.completedTasks,
             totalCount: grade.stats.totalTasks,
-            gradingBasis: grade.gradingBasis
+            gradingBasis: grade.gradingBasis,
+            userGrade: userGrade
         )
         try archiveAndClearSettledTasks(
             tasks: mustDoTasks,

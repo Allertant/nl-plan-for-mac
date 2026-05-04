@@ -49,7 +49,7 @@ struct SummaryView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         // 等级大字展示
-                        GradeDisplay(grade: summary.gradeEnum)
+                        GradeDisplay(grade: summary.gradeEnum, userGrade: summary.userGradeEnum)
 
                         // 统计卡片
                         StatsGrid(summary: summary)
@@ -216,6 +216,35 @@ struct SummaryView: View {
                     }
                     .scrollIndicators(.never)
 
+                    // 自评选择器
+                    VStack(spacing: 8) {
+                        Text("给自己打个分")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            ForEach(Grade.allCases, id: \.self) { grade in
+                                Button {
+                                    viewModel.userGrade = viewModel.userGrade == grade ? nil : grade
+                                } label: {
+                                    Text(grade.displayName)
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(viewModel.userGrade == grade ? .white : grade.historyColor)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(viewModel.userGrade == grade ? grade.historyColor : grade.historyColor.opacity(0.12))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .strokeBorder(grade.historyColor.opacity(viewModel.userGrade == grade ? 0 : 0.3), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 10)
+
                     Button {
                         viewModel.endDay()
                     } label: {
@@ -250,6 +279,7 @@ struct SummaryView: View {
 /// 等级大字展示
 struct GradeDisplay: View {
     let grade: Grade
+    let userGrade: Grade?
 
     var gradeColor: Color {
         switch grade {
@@ -264,15 +294,31 @@ struct GradeDisplay: View {
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(gradeColor.opacity(0.15))
-                .frame(width: 100, height: 100)
+        ZStack(alignment: .bottomTrailing) {
+            ZStack {
+                Circle()
+                    .fill(gradeColor.opacity(0.15))
+                    .frame(width: 100, height: 100)
 
-            Text(grade.displayName)
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(gradeColor)
+                Text(grade.displayName)
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(gradeColor)
+            }
+
+            if let userGrade {
+                ZStack {
+                    Circle()
+                        .fill(userGrade.historyColor.opacity(0.15))
+                        .frame(width: 70, height: 70)
+
+                    Text(userGrade.displayName)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(userGrade.historyColor)
+                }
+                .offset(x: 30, y: 30)
+            }
         }
+        .padding(userGrade != nil ? 20 : 0)
     }
 }
 

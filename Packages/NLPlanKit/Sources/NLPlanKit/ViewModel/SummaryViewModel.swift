@@ -12,6 +12,7 @@ final class SummaryViewModel {
     var showAppealInput: Bool = false
     var isAppealing: Bool = false
     var tasks: [DailyTaskEntity] = []
+    var userGrade: Grade? = nil
     var taskNotes: [UUID: String] = [:]
     var expandedNoteTaskIds: Set<UUID> = []
     var elapsedSecondsCache: [UUID: Int] = [:]
@@ -57,7 +58,7 @@ final class SummaryViewModel {
         errorMessage = nil
         endDayTask = Task {
             do {
-                let result = try await dayManager.settleDay(date: settlementDate, incompleteNotes: sanitizedTaskNotes)
+                let result = try await dayManager.settleDay(date: settlementDate, incompleteNotes: sanitizedTaskNotes, userGrade: userGrade)
                 guard !Task.isCancelled else { return }
                 summary = result
             } catch {
@@ -141,7 +142,8 @@ final class SummaryViewModel {
     }
 
     var canSettle: Bool {
-        incompleteTasks.allSatisfy { task in
+        userGrade != nil
+        && incompleteTasks.allSatisfy { task in
             !(taskNotes[task.id]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         }
     }

@@ -17,11 +17,18 @@ final class DailySummaryEntity {
     var createdAt: Date
     var appealCount: Int
     var gradingBasis: String?
+    var userGrade: String?
 
     @Transient
     var gradeEnum: Grade {
         get { Grade(rawValue: grade) ?? .F }
         set { grade = newValue.rawValue }
+    }
+
+    @Transient
+    var userGradeEnum: Grade? {
+        get { userGrade.flatMap { Grade(rawValue: $0) } }
+        set { userGrade = newValue?.rawValue }
     }
 
     init(

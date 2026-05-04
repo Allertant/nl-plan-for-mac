@@ -19,7 +19,8 @@ final class SummaryRepository {
         totalActualMinutes: Int,
         completedCount: Int,
         totalCount: Int,
-        gradingBasis: String? = nil
+        gradingBasis: String? = nil,
+        userGrade: Grade? = nil
     ) throws -> DailySummaryEntity {
         let entity = DailySummaryEntity(
             date: date,
@@ -32,6 +33,7 @@ final class SummaryRepository {
             totalCount: totalCount,
             gradingBasis: gradingBasis
         )
+        entity.userGrade = userGrade?.rawValue
         modelContext.insert(entity)
         try modelContext.save()
         return entity
