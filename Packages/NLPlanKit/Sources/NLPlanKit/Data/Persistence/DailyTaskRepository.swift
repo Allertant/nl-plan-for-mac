@@ -190,21 +190,4 @@ final class DailyTaskRepository {
     func save() throws {
         try modelContext.save()
     }
-
-    /// 将指定日期未完成的必做项移回想法池（在 DailyTaskEntity 上标记回退）
-    func migrateUnfinishedMustDo(date: Date) throws -> [DailyTaskEntity] {
-        let tasks = try fetchTasks(date: date)
-        let unfinished = tasks.filter { $0.status != TaskStatus.done.rawValue }
-        for task in unfinished {
-            let wasStarted = task.status == TaskStatus.running.rawValue
-                || task.status == TaskStatus.paused.rawValue
-            task.status = TaskStatus.pending.rawValue
-            task.date = Date.now
-            if wasStarted {
-                task.attempted = true
-            }
-        }
-        try modelContext.save()
-        return unfinished
-    }
 }

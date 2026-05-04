@@ -114,50 +114,6 @@ final class DayManager {
         return nil
     }
 
-    // MARK: - Check Yesterday
-
-    /// 检查是否需要触发昨日的自动评分
-    func checkAndGradeYesterday() async throws -> DailySummaryEntity? {
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
-        let yesterdayStart = Calendar.current.startOfDay(for: yesterday)
-
-        // 检查昨天是否已有评分
-        if try summaryRepo.fetch(date: yesterdayStart) != nil {
-            return nil
-        }
-
-        // 检查昨天是否有必做项
-        let yesterdayTasks = try dailyTaskRepo.fetchTasks(date: yesterdayStart)
-        if yesterdayTasks.isEmpty {
-            return nil
-        }
-
-        // 先迁移未完成的任务，然后评分
-        _ = try dailyTaskRepo.migrateUnfinishedMustDo(date: yesterdayStart)
-
-        let grade = try await gradeWithFallback(tasks: yesterdayTasks, fallbackSummary: "自动补评（AI 不可用）")
-        return try summaryRepo.create(
-            date: yesterdayStart,
-            grade: grade.grade,
-            summary: grade.summary,
-            suggestion: grade.suggestion,
-            totalPlannedMinutes: grade.stats.totalPlannedMinutes,
-            totalActualMinutes: grade.stats.totalActualMinutes,
-            completedCount: grade.stats.completedTasks,
-            totalCount: grade.stats.totalTasks,
-            gradingBasis: grade.gradingBasis
-        )
-    }
-
-    // MARK: - Migrate
-
-    /// 跨天迁移：将昨日未完成的必做项移回想法池
-    func migrateUnfinishedMustDo() async throws -> [DailyTaskEntity] {
-        let today = Calendar.current.startOfDay(for: .now)
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
-        return try dailyTaskRepo.migrateUnfinishedMustDo(date: yesterday)
-    }
-
     // MARK: - Appeal
 
     /// 驳斥评分
