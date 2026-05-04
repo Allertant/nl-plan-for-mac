@@ -530,7 +530,7 @@ final class MustDoViewModel {
 
             // 安排（未完成的）
             let arrangements = (try? await taskManager.fetchArrangements(projectId: project.id)) ?? []
-            for arr in arrangements where arr.arrangementStatus != .done {
+            for arr in arrangements where arr.arrangementStatus != .completed && arr.arrangementStatus != .archived {
                 allArrangementInputs.append(TaskRecommendationInput(
                     id: arr.id,
                     title: arr.content,

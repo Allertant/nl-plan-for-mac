@@ -544,9 +544,12 @@ private struct ProjectDetailPageView: View {
 
     private var arrangementCard: some View {
         let pendingItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.pending.rawValue }
+        let attemptedItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.attempted.rawValue }
         let inProgressItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.inProgress.rawValue }
-        let doneItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.done.rawValue }
-        let activeCount = pendingItems.count + inProgressItems.count
+        let completedItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.completed.rawValue }
+        let archivedItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.archived.rawValue }
+        let activeCount = pendingItems.count + inProgressItems.count + attemptedItems.count
+        let doneItems = completedItems + archivedItems
         let doneDefaultCount = max(2 - activeCount, 0)
         let doneVisibleCount = doneDefaultCount + arrangementHistoryVisibleCount
         let doneTotal = doneItems.count
@@ -599,7 +602,7 @@ private struct ProjectDetailPageView: View {
                 .background(Color(nsColor: .windowBackgroundColor).contentShape(Rectangle()).onTapGesture { newArrangementMinutesFocused = false })
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                if pendingItems.isEmpty && inProgressItems.isEmpty && doneItems.isEmpty {
+                if pendingItems.isEmpty && inProgressItems.isEmpty && attemptedItems.isEmpty && doneItems.isEmpty {
                     Text("暂无安排").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
 
@@ -610,6 +613,11 @@ private struct ProjectDetailPageView: View {
 
                 // 进行中（全部展示）
                 ForEach(inProgressItems, id: \.id) { item in
+                    arrangementRow(item)
+                }
+
+                // 已尝试
+                ForEach(attemptedItems, id: \.id) { item in
                     arrangementRow(item)
                 }
 
@@ -909,8 +917,8 @@ private struct ArrangementRow: View {
     private enum Field: Hashable { case title, minutes, deadline }
 
     private var status: ArrangementStatus { item.arrangementStatus }
-    private var isEditable: Bool { status == .pending }
-    private var canPromote: Bool { status == .pending && !isPromoting }
+    private var isEditable: Bool { status == .pending || status == .attempted }
+    private var canPromote: Bool { (status == .pending || status == .attempted) && !isPromoting }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -933,8 +941,8 @@ private struct ArrangementRow: View {
                 } else {
                     Text(item.content)
                         .font(.system(size: 11))
-                        .foregroundStyle(status == .done ? .tertiary : .secondary)
-                        .strikethrough(status == .done)
+                        .foregroundStyle(status == .completed || status == .archived ? .tertiary : .secondary)
+                        .strikethrough(status == .completed || status == .archived)
                         .lineLimit(2)
                         .onTapGesture { if isEditable { startEditingTitle() } }
                 }
@@ -1014,7 +1022,7 @@ private struct ArrangementRow: View {
 
                 Spacer()
 
-                if status == .done {
+                if status == .completed || status == .archived {
                     Button(action: onRevive) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 10))
@@ -1024,7 +1032,7 @@ private struct ArrangementRow: View {
                     .help("复活")
                 }
 
-                if status != .inProgress {
+                if status != .inProgress && status != .completed && status != .archived {
                     Button(action: onDelete) {
                         Image(systemName: "xmark")
                             .font(.system(size: 10))
@@ -1051,7 +1059,9 @@ private struct ArrangementRow: View {
         switch status {
         case .pending: return "circle"
         case .inProgress: return "circle.fill"
-        case .done: return "checkmark"
+        case .attempted: return "exclamationmark.circle"
+        case .completed: return "checkmark"
+        case .archived: return "archivebox"
         }
     }
 
@@ -1059,7 +1069,9 @@ private struct ArrangementRow: View {
         switch status {
         case .pending: return .secondary
         case .inProgress: return .blue
-        case .done: return .green
+        case .attempted: return .orange
+        case .completed: return .green
+        case .archived: return .secondary
         }
     }
 

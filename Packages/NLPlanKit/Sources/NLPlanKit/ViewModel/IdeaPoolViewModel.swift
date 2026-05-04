@@ -721,10 +721,11 @@ final class IdeaPoolViewModel {
     private func repairStaleInProgressIdeas() async throws {
         for idea in ideas where idea.ideaStatus == .inProgress {
             let tasks = try await taskManager.fetchMustDo(sourceIdeaId: idea.id)
-            let hasActive = tasks.contains { !$0.isSettled }
-            if !hasActive {
-                idea.ideaStatus = .pending
-            }
+            let activeTasks = tasks.filter { !$0.isSettled }
+            if !activeTasks.isEmpty { continue }
+            let allDone = tasks.filter { $0.isSettled }.allSatisfy { $0.taskStatus == .done }
+            idea.ideaStatus = allDone && !tasks.isEmpty ? .completed : .pending
+            try await taskManager.updateIdea(idea)
         }
     }
 

@@ -240,7 +240,7 @@ final class TaskManager {
 
         if let arrangementId = dailyTask.arrangementId,
            let arrangement = try arrangementRepo.fetchById(arrangementId) {
-            arrangement.status = ArrangementStatus.pending.rawValue
+            arrangement.status = markAttempted ? ArrangementStatus.attempted.rawValue : ArrangementStatus.pending.rawValue
             try arrangementRepo.update(arrangement)
         }
 
@@ -703,6 +703,7 @@ final class TaskManager {
         try arrangementRepo.update(item)
     }
 
+
     func deleteArrangement(_ item: ProjectArrangementEntity) async throws {
         try arrangementRepo.delete(item)
     }
@@ -724,7 +725,7 @@ final class TaskManager {
         guard let arrangement = try arrangementRepo.fetchById(arrangementId) else {
             throw NLPlanError.dataNotFound(entity: "ProjectArrangement", id: arrangementId)
         }
-        guard arrangement.arrangementStatus != .done else { return nil }
+        guard arrangement.arrangementStatus != .completed else { return nil }
 
         let projectEntity = try projectRepo.fetchById(arrangement.projectId)
         let category = categoryOverride ?? projectEntity?.category ?? ""

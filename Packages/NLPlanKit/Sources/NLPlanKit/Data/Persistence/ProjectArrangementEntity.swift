@@ -5,13 +5,17 @@ import SwiftData
 enum ArrangementStatus: String, CaseIterable {
     case pending
     case inProgress = "in_progress"
-    case done
+    case attempted
+    case completed = "done"
+    case archived
 
     var displayName: String {
         switch self {
         case .pending: return "待安排"
         case .inProgress: return "进行中"
-        case .done: return "已完成"
+        case .attempted: return "已尝试"
+        case .completed: return "已完成"
+        case .archived: return "已归档"
         }
     }
 }

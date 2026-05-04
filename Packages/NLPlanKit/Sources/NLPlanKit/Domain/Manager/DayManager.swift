@@ -385,9 +385,14 @@ final class DayManager {
             // 更新关联安排状态
             if let arrangementId = task.arrangementId,
                let arrangement = try arrangementRepo.fetchById(arrangementId) {
-                arrangement.status = (task.taskStatus == .done)
-                    ? ArrangementStatus.done.rawValue
-                    : ArrangementStatus.pending.rawValue
+                let current = arrangement.arrangementStatus
+                if task.taskStatus == .done {
+                    if current == .completed || current == .inProgress {
+                        arrangement.status = ArrangementStatus.archived.rawValue
+                    }
+                } else {
+                    arrangement.status = ArrangementStatus.attempted.rawValue
+                }
                 try arrangementRepo.update(arrangement)
             }
 
@@ -395,7 +400,9 @@ final class DayManager {
             if let sourceIdeaId = task.sourceIdeaId,
                let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
                 if task.taskStatus == .done {
-                    sourceIdea.ideaStatus = .completed
+                    if sourceIdea.ideaStatus == .completed || sourceIdea.ideaStatus == .inProgress {
+                        sourceIdea.ideaStatus = .archived
+                    }
                 } else {
                     sourceIdea.ideaStatus = .attempted
                     sourceIdea.attempted = true
