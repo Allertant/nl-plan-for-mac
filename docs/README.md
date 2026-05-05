@@ -18,7 +18,6 @@
 - `spec/SRS.md`
 - `design/ai-recommendation-upgrade.md`
 - `design/project-and-progress.md`
-- `design/settlement-scoring-upgrade.md`
 - `guides/macos-app-local-package-migration-guide.md`
 - `meta/AGENTS.md`
 - `meta/to-do.md`

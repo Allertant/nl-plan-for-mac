@@ -106,7 +106,6 @@ xcodebuild \
 | [docs/spec/SAD.md](docs/spec/SAD.md) | 软件架构文档 |
 | [docs/spec/SRS.md](docs/spec/SRS.md) | 软件需求规格说明 |
 | [docs/design/ai-recommendation-upgrade.md](docs/design/ai-recommendation-upgrade.md) | AI 推荐必做项流程升级设计 |
-| [docs/design/settlement-scoring-upgrade.md](docs/design/settlement-scoring-upgrade.md) | 结算评分机制升级设计 |
 | [docs/design/project-and-progress.md](docs/design/project-and-progress.md) | 想法池项目与 AI 进度设计 |
 | [docs/guides/macos-app-local-package-migration-guide.md](docs/guides/macos-app-local-package-migration-guide.md) | macOS App + local package 通用改造指南 |
 
