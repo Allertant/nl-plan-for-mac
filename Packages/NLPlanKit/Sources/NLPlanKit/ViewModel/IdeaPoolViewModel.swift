@@ -68,15 +68,17 @@ final class IdeaPoolViewModel {
     var projects: [ProjectEntity] = []
     var isExpanded: Bool = false
 
-    /// pending 安排数（主页 badge 用）
+    /// (pending + attempted) 安排数（主页 badge 用）
     private(set) var pendingArrangementCount: Int = 0
 
     /// (pending + inProgress + attempted) 安排数（想法池页面 badge 用）
     private(set) var activeArrangementCount: Int = 0
 
-    /// 待处理数量：pending 想法（实时计算）+ pending 项目安排
+    /// 主页数字：pending + attempted 想法（实时计算）+ pending + attempted 项目安排
     var pendingCount: Int {
-        ideas.filter { $0.status == IdeaStatus.pending.rawValue }.count
+        ideas.filter {
+            $0.status == IdeaStatus.pending.rawValue || $0.status == IdeaStatus.attempted.rawValue
+        }.count
         + pendingArrangementCount
     }
     var errorMessage: String?
@@ -202,7 +204,7 @@ final class IdeaPoolViewModel {
             let fetchedIdeas = try await taskManager.fetchIdeaPool()
             let fetchedProjects = (try? await taskManager.fetchVisibleProjects()) ?? []
             let fetchedActiveArrangementCount = (try? await taskManager.fetchAllActiveArrangements().count) ?? 0
-            let fetchedPendingArrangementCount = (try? await taskManager.fetchAllPendingArrangements().count) ?? 0
+            let fetchedPendingArrangementCount = (try? await taskManager.fetchAllPendingOrAttemptedArrangements().count) ?? 0
             if animated {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                     ideas = fetchedIdeas
