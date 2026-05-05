@@ -17,6 +17,24 @@ struct PopoverView: View {
         return max(0, endHour - currentTime)
     }
 
+    private var versionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        if let shortVersion, !shortVersion.isEmpty {
+            if let buildVersion, !buildVersion.isEmpty, buildVersion != shortVersion {
+                return "v\(shortVersion) (\(buildVersion))"
+            }
+            return "v\(shortVersion)"
+        }
+
+        if let buildVersion, !buildVersion.isEmpty {
+            return "v\(buildVersion)"
+        }
+
+        return "v-"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
                 if !appState.isAPIKeyConfigured {
@@ -61,6 +79,10 @@ struct PopoverView: View {
 
                 // 底部操作栏
                 HStack(spacing: 12) {
+                    Text(versionText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+
                     Spacer()
 
                     ToolbarIconButton {
