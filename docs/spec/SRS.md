@@ -78,9 +78,10 @@
 |------|------|--------|
 | F-SETTLE-01 | 结算时必做项标记为已归档（isSettled=true），计算实际耗时 | 必须 |
 | F-SETTLE-02 | 已归档必做项不在活跃列表中显示，但在项目详情中可见 | 必须 |
-| F-SETTLE-03 | 任务完成时：想法/安排状态为 completed 或 inProgress 则归档为 archived | 必须 |
-| F-SETTLE-04 | 任务未完成时：想法/安排状态更新为 attempted | 必须 |
-| F-SETTLE-05 | 结算后刷新项目推荐上下文时间 | 必须 |
+| F-SETTLE-03 | 任务完成时：想法/安排状态更新为 completed | 必须 |
+| F-SETTLE-04 | 归档是 completed 之后的下一阶段，用于收纳/隐藏完成项 | 必须 |
+| F-SETTLE-05 | 任务未完成时：想法/安排状态更新为 attempted | 必须 |
+| F-SETTLE-06 | 结算后刷新项目推荐上下文时间 | 必须 |
 
 ### 2.7 跨天处理
 
