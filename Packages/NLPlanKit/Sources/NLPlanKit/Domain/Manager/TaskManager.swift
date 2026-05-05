@@ -384,6 +384,19 @@ final class TaskManager {
         dailyTask.taskStatus = .done
         dailyTask.completedAt = .now
         try dailyTaskRepo.update(dailyTask)
+
+        if let sourceIdeaId = dailyTask.sourceIdeaId,
+           let sourceIdea = try ideaRepo.fetchById(sourceIdeaId) {
+            sourceIdea.ideaStatus = .completed
+            try ideaRepo.update(sourceIdea)
+        }
+
+        if let arrangementId = dailyTask.arrangementId,
+           let arrangement = try arrangementRepo.fetchById(arrangementId) {
+            arrangement.status = ArrangementStatus.completed.rawValue
+            try arrangementRepo.update(arrangement)
+        }
+
         touchSourceContext(dailyTask)
     }
 
