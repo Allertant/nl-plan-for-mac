@@ -167,7 +167,11 @@ final class MustDoViewModel {
 
     func refresh() async {
         do {
-            tasks = try await taskManager.fetchMustDo()
+            let todayTasks = try await taskManager.fetchMustDo()
+            let crossDayTasks = (try? await taskManager.fetchCrossDayActiveTasks()) ?? []
+            let todayIds = Set(todayTasks.map(\.id))
+            let newCrossDay = crossDayTasks.filter { !todayIds.contains($0.id) }
+            tasks = newCrossDay + todayTasks
             elapsedSecondsCache.removeAll()
             for task in tasks {
                 elapsedSecondsCache[task.id] = try await taskManager.totalElapsedSeconds(taskId: task.id)

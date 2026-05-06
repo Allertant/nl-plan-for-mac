@@ -616,6 +616,10 @@ final class TaskManager {
         try dailyTaskRepo.fetchTasks(date: date)
     }
 
+    func fetchCrossDayActiveTasks(today: Date = .now) async throws -> [DailyTaskEntity] {
+        try dailyTaskRepo.fetchCrossDayActiveTasks(today: today)
+    }
+
     /// 获取绑定到指定来源的全部必做项
     func fetchMustDo(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)

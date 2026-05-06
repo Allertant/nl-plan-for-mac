@@ -143,6 +143,20 @@ final class DailyTaskRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchCrossDayActiveTasks(today: Date) throws -> [DailyTaskEntity] {
+        let runningRaw = TaskStatus.running.rawValue
+        let pausedRaw = TaskStatus.paused.rawValue
+        let todayStart = Calendar.current.startOfDay(for: today)
+        let descriptor = FetchDescriptor<DailyTaskEntity>(
+            predicate: #Predicate { task in
+                (task.status == runningRaw || task.status == pausedRaw)
+                && task.isSettled == false
+                && task.date < todayStart
+            }
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func update(_ task: DailyTaskEntity) throws {
         task.updatedAt = .now
         try modelContext.save()
