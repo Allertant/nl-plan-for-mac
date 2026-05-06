@@ -173,6 +173,7 @@ struct IdeaPoolContainerView: View {
                 IdeaPoolPageView(viewModel: ideaPoolVM) {
                     appState.currentPage = .main
                 }
+                .task { await ideaPoolVM.refresh() }
             } else {
                 ProgressView("加载中...")
                     .frame(width: 360, height: 520)
