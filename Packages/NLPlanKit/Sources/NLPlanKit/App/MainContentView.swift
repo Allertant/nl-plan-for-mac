@@ -120,6 +120,7 @@ struct PopoverContainerView: View {
         }
         .task {
             appState.ensureViewModelsInitialized()
+            appState.refreshPendingSettlement()
         }
     }
 }

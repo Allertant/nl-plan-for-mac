@@ -157,6 +157,26 @@ final class AppState {
         checkAPIKey()
     }
 
+    @MainActor
+    func refreshPendingSettlement() {
+        let context = modelContainer.mainContext
+        let dayMgr = DayManager(
+            ideaRepo: IdeaRepository(modelContext: context),
+            projectRepo: ProjectRepository(modelContext: context),
+            dailyTaskRepo: DailyTaskRepository(modelContext: context),
+            summaryRepo: SummaryRepository(modelContext: context),
+            sessionLogRepo: SessionLogRepository(modelContext: context),
+            arrangementRepo: ProjectArrangementRepository(modelContext: context),
+            timerEngine: timerEngine,
+            aiService: makeAIService()
+        )
+        do {
+            pendingSettlementDate = try dayMgr.pendingSettlementDate()
+        } catch {
+            print("刷新补结算状态失败：\(error)")
+        }
+    }
+
     func updateAppearanceMode(_ mode: AppearanceMode) {
         appearanceMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: AppConstants.appearanceModeKey)
