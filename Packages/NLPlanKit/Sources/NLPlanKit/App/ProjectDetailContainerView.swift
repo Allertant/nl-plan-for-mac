@@ -918,19 +918,19 @@ private struct ProjectNoteRow: View {
                 }
             }
 
-            if isHovered && !isEditing {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .padding(3)
-                        .background(isDeleteHovered ? Color.primary.opacity(0.08) : .clear)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 2)
-                .onHover { isDeleteHovered = $0 }
+            Button(action: onDelete) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .padding(3)
+                    .background(isDeleteHovered ? Color.primary.opacity(0.08) : .clear)
+                    .clipShape(Circle())
             }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+            .opacity(isHovered && !isEditing ? 1 : 0)
+            .disabled(!isHovered || isEditing)
+            .onHover { isDeleteHovered = $0 }
         }
         .onChange(of: isFocused) { _, focused in
             if !focused && isEditing { commitEdit() }
