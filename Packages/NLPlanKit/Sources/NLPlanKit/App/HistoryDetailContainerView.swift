@@ -159,7 +159,7 @@ private struct HistoryDetailPageView: View {
                     Label("\(summary.completedCount)/\(summary.totalCount) 完成", systemImage: "checkmark.circle")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Label("\(summary.totalActualMinutes) 分钟", systemImage: "clock")
+                    Label(summary.totalActualMinutes.hourMinuteString, systemImage: "clock")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -257,11 +257,11 @@ private struct HistoryDetailPageView: View {
             HStack(spacing: 8) {
                 TagChip(text: task.category)
 
-                Text("预估 \(task.estimatedMinutes)分钟")
+                Text("预估 \(task.estimatedMinutes.hourMinuteString)")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                 if let actual = task.actualMinutes {
-                    Text("实际 \(actual)分钟")
+                    Text("实际 \(actual.hourMinuteString)")
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
