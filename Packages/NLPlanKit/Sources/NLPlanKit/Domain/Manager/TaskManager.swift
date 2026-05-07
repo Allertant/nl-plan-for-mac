@@ -480,6 +480,13 @@ final class TaskManager {
         try? await touchProjectRecommendationContext(projectId: note.projectId)
     }
 
+    func deleteProjectNote(noteId: UUID) async throws {
+        guard let note = try projectRepo.fetchProjectNoteById(noteId) else { return }
+        let projectId = note.projectId
+        try projectRepo.deleteProjectNote(noteId)
+        try? await touchProjectRecommendationContext(projectId: projectId)
+    }
+
     func generatePlanningBackgroundPrompt(projectId: UUID) async throws {
         guard let project = try projectRepo.fetchById(projectId) else { return }
         let activeTasks = try await fetchMustDo(sourceProjectId: projectId)

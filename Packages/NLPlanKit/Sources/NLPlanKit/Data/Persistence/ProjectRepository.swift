@@ -136,6 +136,12 @@ final class ProjectRepository {
         try modelContext.save()
     }
 
+    func deleteProjectNote(_ id: UUID) throws {
+        guard let note = try fetchProjectNoteById(id) else { return }
+        modelContext.delete(note)
+        try modelContext.save()
+    }
+
     func deleteProjectNotes(projectId: UUID) throws {
         let notes = try fetchProjectNotes(projectId: projectId)
         for note in notes {

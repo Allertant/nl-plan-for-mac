@@ -54,6 +54,12 @@ private struct ProjectDetailPageView: View {
     // 笔记
     @State private var newNoteText = ""
     @FocusState private var newNoteFocused: Bool
+    @State private var pendingDeleteNoteId: UUID?
+
+    private var pendingDeleteNoteContent: String? {
+        guard let id = pendingDeleteNoteId else { return nil }
+        return notes.first(where: { $0.id == id })?.content
+    }
 
     // 安排
     @State private var newArrangementText = ""
@@ -118,6 +124,8 @@ private struct ProjectDetailPageView: View {
         .overlay {
             if viewModel.pendingArrangementId != nil {
                 arrangementConfirmOverlay
+            } else if pendingDeleteNoteId != nil {
+                noteDeleteConfirmOverlay
             }
         }
         .task { await loadProjectDetail() }
@@ -541,6 +549,27 @@ private struct ProjectDetailPageView: View {
         )
     }
 
+    private var noteDeleteConfirmOverlay: some View {
+        ConfirmActionPage(
+            icon: "trash",
+            iconTint: .red,
+            title: pendingDeleteNoteContent ?? "",
+            message: "确认删除该笔记？",
+            confirmLabel: "确认删除",
+            onCancel: { pendingDeleteNoteId = nil },
+            onConfirm: {
+                guard let noteId = pendingDeleteNoteId else { return }
+                pendingDeleteNoteId = nil
+                Task {
+                    await viewModel.deleteProjectNote(noteId: noteId)
+                    notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
+                    requestScrollRestore(.notes)
+                }
+            }
+        )
+        .background(.ultraThinMaterial)
+    }
+
     private var arrangementCard: some View {
         let pendingItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.pending.rawValue }
         let attemptedItems = viewModel.arrangements.filter { $0.status == ArrangementStatus.attempted.rawValue }
@@ -740,7 +769,8 @@ private struct ProjectDetailPageView: View {
                                 notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
                                 requestScrollRestore(.notes)
                             }
-                        }
+                        },
+                        onDelete: { pendingDeleteNoteId = note.id }
                     )
                 }
 
@@ -859,33 +889,48 @@ struct DetailSectionCard<Content: View>: View {
 private struct ProjectNoteRow: View {
     let note: ProjectNoteEntity
     let onUpdate: (String) -> Void
+    let onDelete: () -> Void
     @State private var isEditing = false
     @State private var draftText = ""
+    @State private var isHovered = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        Group {
-            if isEditing {
-                TextEditor(text: $draftText)
-                    .font(.system(size: 11))
-                    .frame(minHeight: 60)
-                    .padding(6)
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .focused($isFocused)
-            } else {
-                Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onTapGesture {
-                        draftText = note.content
-                        isEditing = true
-                        DispatchQueue.main.async { isFocused = true }
-                    }
+        HStack(alignment: .top, spacing: 4) {
+            Group {
+                if isEditing {
+                    TextEditor(text: $draftText)
+                        .font(.system(size: 11))
+                        .frame(minHeight: 60)
+                        .padding(6)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .focused($isFocused)
+                } else {
+                    Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onTapGesture {
+                            draftText = note.content
+                            isEditing = true
+                            DispatchQueue.main.async { isFocused = true }
+                        }
+                }
+            }
+
+            if isHovered && !isEditing {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
             }
         }
         .onChange(of: isFocused) { _, focused in
             if !focused && isEditing { commitEdit() }
         }
+        .onHover { isHovered = $0 }
     }
 
     private func commitEdit() {

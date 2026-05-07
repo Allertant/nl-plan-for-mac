@@ -358,6 +358,14 @@ final class IdeaPoolViewModel {
         }
     }
 
+    func deleteProjectNote(noteId: UUID) async {
+        do {
+            try await taskManager.deleteProjectNote(noteId: noteId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func refreshProjectAnalyses(projectId: UUID? = nil) async {
         if let projectId {
             guard !isRefreshingProjects, !refreshingProjectIds.contains(projectId) else { return }
