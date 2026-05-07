@@ -54,6 +54,8 @@ private struct ProjectDetailPageView: View {
     // 笔记
     @State private var newNoteText = ""
     @FocusState private var newNoteFocused: Bool
+    @State private var editingNoteId: UUID?
+    @FocusState private var editingNoteFocused: Bool
     @State private var pendingDeleteNoteId: UUID?
 
     private var pendingDeleteNoteContent: String? {
@@ -151,6 +153,7 @@ private struct ProjectDetailPageView: View {
         if isEditingTitle { titleFocused = false }
         if isEditingDescription { descriptionFocused = false }
         if isEditingPlanningBackground { planningBackgroundFocused = false }
+        editingNoteFocused = false
         newNoteFocused = false
         newArrangementFocused = false
         newArrangementMinutesFocused = false
@@ -770,7 +773,8 @@ private struct ProjectDetailPageView: View {
                                 requestScrollRestore(.notes)
                             }
                         },
-                        onDelete: { pendingDeleteNoteId = note.id }
+                        onDelete: { pendingDeleteNoteId = note.id },
+                        focusedBinding: $editingNoteFocused
                     )
                 }
 
@@ -890,11 +894,11 @@ private struct ProjectNoteRow: View {
     let note: ProjectNoteEntity
     let onUpdate: (String) -> Void
     let onDelete: () -> Void
+    var focusedBinding: FocusState<Bool>.Binding
     @State private var isEditing = false
     @State private var draftText = ""
     @State private var isHovered = false
     @State private var isDeleteHovered = false
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
@@ -906,14 +910,14 @@ private struct ProjectNoteRow: View {
                         .padding(6)
                         .background(Color(nsColor: .windowBackgroundColor))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .focused($isFocused)
+                        .focused(focusedBinding)
                 } else {
                     Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onTapGesture {
                             draftText = note.content
                             isEditing = true
-                            DispatchQueue.main.async { isFocused = true }
+                            DispatchQueue.main.async { focusedBinding.wrappedValue = true }
                         }
                 }
             }
@@ -932,7 +936,7 @@ private struct ProjectNoteRow: View {
             .disabled(!isHovered || isEditing)
             .onHover { isDeleteHovered = $0 }
         }
-        .onChange(of: isFocused) { _, focused in
+        .onChange(of: focusedBinding.wrappedValue) { _, focused in
             if !focused && isEditing { commitEdit() }
         }
         .onHover { isHovered = $0 }
