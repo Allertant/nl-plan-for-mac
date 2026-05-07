@@ -769,8 +769,6 @@ private struct ProjectDetailPageView: View {
                         onUpdate: { content in
                             Task {
                                 await viewModel.updateProjectNote(noteId: note.id, content: content)
-                                notes = await viewModel.fetchProjectNotesByProjectId(projectId: projectId)
-                                requestScrollRestore(.notes)
                             }
                         },
                         onDelete: { pendingDeleteNoteId = note.id },
@@ -901,41 +899,68 @@ private struct ProjectNoteRow: View {
     @State private var isDeleteHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 4) {
-            Group {
+        VStack(alignment: .leading, spacing: 4) {
+            // 行 1：图标 + 文本内容
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+
                 if isEditing {
-                    TextEditor(text: $draftText)
+                    TextField("笔记内容", text: $draftText, axis: .vertical)
+                        .textFieldStyle(.plain)
                         .font(.system(size: 11))
-                        .frame(minHeight: 60)
-                        .padding(6)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .focused(focusedBinding)
+                        .onSubmit {
+                            if NSEvent.modifierFlags.contains(.shift) {
+                                draftText += "\n"
+                                return
+                            }
+                            focusedBinding.wrappedValue = false
+                        }
+                        .padding(.horizontal, 4).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
                 } else {
-                    Text(note.content).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(note.content)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onTapGesture {
                             draftText = note.content
                             isEditing = true
-                            DispatchQueue.main.async { focusedBinding.wrappedValue = true }
+                            focusedBinding.wrappedValue = true
+                            moveInsertionPointToEnd()
                         }
                 }
             }
 
-            Button(action: onDelete) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .padding(3)
-                    .background(isDeleteHovered ? Color.primary.opacity(0.08) : .clear)
-                    .clipShape(Circle())
+            // 行 2：创建时间 + 删除按钮
+            HStack(spacing: 8) {
+                Text(note.createdAt, format: .dateTime.month().day().hour().minute())
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+
+                Spacer()
+
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(3)
+                        .background(isDeleteHovered ? Color.primary.opacity(0.08) : .clear)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovered && !isEditing ? 1 : 0)
+                .disabled(!isHovered || isEditing)
+                .onHover { isDeleteHovered = $0 }
             }
-            .buttonStyle(.plain)
-            .padding(.top, 2)
-            .opacity(isHovered && !isEditing ? 1 : 0)
-            .disabled(!isHovered || isEditing)
-            .onHover { isDeleteHovered = $0 }
         }
+        .padding(8)
+        .background { Color(nsColor: .textBackgroundColor).contentShape(Rectangle()).onTapGesture { focusedBinding.wrappedValue = false } }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .onChange(of: focusedBinding.wrappedValue) { _, focused in
             if !focused && isEditing { commitEdit() }
         }
@@ -947,6 +972,17 @@ private struct ProjectNoteRow: View {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != note.content.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
         onUpdate(trimmed)
+    }
+
+    private func moveInsertionPointToEnd(retryCount: Int = 3) {
+        DispatchQueue.main.async {
+            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else {
+                if retryCount > 0 { self.moveInsertionPointToEnd(retryCount: retryCount - 1) }
+                return
+            }
+            let endLocation = textView.string.count
+            textView.setSelectedRange(NSRange(location: endLocation, length: 0))
+        }
     }
 }
 
