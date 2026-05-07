@@ -893,6 +893,7 @@ private struct ProjectNoteRow: View {
     @State private var isEditing = false
     @State private var draftText = ""
     @State private var isHovered = false
+    @State private var isDeleteHovered = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -922,9 +923,13 @@ private struct ProjectNoteRow: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
+                        .padding(3)
+                        .background(isDeleteHovered ? Color.primary.opacity(0.08) : .clear)
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
+                .onHover { isDeleteHovered = $0 }
             }
         }
         .onChange(of: isFocused) { _, focused in
