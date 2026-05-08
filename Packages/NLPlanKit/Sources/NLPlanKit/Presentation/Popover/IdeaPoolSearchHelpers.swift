@@ -7,9 +7,25 @@ struct SearchTagToken: View {
     let text: String; var isHighlighted: Bool = false; let onRemove: () -> Void
     var body: some View {
         HStack(spacing: 4) {
-            TagChip(text: text)
-            if !isHighlighted { Button(action: onRemove) { Image(systemName: "xmark.circle.fill").font(.system(size: 10)).foregroundStyle(.secondary) }.buttonStyle(.plain) }
-        }.padding(.trailing, 2).overlay { if isHighlighted { RoundedRectangle(cornerRadius: 999).stroke(Color.accentColor.opacity(0.35), lineWidth: 1) } }
+            HStack(spacing: 3) {
+                Image(systemName: "tag.fill")
+                    .font(.system(size: 7, weight: .semibold))
+                Text(text)
+                    .font(.system(size: 9))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(isHighlighted ? Color.accentColor : text.tagColor.opacity(0.14))
+            .clipShape(Capsule())
+            .foregroundStyle(isHighlighted ? .white : text.tagColor)
+
+            if !isHighlighted {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 10)).foregroundStyle(.secondary)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(.trailing, 2)
     }
 }
 

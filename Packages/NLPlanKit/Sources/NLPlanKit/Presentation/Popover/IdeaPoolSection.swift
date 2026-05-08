@@ -75,22 +75,19 @@ struct IdeaPoolSection: View {
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                         if hasSearchTokens {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(Array(selectedSearchTags.enumerated()), id: \.element) { index, tag in
-                                        SearchTagToken(
-                                            text: tag,
-                                            isHighlighted: highlightedSelectedTagIndex == index
-                                        ) {
-                                            removeSearchTag(tag)
-                                        }
-                                    }
-
-                                    if let activeTagQuery {
-                                        DraftSearchTagToken(text: activeTagQuery)
+                            FlowLayout(spacing: 6) {
+                                ForEach(Array(selectedSearchTags.enumerated()), id: \.element) { index, tag in
+                                    SearchTagToken(
+                                        text: tag,
+                                        isHighlighted: highlightedSelectedTagIndex == index
+                                    ) {
+                                        removeSearchTag(tag)
                                     }
                                 }
-                                .padding(.vertical, 1)
+
+                                if let activeTagQuery {
+                                    DraftSearchTagToken(text: activeTagQuery)
+                                }
                             }
                         }
 
@@ -202,24 +199,21 @@ struct IdeaPoolSection: View {
                         }
 
                         if !candidateTags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(candidateTags, id: \.self) { tag in
-                                        Button {
-                                            addSearchTag(tag)
-                                        } label: {
-                                            TagChip(text: tag)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .overlay {
-                                            if isCandidateTagNavigationEnabled, highlightedCandidateTag == tag {
-                                                RoundedRectangle(cornerRadius: 999)
-                                                    .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
-                                            }
+                            FlowLayout(spacing: 6) {
+                                ForEach(candidateTags, id: \.self) { tag in
+                                    Button {
+                                        addSearchTag(tag)
+                                    } label: {
+                                        TagChip(text: tag)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .overlay {
+                                        if isCandidateTagNavigationEnabled, highlightedCandidateTag == tag {
+                                            RoundedRectangle(cornerRadius: 999)
+                                                .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
                                         }
                                     }
                                 }
-                                .padding(.vertical, 1)
                             }
                         }
                     }
