@@ -55,6 +55,7 @@ struct IdeaPoolPageView: View {
                             .padding(12)
                             .padding(.bottom, 40)
                     }
+                    .frame(minHeight: 452, alignment: .top)
                     .background(
                         Color(nsColor: .windowBackgroundColor)
                             .contentShape(Rectangle())
