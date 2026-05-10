@@ -708,7 +708,7 @@ struct MustDoTaskRow: View {
                 .help("标记完成")
 
             HoverIconButton(icon: "arrow.uturn.backward", iconSize: 11, action: onDemote)
-                .help("移回想法池")
+                .help(task.sourceType == DailyTaskSourceType.none.rawValue ? "删除" : "移回想法池")
 
             if let sourceIdea {
                 Menu {

@@ -178,13 +178,14 @@ struct PopoverView: View {
                 onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
             )
             .background(.ultraThinMaterial)
-        case .demote:
+        case .demote(let taskId):
+            let isDirect = mustDoViewModel.tasks.first(where: { $0.id == taskId })?.sourceType == DailyTaskSourceType.none.rawValue
             ConfirmActionPage(
                 icon: "arrow.uturn.backward",
                 iconTint: .orange,
                 title: mustDoViewModel.confirmTaskTitle ?? "",
-                message: "确认移回想法池？",
-                confirmLabel: "确认移回",
+                message: isDirect ? "确认删除该必做项？" : "确认移回想法池？",
+                confirmLabel: isDirect ? "确认删除" : "确认移回",
                 onCancel: { mustDoViewModel.cancelConfirm() },
                 onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
             )
