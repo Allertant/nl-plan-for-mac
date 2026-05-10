@@ -84,6 +84,7 @@ struct TaskRecommendationInput: Sendable {
     let elapsedMinutes: Int
     let arrangementId: UUID?
     let projectTitle: String?
+    let isPinned: Bool
 }
 
 /// 第一轮项目筛选输入（轻量）
@@ -94,6 +95,7 @@ struct ProjectSelectionInput: Sendable {
     let progress: Double?
     let recommendationSummary: String?
     let deadlineDisplay: String?
+    let isPinned: Bool
 }
 
 /// 第一轮筛选结果（单条）

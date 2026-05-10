@@ -423,6 +423,9 @@ enum PromptTemplates {
                 typeTag = "[普通想法]"
             }
             var base = "\(i + 1). [id: \(t.id.uuidString)] \(typeTag) 标题: \(t.title) | 时长: \(durationText) | 分类: \(t.category)"
+            if t.isPinned {
+                base += " | 已置顶"
+            }
             if t.attempted {
                 base += " | 已尝试"
             }
@@ -497,6 +500,7 @@ enum PromptTemplates {
         7. 如果空余时间不够或没有合适的任务，返回空列表并说明理由。如果某个项目很重要但时间不足，生成一个更小的项目切片。
         8. 有截止时间的任务应优先考虑，截止时间越紧迫优先级越高。但截止时间在未来且无需提前准备的任务，不必提前推荐。
         9. 会议、活动、约见等事件类想法：截止时间是今天才推荐；如果截止时间在未来且备注没有准备要求，不要提前推荐（当天再推荐即可）。
+        10. 已置顶的任务和来自已置顶项目的安排，推荐优先级提升约 25%。置顶代表用户明确标记为重点关注，在同等条件下应优先推荐。
 
         reason 应写清楚：
         - 为什么适合今天
@@ -828,6 +832,9 @@ enum PromptTemplates {
         let projectList = inputs.enumerated().map { i, p in
             let progressText = p.progress.map { "\(Int($0))%" } ?? "未知"
             var line = "\(i + 1). [idea_id: \(p.ideaId.uuidString)] 标题: \(p.title) | 分类: \(p.category) | 进度: \(progressText)"
+            if p.isPinned {
+                line += " | 已置顶"
+            }
             if let summaryText = p.recommendationSummary {
                 line += " | 状态摘要: \(summaryText)"
             }
@@ -864,6 +871,7 @@ enum PromptTemplates {
         3. 推荐状态摘要中提到的下一步方向是否适合今天执行
         4. 剩余空余时间是否足够推进该项目
         5. 如果没有合适的项目，返回空列表并说明理由
+        6. 已置顶的项目优先级提升约 25%。置顶代表用户明确标记为重点关注，在同等条件下应优先选择
 
         输出要求：只输出严格 JSON，不要输出 Markdown 代码块、解释文字或多余字段。
         {

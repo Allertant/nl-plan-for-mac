@@ -472,7 +472,8 @@ final class IdeaPoolViewModel {
                 projectNotes: [],
                 elapsedMinutes: 0,
                 arrangementId: nil,
-                projectTitle: nil
+                projectTitle: nil,
+                isPinned: idea.isPinned
             )
         }
 

@@ -377,7 +377,8 @@ final class MustDoViewModel {
                 projectNotes: [],
                 elapsedMinutes: 0,
                 arrangementId: nil,
-                projectTitle: nil
+                projectTitle: nil,
+                isPinned: idea.isPinned
             ))
         }
 
@@ -404,7 +405,8 @@ final class MustDoViewModel {
                     projectNotes: projectNotes,
                     elapsedMinutes: 0,
                     arrangementId: arrangement.id,
-                    projectTitle: project.title
+                    projectTitle: project.title,
+                    isPinned: project.isPinned
                 ))
             }
         }
@@ -478,7 +480,8 @@ final class MustDoViewModel {
                 category: project.category,
                 progress: project.projectProgress,
                 recommendationSummary: project.projectRecommendationSummary,
-                deadlineDisplay: nil
+                deadlineDisplay: nil,
+                isPinned: project.isPinned
             )
         }
 
@@ -529,7 +532,8 @@ final class MustDoViewModel {
                 projectNotes: projectNotes,
                 elapsedMinutes: 0,
                 arrangementId: nil,
-                projectTitle: nil
+                projectTitle: nil,
+                isPinned: project.isPinned
             ))
 
             // 安排（未完成的）
@@ -551,7 +555,8 @@ final class MustDoViewModel {
                     projectNotes: [],
                     elapsedMinutes: 0,
                     arrangementId: arr.id,
-                    projectTitle: nil
+                    projectTitle: nil,
+                    isPinned: false
                 ))
             }
 
@@ -574,7 +579,8 @@ final class MustDoViewModel {
                     projectNotes: [],
                     elapsedMinutes: 0,
                     arrangementId: nil,
-                    projectTitle: nil
+                    projectTitle: nil,
+                    isPinned: false
                 ))
             }
 
@@ -597,7 +603,8 @@ final class MustDoViewModel {
                     projectNotes: [],
                     elapsedMinutes: 0,
                     arrangementId: task.arrangementId,
-                    projectTitle: nil
+                    projectTitle: nil,
+                    isPinned: false
                 ))
             }
         }
@@ -683,7 +690,8 @@ final class MustDoViewModel {
                 projectNotes: [],
                 elapsedMinutes: elapsed,
                 arrangementId: nil,
-                projectTitle: nil
+                projectTitle: nil,
+                isPinned: false
             )
         }
     }
