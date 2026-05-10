@@ -9,6 +9,22 @@ struct MustDoSection: View {
     @State private var completedToggleHovered = false
     @State private var completedCollapseHovered = false
 
+    // 直接添加必做项输入状态
+    @State private var directText = ""
+    @State private var directMinutes: Int = 30
+    @State private var directCategory: String = ""
+    @State private var directPriority: TaskPriority = .medium
+    @State private var editingDirectMinutes = false
+    @State private var draftDirectMinutes = ""
+    @State private var showingDirectCategoryPicker = false
+    @FocusState private var directTextFocused: Bool
+    @FocusState private var directMinutesFocused: Bool
+
+    private var effectiveDirectCategory: String {
+        let tags = UserDefaults.standard.stringArray(forKey: AppConstants.tagsKey) ?? AppConstants.defaultTags
+        return directCategory.isEmpty ? (tags.first ?? "其他") : directCategory
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             mustDoListContent
@@ -31,6 +47,24 @@ struct MustDoSection: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
+
+            if !viewModel.showRecommendationPanel {
+                DirectTaskInputArea(
+                    viewModel: viewModel,
+                    text: $directText,
+                    minutes: $directMinutes,
+                    category: $directCategory,
+                    priority: $directPriority,
+                    editingMinutes: $editingDirectMinutes,
+                    draftMinutes: $draftDirectMinutes,
+                    showingCategoryPicker: $showingDirectCategoryPicker,
+                    effectiveCategory: effectiveDirectCategory,
+                    textFocused: $directTextFocused,
+                    minutesFocused: $directMinutesFocused
+                )
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+            }
 
             if viewModel.tasks.isEmpty {
                 Text("还没有必做项")
@@ -793,6 +827,143 @@ struct CompletedTaskRow: View {
         .padding(8)
         .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
         .cornerRadius(6)
+    }
+}
+
+// MARK: - 直接添加必做项输入区
+
+private struct DirectTaskInputArea: View {
+    @Bindable var viewModel: MustDoViewModel
+    @Binding var text: String
+    @Binding var minutes: Int
+    @Binding var category: String
+    @Binding var priority: TaskPriority
+    @Binding var editingMinutes: Bool
+    @Binding var draftMinutes: String
+    @Binding var showingCategoryPicker: Bool
+    var effectiveCategory: String
+    @FocusState.Binding var textFocused: Bool
+    @FocusState.Binding var minutesFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                TextField("按 Enter 添加必做项...", text: $text, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .focused($textFocused)
+                    .onSubmit {
+                        if NSEvent.modifierFlags.contains(.shift) {
+                            text += "\n"
+                            return
+                        }
+                        submitTask()
+                    }
+
+                Group {
+                    if editingMinutes {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                            TextField("30m", text: $draftMinutes)
+                                .textFieldStyle(.plain)
+                                .frame(width: 52)
+                                .focused($minutesFocused)
+                                .onSubmit { commitMinutesEdit() }
+                        }
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1))
+                        .cornerRadius(3)
+                    } else {
+                        Label(minutes.hourMinuteString, systemImage: "clock")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .onTapGesture {
+                                draftMinutes = minutes.hourMinuteString
+                                editingMinutes = true
+                                DispatchQueue.main.async { minutesFocused = true }
+                            }
+                    }
+                }
+                .frame(width: 72)
+            }
+
+            HStack(spacing: 8) {
+                Button { showingCategoryPicker.toggle() } label: {
+                    TagChip(text: effectiveCategory)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showingCategoryPicker, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                    CategoryPickerMenu(currentCategory: effectiveCategory) { tag in
+                        showingCategoryPicker = false
+                        category = tag
+                    }
+                }
+
+                Menu {
+                    ForEach(TaskPriority.allCases, id: \.self) { p in
+                        Button {
+                            priority = p
+                        } label: {
+                            Label(p.displayName, systemImage: p.iconName)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: priority.iconName)
+                            .font(.system(size: 9))
+                            .foregroundStyle(priorityColor)
+                        Text(priority.displayName)
+                            .font(.system(size: 9))
+                            .foregroundStyle(priorityColor)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+
+                Spacer()
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .textBackgroundColor).contentShape(Rectangle()).onTapGesture { minutesFocused = false })
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .onChange(of: minutesFocused) { _, focused in
+            if !focused && editingMinutes { commitMinutesEdit() }
+        }
+    }
+
+    private var priorityColor: Color {
+        switch priority.colorName {
+        case "red": return .red
+        case "orange": return .orange
+        case "blue": return .blue
+        default: return .secondary
+        }
+    }
+
+    private func commitMinutesEdit() {
+        editingMinutes = false
+        guard let parsed = draftMinutes.trimmingCharacters(in: .whitespacesAndNewlines).parsedHourMinuteDuration else { return }
+        minutes = max(parsed, 5)
+    }
+
+    private func submitTask() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Task {
+            await viewModel.addDirectTask(
+                title: trimmed,
+                category: effectiveCategory,
+                estimatedMinutes: minutes,
+                priority: priority
+            )
+        }
+        text = ""
+        minutes = 30
+        category = ""
+        priority = .medium
     }
 }
 

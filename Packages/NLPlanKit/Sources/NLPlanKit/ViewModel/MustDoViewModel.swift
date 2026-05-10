@@ -229,6 +229,24 @@ final class MustDoViewModel {
         }
     }
 
+    func addDirectTask(title: String, category: String, estimatedMinutes: Int, priority: TaskPriority) async {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            _ = try await taskManager.createMustDoTask(
+                title: trimmed,
+                category: category,
+                estimatedMinutes: estimatedMinutes,
+                priority: priority,
+                sortOrder: 0,
+                aiRecommended: false
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     var completedTasks: [DailyTaskEntity] {
         tasks.filter { $0.taskStatus == .done }
     }

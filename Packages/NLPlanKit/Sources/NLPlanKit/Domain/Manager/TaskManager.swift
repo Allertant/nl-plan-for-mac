@@ -193,7 +193,8 @@ final class TaskManager {
         sourceIdeaId: UUID? = nil,
         sourceProjectId: UUID? = nil,
         arrangementId: UUID? = nil,
-        recommendationReason: String? = nil
+        recommendationReason: String? = nil,
+        aiRecommended: Bool = true
     ) async throws -> DailyTaskEntity {
         let sourceType: DailyTaskSourceType
         if sourceProjectId != nil {
@@ -209,7 +210,7 @@ final class TaskManager {
             category: category,
             estimatedMinutes: estimatedMinutes,
             priority: priority,
-            aiRecommended: true,
+            aiRecommended: aiRecommended,
             recommendationReason: recommendationReason,
             sortOrder: sortOrder,
             date: .now,
