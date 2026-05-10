@@ -592,7 +592,7 @@ final class IdeaPoolViewModel {
                 estimatedMinutes: estimatedMinutes,
                 deadline: deadline
             )
-            arrangements.append(item)
+            arrangements.insert(item, at: 0)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
