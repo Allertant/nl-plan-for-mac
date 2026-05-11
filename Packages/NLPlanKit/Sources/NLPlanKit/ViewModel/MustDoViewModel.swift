@@ -20,6 +20,7 @@ final class MustDoViewModel {
     enum ConfirmAction: Equatable {
         case complete(UUID)
         case demote(UUID)
+        case postpone(UUID)
     }
 
     var pendingConfirm: ConfirmAction?
@@ -30,6 +31,7 @@ final class MustDoViewModel {
         switch pending {
         case .complete(let taskId): id = taskId
         case .demote(let taskId): id = taskId
+        case .postpone(let taskId): id = taskId
         }
         return tasks.first(where: { $0.id == id })?.title
     }
@@ -50,6 +52,8 @@ final class MustDoViewModel {
             await markComplete(taskId: taskId)
         case .demote(let taskId):
             await demoteToIdeaPool(taskId: taskId)
+        case .postpone(let taskId):
+            await postponeTask(taskId: taskId)
         }
     }
 
@@ -224,6 +228,15 @@ final class MustDoViewModel {
             try await taskManager.demoteToIdeaPool(taskId: taskId)
             await refresh()
             await onDemotedToIdeaPool?()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func postponeTask(taskId: UUID) async {
+        do {
+            try await taskManager.postponeTask(taskId: taskId)
+            await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }

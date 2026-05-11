@@ -85,6 +85,8 @@ struct MustDoSection: View {
                             onResume: { Task { await viewModel.resumeTask(taskId: task.id) } },
                             onComplete: { viewModel.requestConfirm(.complete(task.id)) },
                             onDemote: { viewModel.requestConfirm(.demote(task.id)) },
+                            onPostpone: task.sourceType == DailyTaskSourceType.none.rawValue
+                                ? { viewModel.requestConfirm(.postpone(task.id)) } : nil,
                             onUpdateNote: { note in
                                 Task { await viewModel.updateTaskNote(taskId: task.id, note: note) }
                             }
@@ -609,6 +611,7 @@ struct MustDoTaskRow: View {
     let onResume: () -> Void
     let onComplete: () -> Void
     let onDemote: () -> Void
+    var onPostpone: (() -> Void)? = nil
     var onUpdateNote: ((String) -> Void)? = nil
 
     @State private var isEditingNote = false
@@ -709,6 +712,11 @@ struct MustDoTaskRow: View {
 
             HoverIconButton(icon: "arrow.uturn.backward", iconSize: 11, action: onDemote)
                 .help(task.sourceType == DailyTaskSourceType.none.rawValue ? "删除" : "移回想法池")
+
+            if let onPostpone, task.sourceType == DailyTaskSourceType.none.rawValue {
+                HoverIconButton(icon: "calendar.badge.clock", iconSize: 11, color: .secondary, action: onPostpone)
+                    .help("推迟到明天")
+            }
 
             if let sourceIdea {
                 Menu {

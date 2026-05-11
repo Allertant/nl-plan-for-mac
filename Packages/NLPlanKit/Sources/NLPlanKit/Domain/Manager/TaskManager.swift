@@ -633,6 +633,22 @@ final class TaskManager {
         try dailyTaskRepo.fetchTasks(sourceIdeaId: sourceIdeaId)
     }
 
+    /// 推迟必做项到明天
+    func postponeTask(taskId: UUID) async throws {
+        guard let task = try dailyTaskRepo.fetchById(taskId) else {
+            throw NLPlanError.dataNotFound(entity: "DailyTask", id: taskId)
+        }
+        if task.taskStatus == .running {
+            try commitRunningTime(task)
+        }
+        task.date = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now)) ?? .now
+        task.taskStatus = .pending
+        task.timerAccumulatedSeconds = 0
+        task.timerLastStartedAt = nil
+        task.sortOrder = 0
+        try dailyTaskRepo.update(task)
+    }
+
     /// 获取绑定到指定来源的已归档任务
     func fetchSettledTasks(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: sourceIdeaId)

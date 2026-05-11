@@ -190,6 +190,17 @@ struct PopoverView: View {
                 onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
             )
             .background(.ultraThinMaterial)
+        case .postpone:
+            ConfirmActionPage(
+                icon: "calendar.badge.clock",
+                iconTint: .orange,
+                title: mustDoViewModel.confirmTaskTitle ?? "",
+                message: "确认推迟到明天？",
+                confirmLabel: "确认推迟",
+                onCancel: { mustDoViewModel.cancelConfirm() },
+                onConfirm: { Task { await mustDoViewModel.executeConfirm() } }
+            )
+            .background(.ultraThinMaterial)
         }
     }
 }
