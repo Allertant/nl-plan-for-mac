@@ -7,6 +7,7 @@ struct ArchivedProjectsPageView: View {
     let onBack: () -> Void
 
     @State private var selectedSegment = 0
+    @State private var pendingRestoreProject: ProjectEntity?
 
     private var currentProjects: [ProjectEntity] {
         selectedSegment == 0 ? viewModel.archivedProjects : viewModel.completedProjects
@@ -22,6 +23,29 @@ struct ArchivedProjectsPageView: View {
         }
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay {
+            if let project = pendingRestoreProject {
+                ConfirmActionPage(
+                    icon: "arrow.uturn.backward.circle",
+                    iconTint: .indigo,
+                    title: project.title,
+                    message: "确认恢复该项目为进行中？",
+                    confirmLabel: "确认恢复",
+                    onCancel: { pendingRestoreProject = nil },
+                    onConfirm: {
+                        Task {
+                            await viewModel.updateProjectStatus(
+                                projectId: project.id,
+                                status: .active
+                            )
+                            await viewModel.fetchArchivedProjects()
+                            pendingRestoreProject = nil
+                        }
+                    }
+                )
+                .background(.ultraThinMaterial)
+            }
+        }
     }
 
     // MARK: - Header
@@ -97,15 +121,7 @@ struct ArchivedProjectsPageView: View {
                     ForEach(currentProjects, id: \.id) { project in
                         ArchivedProjectCard(
                             project: project,
-                            onRestore: {
-                                Task {
-                                    await viewModel.updateProjectStatus(
-                                        projectId: project.id,
-                                        status: .active
-                                    )
-                                    await viewModel.fetchArchivedProjects()
-                                }
-                            },
+                            onRestore: { pendingRestoreProject = project },
                             onOpenDetail: {
                                 appState.returnPage = .archivedProjects
                                 appState.currentPage = .projectDetail(project.id)
