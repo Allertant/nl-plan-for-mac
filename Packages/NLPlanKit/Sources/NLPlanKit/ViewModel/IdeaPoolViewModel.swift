@@ -66,6 +66,8 @@ final class IdeaPoolViewModel {
 
     var ideas: [IdeaEntity] = []
     var projects: [ProjectEntity] = []
+    var archivedProjects: [ProjectEntity] = []
+    var completedProjects: [ProjectEntity] = []
     var isExpanded: Bool = false
 
     /// (pending + attempted) 安排数（主页 badge 用）
@@ -227,6 +229,37 @@ final class IdeaPoolViewModel {
                     self?.newlyAddedIdeaIds.removeAll()
                 }
             }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func fetchArchivedProjects() async {
+        do {
+            archivedProjects = try await taskManager.fetchProjectsByStatus(.archived)
+            completedProjects = try await taskManager.fetchProjectsByStatus(.completed)
+        } catch {
+            archivedProjects = []
+            completedProjects = []
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateProjectStatus(projectId: UUID, status: ProjectStatus) async {
+        do {
+            try await taskManager.updateProjectStatus(projectId: projectId, status: status)
+            switch status {
+            case .active:
+                archivedProjects.removeAll { $0.id == projectId }
+                completedProjects.removeAll { $0.id == projectId }
+            case .archived:
+                projects.removeAll { $0.id == projectId }
+                completedProjects.removeAll { $0.id == projectId }
+            case .completed:
+                projects.removeAll { $0.id == projectId }
+                archivedProjects.removeAll { $0.id == projectId }
+            }
+            await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }

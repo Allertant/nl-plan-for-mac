@@ -16,7 +16,7 @@ final class ProjectRepository {
         category: String,
         priority: TaskPriority = .medium,
         sortOrder: Int = 0,
-        status: ProjectStatus = .pending,
+        status: ProjectStatus = .active,
         projectDecisionSource: String? = nil,
         projectProgress: Double? = nil,
         projectProgressSummary: String? = nil,
@@ -68,10 +68,10 @@ final class ProjectRepository {
     }
 
     func fetchVisibleProjects() throws -> [ProjectEntity] {
-        let archived = ProjectStatus.archived.rawValue
+        let active = ProjectStatus.active.rawValue
         let descriptor = FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { project in
-                project.status != archived
+                project.status == active
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )
@@ -79,10 +79,21 @@ final class ProjectRepository {
     }
 
     func fetchRecommendationCandidates() throws -> [ProjectEntity] {
-        let archived = ProjectStatus.archived.rawValue
+        let active = ProjectStatus.active.rawValue
         let descriptor = FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { project in
-                project.status != archived
+                project.status == active
+            },
+            sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchByStatus(_ status: ProjectStatus) throws -> [ProjectEntity] {
+        let raw = status.rawValue
+        let descriptor = FetchDescriptor<ProjectEntity>(
+            predicate: #Predicate { project in
+                project.status == raw
             },
             sortBy: [SortDescriptor(\.createdDate, order: .reverse)]
         )

@@ -90,10 +90,11 @@ final class AppState {
         case cleanupDetail
         case projectDetail(UUID)
         case historyDetail(Date)
+        case archivedProjects
 
         static func == (lhs: Page, rhs: Page) -> Bool {
             switch (lhs, rhs) {
-            case (.main, .main), (.ideaPool, .ideaPool), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail):
+            case (.main, .main), (.ideaPool, .ideaPool), (.summary, .summary), (.history, .history), (.settings, .settings), (.cleanupDetail, .cleanupDetail), (.archivedProjects, .archivedProjects):
                 return true
             case (.queueDetail(let a), .queueDetail(let b)):
                 return a == b
@@ -304,27 +305,26 @@ final class AppState {
         dailyTaskRepo: DailyTaskRepository
     ) async {
         let migrationKey = "nlplan.projectsMigrated"
-        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
 
-        do {
-            // 迁移 DailyTaskEntity: 对 sourceProjectId 为 nil 但 sourceIdeaId 指向 ProjectEntity 的必做项，
-            // 将 sourceIdeaId 转移到 sourceProjectId
-            let allProjects = try projectRepo.fetchVisibleProjects()
-            let projectIds = Set(allProjects.map(\.id))
+        if !UserDefaults.standard.bool(forKey: migrationKey) {
+            do {
+                let allProjects = try projectRepo.fetchVisibleProjects()
+                let projectIds = Set(allProjects.map(\.id))
 
-            for projectId in projectIds {
-                let tasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: projectId)
-                for task in tasks where task.sourceProjectId == nil {
-                    task.sourceProjectId = projectId
-                    task.sourceIdeaId = nil
-                    task.sourceType = DailyTaskSourceType.project.rawValue
+                for projectId in projectIds {
+                    let tasks = try dailyTaskRepo.fetchTasks(sourceIdeaId: projectId)
+                    for task in tasks where task.sourceProjectId == nil {
+                        task.sourceProjectId = projectId
+                        task.sourceIdeaId = nil
+                        task.sourceType = DailyTaskSourceType.project.rawValue
+                    }
                 }
-            }
 
-            try context.save()
-            UserDefaults.standard.set(true, forKey: migrationKey)
-        } catch {
-            print("数据迁移失败：\(error)")
+                try context.save()
+                UserDefaults.standard.set(true, forKey: migrationKey)
+            } catch {
+                print("数据迁移失败：\(error)")
+            }
         }
     }
 }

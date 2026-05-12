@@ -14,13 +14,23 @@ struct MainContentView: View {
             case .main:
                 PopoverContainerView()
 
-            case .ideaPool, .projectDetail:
+            case .ideaPool:
                 IdeaPoolContainerView()
-                    .overlay {
-                        if case .projectDetail = appState.currentPage {
-                            ProjectDetailContainerView()
-                        }
+
+            case .projectDetail:
+                Group {
+                    if appState.returnPage == .archivedProjects {
+                        ArchivedProjectsContainerView()
+                    } else {
+                        IdeaPoolContainerView()
                     }
+                }
+                .overlay {
+                    ProjectDetailContainerView()
+                }
+
+            case .archivedProjects:
+                ArchivedProjectsContainerView()
 
             case .summary:
                 SummaryContainerView()
@@ -174,6 +184,26 @@ struct IdeaPoolContainerView: View {
                     appState.currentPage = .main
                 }
                 .task { await ideaPoolVM.refresh() }
+            } else {
+                ProgressView("加载中...")
+                    .frame(width: 360, height: 520)
+            }
+        }
+    }
+}
+
+// MARK: - Archived Projects Container
+
+struct ArchivedProjectsContainerView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        Group {
+            if let ideaPoolVM = appState.ideaPoolViewModel {
+                ArchivedProjectsPageView(viewModel: ideaPoolVM) {
+                    appState.currentPage = .ideaPool
+                }
+                .task { await ideaPoolVM.fetchArchivedProjects() }
             } else {
                 ProgressView("加载中...")
                     .frame(width: 360, height: 520)

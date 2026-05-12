@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 想法池独立页面
 struct IdeaPoolPageView: View {
+    @Environment(AppState.self) private var appState
     @Bindable var viewModel: IdeaPoolViewModel
 
     /// 想法池页面 badge：(pending + inProgress + attempted) 想法 + (pending + inProgress + attempted) 安排 + 可见项目
@@ -37,6 +38,16 @@ struct IdeaPoolPageView: View {
                             .clipShape(Capsule())
 
                     Spacer()
+
+                    Button {
+                        appState.currentPage = .archivedProjects
+                    } label: {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("项目归档")
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)

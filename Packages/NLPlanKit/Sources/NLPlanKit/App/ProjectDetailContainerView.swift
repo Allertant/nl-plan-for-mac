@@ -86,6 +86,9 @@ private struct ProjectDetailPageView: View {
                 Image(systemName: "folder.fill").font(.system(size: 12)).foregroundStyle(.indigo)
                 Text("项目详情").font(.system(size: 13, weight: .semibold))
                 Spacer()
+                if let project = projectDetail {
+                    statusButtons(for: project)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -147,6 +150,59 @@ private struct ProjectDetailPageView: View {
         .onChange(of: newArrangementMinutesFocused) { _, focused in
             if !focused && editingNewArrangementMinutes { commitNewArrangementMinutes() }
         }
+    }
+
+    @ViewBuilder
+    private func statusButtons(for project: ProjectDetailSnapshot) -> some View {
+        switch project.status {
+        case .active:
+            Button {
+                Task { await updateStatus(.archived) }
+            } label: {
+                Image(systemName: "archivebox")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("归档")
+
+            Button {
+                Task { await updateStatus(.completed) }
+            } label: {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("标记完成")
+
+        case .archived:
+            Button {
+                Task { await updateStatus(.active) }
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+            .help("恢复活跃")
+
+        case .completed:
+            Button {
+                Task { await updateStatus(.active) }
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+            .help("重新打开")
+        }
+    }
+
+    private func updateStatus(_ status: ProjectStatus) async {
+        await viewModel.updateProjectStatus(projectId: projectId, status: status)
+        await reloadDetail()
     }
 
     private func dismissAllEditing() {
@@ -826,6 +882,7 @@ struct ProjectDetailSnapshot {
     var title: String
     let category: String
     let createdDate: Date
+    let status: ProjectStatus
     let projectProgress: Double?
     let projectProgressSummary: String?
     let projectProgressUpdatedAt: Date?
@@ -839,6 +896,7 @@ struct ProjectDetailSnapshot {
         title = project.title
         category = project.category
         createdDate = project.createdDate
+        status = project.projectStatus
         projectProgress = project.projectProgress
         projectProgressSummary = project.projectProgressSummary
         projectProgressUpdatedAt = project.projectProgressUpdatedAt

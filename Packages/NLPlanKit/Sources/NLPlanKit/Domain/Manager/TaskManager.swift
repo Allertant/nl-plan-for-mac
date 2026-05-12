@@ -649,6 +649,20 @@ final class TaskManager {
         try dailyTaskRepo.update(task)
     }
 
+    // MARK: - 项目状态
+
+    func updateProjectStatus(projectId: UUID, status: ProjectStatus) async throws {
+        guard let project = try projectRepo.fetchById(projectId) else {
+            throw NLPlanError.dataNotFound(entity: "Project", id: projectId)
+        }
+        project.projectStatus = status
+        try projectRepo.update(project)
+    }
+
+    func fetchProjectsByStatus(_ status: ProjectStatus) async throws -> [ProjectEntity] {
+        try projectRepo.fetchByStatus(status)
+    }
+
     /// 获取绑定到指定来源的已归档任务
     func fetchSettledTasks(sourceIdeaId: UUID) async throws -> [DailyTaskEntity] {
         try dailyTaskRepo.fetchSettledTasks(sourceIdeaId: sourceIdeaId)

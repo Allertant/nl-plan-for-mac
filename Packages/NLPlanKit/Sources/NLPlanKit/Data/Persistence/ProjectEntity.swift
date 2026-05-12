@@ -30,7 +30,7 @@ final class ProjectEntity {
 
     @Transient
     var projectStatus: ProjectStatus {
-        get { ProjectStatus(rawValue: status) ?? .pending }
+        get { ProjectStatus(rawValue: status) ?? .active }
         set { status = newValue.rawValue }
     }
 
@@ -78,7 +78,7 @@ final class ProjectEntity {
         category: String,
         priority: String = TaskPriority.medium.rawValue,
         sortOrder: Int = 0,
-        status: String = ProjectStatus.pending.rawValue,
+        status: String = ProjectStatus.active.rawValue,
         createdDate: Date = .now,
         updatedAt: Date = .now,
         isPinned: Bool = false,
@@ -124,15 +124,15 @@ final class ProjectEntity {
 }
 
 enum ProjectStatus: String, CaseIterable {
-    case pending
     case active
     case archived
+    case completed
 
     var displayName: String {
         switch self {
-        case .pending: return "待推进"
         case .active: return "进行中"
         case .archived: return "已归档"
+        case .completed: return "已完成"
         }
     }
 }
