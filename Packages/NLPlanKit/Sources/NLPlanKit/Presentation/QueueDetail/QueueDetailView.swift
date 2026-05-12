@@ -192,29 +192,21 @@ struct QueueDetailView: View {
 
                     // 操作按钮
                     HStack {
-                        Button {
+                        HoverTextButton("取消") {
                             viewModel.cancelQueueItem(id: queueItem.id)
                             appState.currentPage = .main
-                        } label: {
-                            Text("取消")
-                                .font(.system(size: 11))
                         }
-                        .buttonStyle(.borderless)
                         .disabled(isLocked)
 
                         Spacer()
 
                         if !cachedTasks.isEmpty {
-                            Button {
+                            HoverTextButton("全部确认添加", color: .primary, isEmphasized: true) {
                                 Task {
                                     await viewModel.confirmQueueItem(id: queueItem.id)
                                     appState.currentPage = .main
                                 }
-                            } label: {
-                                Text("全部确认添加")
-                                    .font(.system(size: 11, weight: .medium))
                             }
-                            .buttonStyle(.borderless)
                             .disabled(isLocked)
                         }
                     }
