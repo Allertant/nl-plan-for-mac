@@ -277,25 +277,13 @@ struct HistoryDetailView: View {
     let onClose: () -> Void
     let onViewDetail: () -> Void
 
-    @State private var detailButtonHovered = false
-
     var body: some View {
         VStack(spacing: 16) {
             HStack {
                 Text(summary.date.dateString)
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
-                Button("查看详情") { onViewDetail() }
-                    .font(.system(size: 11))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(detailButtonHovered ? Color.primary.opacity(0.08) : .clear)
-                    )
-                    .onHover { detailButtonHovered = $0 }
+                HoverTextButton("查看详情", action: onViewDetail)
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle")
                         .font(.system(size: 14))
