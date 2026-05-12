@@ -39,14 +39,12 @@ struct IdeaPoolPageView: View {
 
                     Spacer()
 
-                    Button {
-                        appState.currentPage = .archivedProjects
-                    } label: {
-                        Image(systemName: "archivebox")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+                    HoverIconButton(
+                        icon: "archivebox",
+                        iconSize: 13,
+                        color: .secondary,
+                        action: { appState.currentPage = .archivedProjects }
+                    )
                     .help("项目归档")
                 }
                 .padding(.horizontal, 16)
