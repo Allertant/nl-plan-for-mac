@@ -79,6 +79,9 @@ private struct ProjectDetailPageView: View {
     @State private var arrangementToggleHovered = false
     @State private var arrangementCollapseHovered = false
 
+    // 状态变更二次确认
+    @State private var pendingStatusChange: ProjectStatus?
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -127,7 +130,18 @@ private struct ProjectDetailPageView: View {
         .frame(width: 360, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay {
-            if viewModel.pendingArrangementId != nil {
+            if let status = pendingStatusChange {
+                ConfirmActionPage(
+                    icon: confirmConfig(for: status).icon,
+                    iconTint: confirmConfig(for: status).tint,
+                    title: projectDetail?.title ?? "",
+                    message: confirmConfig(for: status).message,
+                    confirmLabel: confirmConfig(for: status).label,
+                    onCancel: { pendingStatusChange = nil },
+                    onConfirm: { Task { await executeStatusChange(status) } }
+                )
+                .background(.ultraThinMaterial)
+            } else if viewModel.pendingArrangementId != nil {
                 arrangementConfirmOverlay
             } else if pendingDeleteNoteId != nil {
                 noteDeleteConfirmOverlay
@@ -156,53 +170,79 @@ private struct ProjectDetailPageView: View {
     private func statusButtons(for project: ProjectDetailSnapshot) -> some View {
         switch project.status {
         case .active:
-            Button {
-                Task { await updateStatus(.archived) }
-            } label: {
-                Image(systemName: "archivebox")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+            HoverIconButton(
+                icon: "archivebox",
+                iconSize: 11,
+                color: .secondary,
+                action: { pendingStatusChange = .archived }
+            )
             .help("归档")
 
-            Button {
-                Task { await updateStatus(.completed) }
-            } label: {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+            HoverIconButton(
+                icon: "checkmark.circle",
+                iconSize: 11,
+                color: .secondary,
+                action: { pendingStatusChange = .completed }
+            )
             .help("标记完成")
 
         case .archived:
-            Button {
-                Task { await updateStatus(.active) }
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
-            }
-            .buttonStyle(.plain)
+            HoverIconButton(
+                icon: "arrow.uturn.backward",
+                iconSize: 11,
+                color: .orange,
+                action: { pendingStatusChange = .active }
+            )
             .help("恢复活跃")
 
         case .completed:
-            Button {
-                Task { await updateStatus(.active) }
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
-            }
-            .buttonStyle(.plain)
+            HoverIconButton(
+                icon: "arrow.uturn.backward",
+                iconSize: 11,
+                color: .orange,
+                action: { pendingStatusChange = .active }
+            )
             .help("重新打开")
         }
     }
 
-    private func updateStatus(_ status: ProjectStatus) async {
+    private func executeStatusChange(_ status: ProjectStatus) async {
+        pendingStatusChange = nil
         await viewModel.updateProjectStatus(projectId: projectId, status: status)
         await reloadDetail()
+    }
+
+    private struct StatusConfirmConfig {
+        let icon: String
+        let tint: Color
+        let message: String
+        let label: String
+    }
+
+    private func confirmConfig(for status: ProjectStatus) -> StatusConfirmConfig {
+        switch status {
+        case .archived:
+            return StatusConfirmConfig(
+                icon: "archivebox",
+                tint: .secondary,
+                message: "确认归档该项目？将移出想法池主视图。",
+                label: "确认归档"
+            )
+        case .completed:
+            return StatusConfirmConfig(
+                icon: "checkmark.circle",
+                tint: .green,
+                message: "确认标记该项目为已完成？",
+                label: "确认完成"
+            )
+        case .active:
+            return StatusConfirmConfig(
+                icon: "arrow.uturn.backward",
+                tint: .blue,
+                message: "确认恢复该项目为进行中？",
+                label: "确认恢复"
+            )
+        }
     }
 
     private func dismissAllEditing() {
