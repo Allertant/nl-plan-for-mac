@@ -27,13 +27,13 @@ struct HoverTextButton: View {
                 .foregroundStyle(color)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
-        )
         .onHover { hovering in
             isHovered = hovering
         }

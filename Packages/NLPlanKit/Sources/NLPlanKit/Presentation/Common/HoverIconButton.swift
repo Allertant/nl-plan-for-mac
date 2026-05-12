@@ -32,13 +32,13 @@ struct HoverIconButton: View {
                 .font(.system(size: iconSize))
                 .foregroundStyle(color)
                 .padding(padding)
-                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
         .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
-        )
         .onHover { hovering in
             isHovered = hovering
         }

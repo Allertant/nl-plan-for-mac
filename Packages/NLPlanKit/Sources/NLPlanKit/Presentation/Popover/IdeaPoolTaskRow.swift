@@ -333,8 +333,6 @@ struct ProjectPoolRow: View {
     @State private var editingDeadline = false
     @State private var draftTitle: String = ""
     @State private var draftDeadline: String = ""
-    @State private var projectRefreshHovered = false
-    @State private var detailButtonHovered = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable { case title, deadline }
@@ -414,22 +412,10 @@ struct ProjectPoolRow: View {
             HStack(spacing: 6) {
                 ProgressView(value: (project.projectProgress ?? 0) / 100).progressViewStyle(.linear).tint(.indigo)
                 Text("\(Int(project.projectProgress ?? 0))%").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                Button(action: onRefresh) { RefreshingIcon(systemName: "arrow.clockwise", isAnimating: isRefreshing).font(.system(size: 10)).foregroundStyle(.indigo).padding(4).contentShape(Rectangle()) }
-                    .buttonStyle(.plain)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(projectRefreshHovered ? Color.primary.opacity(0.08) : .clear))
-                    .onHover { projectRefreshHovered = $0 }
+                HoverIconButton(icon: "arrow.clockwise", iconSize: 10, color: .indigo, action: onRefresh)
                     .disabled(isRefreshing).help("刷新项目进度")
                 Spacer(minLength: 8)
-                Button("详情") { onOpenDetail() }
-                    .font(.system(size: 10)).foregroundStyle(.blue)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .contentShape(Rectangle())
-                    .buttonStyle(.plain)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(detailButtonHovered ? Color.primary.opacity(0.08) : .clear)
-                    )
-                    .onHover { detailButtonHovered = $0 }
+                HoverTextButton("详情", color: .blue, action: onOpenDetail)
             }
             if let summary = project.projectProgressSummary, !summary.isEmpty {
                 Text(summary).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)

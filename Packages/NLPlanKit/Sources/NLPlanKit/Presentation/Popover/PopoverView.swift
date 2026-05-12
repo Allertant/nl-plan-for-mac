@@ -372,13 +372,13 @@ private struct ToolbarIconButton<Label: View>: View {
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
                 .padding(8)
-                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
-        )
         .onHover { hovering in
             isHovered = hovering
         }

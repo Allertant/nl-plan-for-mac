@@ -410,15 +410,14 @@ private struct NavIconButton: View {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
                 .frame(width: 30, height: 30)
+                .foregroundStyle(.secondary)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isHovered ? Color.primary.opacity(0.08) : Color(nsColor: .controlBackgroundColor).opacity(0.65))
+                )
                 .contentShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .background(
-            RoundedRectangle(cornerRadius: 7)
-                .fill(isHovered ? Color.primary.opacity(0.08) : Color(nsColor: .controlBackgroundColor).opacity(0.65))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 7))
         .onHover { isHovered = $0 }
     }
 }
