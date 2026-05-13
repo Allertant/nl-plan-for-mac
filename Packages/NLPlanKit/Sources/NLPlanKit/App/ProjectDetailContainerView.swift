@@ -822,7 +822,6 @@ private struct ProjectDetailPageView: View {
                 Task {
                     await viewModel.promoteArrangementToMustDo(arrangementId: item.id, priority: priority)
                     await refreshAllTasks()
-                    requestScrollRestore(.arrangements)
                 }
             },
             onUpdate: { content, minutes, deadline in
