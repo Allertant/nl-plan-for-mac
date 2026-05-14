@@ -8,47 +8,75 @@ struct MainContentView: View {
     @State private var didInitialize = false
     @State private var midnightTimer: Timer?
 
+    private var showsIdeaPoolStack: Bool {
+        switch appState.currentPage {
+        case .ideaPool:
+            return true
+        case .projectDetail:
+            return appState.returnPage != .archivedProjects
+        default:
+            return false
+        }
+    }
+
+    private var showsArchivedProjectsStack: Bool {
+        switch appState.currentPage {
+        case .archivedProjects:
+            return true
+        case .projectDetail:
+            return appState.returnPage == .archivedProjects
+        default:
+            return false
+        }
+    }
+
+    private var isShowingProjectDetail: Bool {
+        if case .projectDetail = appState.currentPage { return true }
+        return false
+    }
+
     var body: some View {
         Group {
-            switch appState.currentPage {
-            case .main:
-                PopoverContainerView()
-
-            case .ideaPool:
+            if showsIdeaPoolStack {
                 IdeaPoolContainerView()
-
-            case .projectDetail:
-                Group {
-                    if appState.returnPage == .archivedProjects {
-                        ArchivedProjectsContainerView()
-                    } else {
-                        IdeaPoolContainerView()
+                    .overlay {
+                        if isShowingProjectDetail {
+                            ProjectDetailContainerView()
+                        }
                     }
-                }
-                .overlay {
-                    ProjectDetailContainerView()
-                }
-
-            case .archivedProjects:
+            } else if showsArchivedProjectsStack {
                 ArchivedProjectsContainerView()
+                    .overlay {
+                        if isShowingProjectDetail {
+                            ProjectDetailContainerView()
+                        }
+                    }
+            } else {
+                switch appState.currentPage {
+                case .main:
+                    PopoverContainerView()
 
-            case .summary:
-                SummaryContainerView()
+                case .summary:
+                    SummaryContainerView()
 
-            case .history:
-                HistoryContainerView()
+                case .history:
+                    HistoryContainerView()
 
-            case .settings:
-                SettingsContainerView()
+                case .settings:
+                    SettingsContainerView()
 
-            case .queueDetail:
-                QueueDetailContainerView()
+                case .queueDetail:
+                    QueueDetailContainerView()
 
-            case .cleanupDetail:
-                CleanupDetailContainerView()
+                case .cleanupDetail:
+                    CleanupDetailContainerView()
 
-            case .historyDetail:
-                HistoryDetailContainerView()
+                case .historyDetail:
+                    HistoryDetailContainerView()
+
+                case .ideaPool, .projectDetail, .archivedProjects:
+                    EmptyView()
+                }
             }
         }
         .task {
