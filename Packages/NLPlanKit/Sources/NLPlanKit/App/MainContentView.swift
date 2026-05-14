@@ -13,7 +13,7 @@ struct MainContentView: View {
         case .ideaPool:
             return true
         case .projectDetail:
-            return appState.returnPage != .archivedProjects
+            return appState.returnPage == nil || appState.returnPage == .ideaPool
         default:
             return false
         }
@@ -25,6 +25,18 @@ struct MainContentView: View {
             return true
         case .projectDetail:
             return appState.returnPage == .archivedProjects
+        default:
+            return false
+        }
+    }
+
+    private var showsHistoryDetailStack: Bool {
+        switch appState.currentPage {
+        case .historyDetail:
+            return true
+        case .projectDetail:
+            if case .historyDetail = appState.returnPage { return true }
+            return false
         default:
             return false
         }
@@ -51,6 +63,13 @@ struct MainContentView: View {
                             ProjectDetailContainerView()
                         }
                     }
+            } else if showsHistoryDetailStack {
+                HistoryDetailContainerView()
+                    .overlay {
+                        if isShowingProjectDetail {
+                            ProjectDetailContainerView()
+                        }
+                    }
             } else {
                 switch appState.currentPage {
                 case .main:
@@ -71,10 +90,7 @@ struct MainContentView: View {
                 case .cleanupDetail:
                     CleanupDetailContainerView()
 
-                case .historyDetail:
-                    HistoryDetailContainerView()
-
-                case .ideaPool, .projectDetail, .archivedProjects:
+                case .ideaPool, .projectDetail, .historyDetail, .archivedProjects:
                     EmptyView()
                 }
             }

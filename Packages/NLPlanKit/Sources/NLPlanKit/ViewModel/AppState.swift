@@ -72,6 +72,9 @@ final class AppState {
     var ideaPoolViewModel: IdeaPoolViewModel?
     var mustDoViewModel: MustDoViewModel?
     var summaryViewModel: SummaryViewModel?
+    var historyDetailState: HistoryDetailState?
+    var historyDetailScrollOffsetY: CGFloat = 0
+    var historyDetailNeedsOffsetRestore: Bool = false
 
     // MARK: - API Key
 
@@ -189,6 +192,15 @@ final class AppState {
         settlementDate = Calendar.current.startOfDay(for: date)
         summaryViewModel = nil
         currentPage = .summary
+    }
+
+    @MainActor
+    func openHistoryDetail(for date: Date) {
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        historyDetailState = HistoryDetailState(date: normalizedDate)
+        historyDetailScrollOffsetY = 0
+        historyDetailNeedsOffsetRestore = false
+        currentPage = .historyDetail(normalizedDate)
     }
 
     private func loadAppearanceMode() {

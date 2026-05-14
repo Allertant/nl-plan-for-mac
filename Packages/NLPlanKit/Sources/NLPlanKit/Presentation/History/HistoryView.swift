@@ -67,7 +67,7 @@ struct HistoryView: View {
                 } onViewDetail: {
                     let date = summary.date
                     viewModel.selectedSummary = nil
-                    appState.currentPage = .historyDetail(date)
+                    appState.openHistoryDetail(for: date)
                 }
                 .zIndex(1)
             }

@@ -12,8 +12,8 @@ struct ProjectDetailContainerView: View {
                     projectId: projectId,
                     onDismiss: {
                         let returnTo = appState.returnPage ?? .ideaPool
-                        appState.returnPage = nil
                         appState.currentPage = returnTo
+                        appState.returnPage = nil
                     }
                 )
             }

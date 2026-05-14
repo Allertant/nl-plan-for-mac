@@ -4,30 +4,53 @@ import SwiftData
 struct HistoryDetailContainerView: View {
     @Environment(AppState.self) private var appState
 
+    private var activeDate: Date? {
+        if let date = appState.currentPage.historyDetailDate {
+            return date
+        }
+        if case .projectDetail = appState.currentPage {
+            return appState.returnPage?.historyDetailDate
+        }
+        return nil
+    }
+
     var body: some View {
         Group {
-            if let date = appState.currentPage.historyDetailDate {
-                HistoryDetailPageView(date: date, onDismiss: {
+            if let date = activeDate,
+               let detailState = resolvedState(for: date) {
+                HistoryDetailPageView(detailState: detailState) {
                     appState.currentPage = .history
-                })
+                }
             } else {
                 ProgressView("加载中...")
                     .frame(width: 360, height: 520)
             }
         }
+        .task(id: activeDate) {
+            guard let date = activeDate else { return }
+            await prepareState(for: date)
+        }
+    }
+
+    private func resolvedState(for date: Date) -> HistoryDetailState? {
+        guard let state = appState.historyDetailState else { return nil }
+        return Calendar.current.isDate(state.date, inSameDayAs: date) ? state : nil
+    }
+
+    private func prepareState(for date: Date) async {
+        if appState.historyDetailState == nil
+            || !(appState.historyDetailState.map { Calendar.current.isDate($0.date, inSameDayAs: date) } ?? false) {
+            appState.historyDetailState = HistoryDetailState(date: date)
+        }
+        await appState.historyDetailState?.loadIfNeeded(appState: appState)
     }
 }
 
 private struct HistoryDetailPageView: View {
     @Environment(AppState.self) private var appState
-    let date: Date
+    @Bindable var detailState: HistoryDetailState
     let onDismiss: () -> Void
 
-    @State private var summary: DailySummaryEntity?
-    @State private var tasks: [DailyTaskEntity] = []
-    @State private var sourceIdeas: [UUID: IdeaEntity] = [:]
-    @State private var sourceProjects: [UUID: ProjectEntity] = [:]
-    @State private var isLoading = true
     @State private var showingIdeaPopover: IdeaEntity?
 
     var body: some View {
@@ -44,13 +67,13 @@ private struct HistoryDetailPageView: View {
 
                 Divider()
 
-                if isLoading {
+                if detailState.isLoading {
                     ProgressView("加载中...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            if let summary {
+                            if let summary = detailState.summary {
                                 gradeCard(summary)
                                 evaluationCard(summary)
                             }
@@ -59,12 +82,23 @@ private struct HistoryDetailPageView: View {
                         .padding(12)
                     }
                     .scrollIndicators(.never)
+                    .background(
+                        ScrollViewOffsetTracker(
+                            offsetY: Binding(
+                                get: { appState.historyDetailScrollOffsetY },
+                                set: { appState.historyDetailScrollOffsetY = $0 }
+                            ),
+                            shouldRestore: Binding(
+                                get: { appState.historyDetailNeedsOffsetRestore },
+                                set: { appState.historyDetailNeedsOffsetRestore = $0 }
+                            )
+                        )
+                    )
                 }
             }
             .frame(width: 360, height: 520)
             .background(Color(nsColor: .windowBackgroundColor))
 
-            // 想法弹窗覆盖层
             if let idea = showingIdeaPopover {
                 Color.black.opacity(0.18)
                     .ignoresSafeArea()
@@ -74,63 +108,7 @@ private struct HistoryDetailPageView: View {
                     .zIndex(1)
             }
         }
-        .task { await loadData() }
     }
-
-    private func loadData() async {
-        let context = appState.modelContainer.mainContext
-        let ideaRepo = IdeaRepository(modelContext: context)
-        let projectRepo = ProjectRepository(modelContext: context)
-        let dailyTaskRepo = DailyTaskRepository(modelContext: context)
-        let sessionLogRepo = SessionLogRepository(modelContext: context)
-        let summaryRepo = SummaryRepository(modelContext: context)
-        let arrangementRepo = ProjectArrangementRepository(modelContext: context)
-        let aiService = appState.makeAIService()
-        let thoughtRepo = ThoughtRepository(modelContext: context)
-
-        let dayMgr = DayManager(
-            ideaRepo: ideaRepo,
-            projectRepo: projectRepo,
-            dailyTaskRepo: dailyTaskRepo,
-            summaryRepo: summaryRepo,
-            sessionLogRepo: sessionLogRepo,
-            arrangementRepo: arrangementRepo,
-            timerEngine: appState.timerEngine,
-            aiService: aiService
-        )
-        let taskMgr = TaskManager(
-            ideaRepo: ideaRepo,
-            projectRepo: projectRepo,
-            dailyTaskRepo: dailyTaskRepo,
-            thoughtRepo: thoughtRepo,
-            sessionLogRepo: sessionLogRepo,
-            arrangementRepo: arrangementRepo,
-            aiService: aiService,
-            timerEngine: appState.timerEngine
-        )
-
-        do {
-            summary = try await dayMgr.fetchSummary(date: date)
-            tasks = try dailyTaskRepo.fetchAllTasks(date: date)
-                .sorted { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
-        } catch {
-            print("加载历史详情失败：\(error)")
-        }
-
-        for task in tasks {
-            let sourceLookup = await taskMgr.fetchTaskSourceLookup(task: task)
-            if let idea = sourceLookup.idea {
-                sourceIdeas[idea.id] = idea
-            }
-            if let project = sourceLookup.project {
-                sourceProjects[project.id] = project
-            }
-        }
-
-        isLoading = false
-    }
-
-    // MARK: - Grade Card
 
     private func gradeCard(_ summary: DailySummaryEntity) -> some View {
         let grade = summary.gradeEnum
@@ -167,8 +145,6 @@ private struct HistoryDetailPageView: View {
             .frame(maxWidth: .infinity)
         }
     }
-
-    // MARK: - Evaluation Card
 
     private func evaluationCard(_ summary: DailySummaryEntity) -> some View {
         DetailSectionCard(
@@ -209,8 +185,6 @@ private struct HistoryDetailPageView: View {
         }
     }
 
-    // MARK: - Tasks Card
-
     private var tasksCard: some View {
         DetailSectionCard(
             title: "必做项",
@@ -220,11 +194,11 @@ private struct HistoryDetailPageView: View {
             border: Color.green.opacity(0.22)
         ) {
             VStack(alignment: .leading, spacing: 8) {
-                if tasks.isEmpty {
+                if detailState.tasks.isEmpty {
                     Text("当日无必做项").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
 
-                ForEach(tasks, id: \.id) { task in
+                ForEach(detailState.tasks, id: \.id) { task in
                     taskRow(task)
                 }
             }
@@ -279,7 +253,7 @@ private struct HistoryDetailPageView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if let ideaId = task.sourceIdeaId, let idea = sourceIdeas[ideaId] {
+            if let ideaId = task.sourceIdeaId, let idea = detailState.sourceIdeas[ideaId] {
                 HStack {
                     Spacer()
                     Button {
@@ -291,10 +265,14 @@ private struct HistoryDetailPageView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } else if let projectId = task.sourceProjectId, sourceProjects[projectId] != nil {
+            } else if let projectId = task.sourceProjectId, detailState.sourceProjects[projectId] != nil {
                 HStack {
                     Spacer()
-                    ProjectNavLink(ideaId: projectId, returnTo: .historyDetail(date))
+                    HoverTextButton("查看项目", color: .indigo, isEmphasized: true) {
+                        appState.historyDetailNeedsOffsetRestore = true
+                        appState.returnPage = .historyDetail(detailState.date)
+                        appState.currentPage = .projectDetail(projectId)
+                    }
                 }
             }
         }
@@ -304,8 +282,6 @@ private struct HistoryDetailPageView: View {
             : Color.orange.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
-
-    // MARK: - Idea Popup Card
 
     private func ideaPopupCard(_ idea: IdeaEntity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -356,8 +332,6 @@ private struct HistoryDetailPageView: View {
         )
         .shadow(color: .black.opacity(0.2), radius: 14, x: 0, y: 5)
     }
-
-    // MARK: - Helpers
 
     private func colorForPriority(_ priority: TaskPriority) -> Color {
         switch priority {
