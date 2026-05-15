@@ -1096,6 +1096,8 @@ private struct ArrangementRow: View {
     @State private var editingTitle = false
     @State private var editingMinutes = false
     @State private var editingDeadline = false
+    @State private var reviveHovered = false
+    @State private var deleteHovered = false
     @State private var draftTitle: String = ""
     @State private var draftMinutes: String = ""
     @State private var draftDeadline: String = ""
@@ -1218,9 +1220,16 @@ private struct ArrangementRow: View {
                     Button(action: onRevive) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 10))
+                            .padding(4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(reviveHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { reviveHovered = $0 }
                     .help("复活")
                 }
 
@@ -1228,9 +1237,16 @@ private struct ArrangementRow: View {
                     Button(action: onDelete) {
                         Image(systemName: "xmark")
                             .font(.system(size: 10))
+                            .padding(4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(deleteHovered ? Color.primary.opacity(0.08) : .clear)
+                    )
+                    .onHover { deleteHovered = $0 }
                     .help("删除")
                 }
             }
