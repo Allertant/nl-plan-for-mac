@@ -827,7 +827,6 @@ private struct ProjectDetailPageView: View {
             onUpdate: { content, minutes, deadline in
                 Task {
                     await viewModel.updateArrangement(arrangementId: item.id, content: content, estimatedMinutes: minutes, deadline: deadline)
-                    requestScrollRestore(.arrangements)
                 }
             },
             onDelete: { viewModel.requestDeleteArrangement(id: item.id) },
